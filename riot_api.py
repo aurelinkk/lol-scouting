@@ -48,3 +48,20 @@ def get_match_ids_by_puuid(puuid, count=20):
 
     print("Erreur :", response.text)
     return None
+
+def get_match_by_id(match_id):
+    url = f"https://europe.api.riotgames.com/lol/match/v5/matches/{match_id}"
+
+    headers = {
+        "X-Riot-Token": API_KEY
+    }
+
+    response = requests.get(url, headers=headers)
+
+    print("Match details status :", response.status_code)
+
+    if response.status_code == 200:
+        return response.json()
+
+    print("Erreur :", response.text)
+    return None
