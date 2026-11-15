@@ -16,6 +16,11 @@ Les stats @15 et first blood viennent d'Oracle's Elixir : télécharger les CSV
 sur oracleselixir.com/tools/downloads et les placer dans `data/oracles/`
 (`python oracles.py 2026` vérifie la couverture).
 
+Âges : Leaguepedia n'a pas la date de naissance de beaucoup de joueurs d'ERL.
+`python missing_ages.py` liste les joueurs classés sans âge (du mieux classé au
+moins bien) ; compléter `birthdates.csv` (`player,birthdate,source`), puis
+relancer `python export_web.py`.
+
 Pour accélérer Leaguepedia, mettre un bot password dans `.env` :
 `LEAGUEPEDIA_USER` et `LEAGUEPEDIA_PASSWORD`.
 
@@ -28,6 +33,7 @@ Pour accélérer Leaguepedia, mettre un bot password dans `.env` :
 | `promotions.py` | Qui est monté (ERL2→ERL1, ERL1→LEC) et son profil l'année d'avant |
 | `league_strength.py` | Coefficient des ligues d'après les placements à l'EMEA Masters |
 | `scoring.py` | Tous les poids du score (à ajuster) |
+| `missing_ages.py` | Joueurs classés sans date de naissance, à compléter dans `birthdates.csv` |
 | `leagues.py` | Ligues suivies par saison et leur niveau |
 
 ## Site web (Vercel)

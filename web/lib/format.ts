@@ -8,6 +8,8 @@ export const STAT_LABELS: Record<StatKey, string> = {
   dpm: "DMG/min",
   kp: "Kill participation",
   dmg_share: "DMG %",
+  dpm_vs_champ: "DMG/min vs champion",
+  dmg_share_vs_champ: "DMG % vs champion",
   gold_share: "Gold %",
   vision_min: "Vision/min",
   deaths_pg: "Morts/partie",
@@ -22,10 +24,11 @@ export const STAT_LABELS: Record<StatKey, string> = {
 };
 
 const PERCENT: StatKey[] = ["winrate", "kp", "dmg_share", "gold_share", "ahead_cs15", "fb_part", "fb_victim"];
-const SIGNED: StatKey[] = ["csd15", "gd15", "xpd15"];
+const SIGNED: StatKey[] = ["csd15", "gd15", "xpd15", "dpm_vs_champ"];
 
 export function fmtStat(stat: StatKey, value: number | undefined | null): string {
   if (value === undefined || value === null || Number.isNaN(value)) return "–";
+  if (stat === "dmg_share_vs_champ") return `${value > 0 ? "+" : ""}${(value * 100).toFixed(1)} %`;
   if (PERCENT.includes(stat)) return `${(value * 100).toFixed(1)} %`;
   if (SIGNED.includes(stat)) return `${value > 0 ? "+" : ""}${Math.round(value)}`;
   if (Math.abs(value) >= 100) return Math.round(value).toString();

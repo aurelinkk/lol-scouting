@@ -17,42 +17,52 @@ prospects.py. Aucun retéléchargement n'est nécessaire.
 #   kda, cs_min, gold_min, dpm (dégâts/min), kp (participation aux kills),
 #   dmg_share (% des dégâts de l'équipe), gold_share (% du gold de l'équipe),
 #   vision_min, deaths_pg, assists_pg (par partie), winrate, champions
+#   dmg_share_vs_champ / dpm_vs_champ : dégâts comparés à la moyenne des joueurs
+#     du même poste sur le même champion (un mid Orianna n'est pas comparé à LeBlanc)
 #
 # Stats avancées (Oracle's Elixir, seulement si le CSV est dans data/oracles/
 # et que la ligue y est couverte ; sinon la stat est ignorée pour ce joueur) :
 #   csd15 / gd15 / xpd15 : écart de CS / gold / XP avec l'adversaire direct à 15 min
 #   ahead_cs15 : % de parties avec plus de CS que l'adversaire direct à 15 min
 #   fb_part : % de first blood (kill ou assist) ; fb_victim : % de first blood subi
+#
+# Principes des poids actuels :
+#   - la phase de lane (@15) pèse le plus : elle dépend le moins de l'équipe
+#   - les dégâts sont comparés au champion joué et pèsent moins
+#   - le winrate pèse peu : il reflète surtout le niveau de l'équipe
 
 ROLE_WEIGHTS = {
     "Top": {
-        "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5, "dpm": 1.0, "dmg_share": 1.0,
-        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
-        "csd15": 1.0, "gd15": 1.0, "xpd15": 1.0, "ahead_cs15": 0.5,
+        "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5,
+        "dpm_vs_champ": 0.5, "dmg_share_vs_champ": 0.5,
+        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.25,
+        "csd15": 1.5, "gd15": 1.5, "xpd15": 1.5, "ahead_cs15": 0.5,
         "fb_part": 0.25, "fb_victim": -0.5,
     },
     "Jungle": {
-        "kda": 1.0, "cs_min": 0.5, "gold_min": 0.5, "dpm": 0.5, "kp": 1.0,
-        "vision_min": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
-        "csd15": 0.5, "gd15": 1.0, "xpd15": 1.0,
+        "kda": 1.0, "cs_min": 0.5, "gold_min": 0.5, "dpm_vs_champ": 0.5, "kp": 1.0,
+        "vision_min": 0.5, "deaths_pg": -0.5, "winrate": 0.25,
+        "csd15": 0.5, "gd15": 1.5, "xpd15": 1.5,
         "fb_part": 1.0, "fb_victim": -0.5,
     },
     "Mid": {
-        "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5, "dpm": 1.0, "dmg_share": 1.0,
-        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
-        "csd15": 1.0, "gd15": 1.0, "xpd15": 1.0, "ahead_cs15": 0.5,
+        "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5,
+        "dpm_vs_champ": 0.5, "dmg_share_vs_champ": 0.5,
+        "gold_share": 0.5, "kp": 0.75, "deaths_pg": -0.5, "winrate": 0.25,
+        "csd15": 1.5, "gd15": 1.5, "xpd15": 1.5, "ahead_cs15": 0.5,
         "fb_part": 0.5, "fb_victim": -0.5,
     },
     "Bot": {
-        "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5, "dpm": 1.0, "dmg_share": 1.0,
-        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
-        "csd15": 1.0, "gd15": 1.0, "xpd15": 0.5, "ahead_cs15": 0.5,
+        "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5,
+        "dpm_vs_champ": 0.75, "dmg_share_vs_champ": 0.75,
+        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.25,
+        "csd15": 1.5, "gd15": 1.5, "xpd15": 1.0, "ahead_cs15": 0.5,
         "fb_part": 0.25, "fb_victim": -0.5,
     },
     "Support": {
         "kda": 1.0, "kp": 1.0, "vision_min": 1.0, "assists_pg": 0.5,
-        "deaths_pg": -0.5, "winrate": 0.5,
-        "gd15": 0.5, "xpd15": 0.5, "fb_part": 1.0, "fb_victim": -0.5,
+        "deaths_pg": -0.5, "winrate": 0.25,
+        "gd15": 0.5, "xpd15": 1.0, "fb_part": 1.0, "fb_victim": -0.5,
     },
 }
 
@@ -60,6 +70,7 @@ ROLE_WEIGHTS = {
 STAT_LABELS = {
     "winrate": "Win rate", "kda": "KDA", "cs_min": "CS/min", "gold_min": "Gold/min",
     "dpm": "DMG/min", "kp": "Kill participation", "dmg_share": "DMG %",
+    "dpm_vs_champ": "DMG/min vs champion", "dmg_share_vs_champ": "DMG % vs champion",
     "gold_share": "Gold %", "vision_min": "Vision/min", "deaths_pg": "Morts/partie",
     "assists_pg": "Assists/partie", "champions": "Champions joués",
     "csd15": "CS diff @15", "gd15": "Gold diff @15", "xpd15": "XP diff @15",

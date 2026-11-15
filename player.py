@@ -14,8 +14,8 @@ from prospects import add_game_metrics, aggregate, build_ranking, weighted_score
 from scoring import EM_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
 PERCENT_STATS = {"winrate", "kp", "dmg_share", "gold_share", "ahead_cs15",
-                 "fb_part", "fb_victim"}
-SIGNED_STATS = {"csd15", "gd15", "xpd15"}
+                 "fb_part", "fb_victim", "dmg_share_vs_champ"}
+SIGNED_STATS = {"csd15", "gd15", "xpd15", "dpm_vs_champ", "dmg_share_vs_champ"}
 LOWER_IS_BETTER = {"deaths_pg", "fb_victim"}
 
 
@@ -23,7 +23,8 @@ def fmt(stat, value):
     if pd.isna(value):
         return "-"
     if stat in PERCENT_STATS:
-        return f"{100 * value:.1f} %"
+        sign = "+" if stat in SIGNED_STATS and value > 0 else ""
+        return f"{sign}{100 * value:.1f} %"
     if stat in SIGNED_STATS:
         return f"{value:+.0f}"
     if abs(value) >= 100:

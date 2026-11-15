@@ -15,6 +15,7 @@ const STAT_COLUMNS: { key: StatKey; label: string; oe?: boolean }[] = [
   { key: "gold_min", label: "Gold/m" },
   { key: "dpm", label: "DMG/m" },
   { key: "dmg_share", label: "DMG%" },
+  { key: "dmg_share_vs_champ", label: "DMG% vs champ" },
   { key: "kp", label: "KP" },
   { key: "csd15", label: "CSD@15", oe: true },
   { key: "gd15", label: "GD@15", oe: true },
@@ -36,6 +37,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
   const [minGames, setMinGames] = useState<string>("10");
   const [search, setSearch] = useState("");
   const [includeLec, setIncludeLec] = useState(false);
+  const [unknownAge, setUnknownAge] = useState(true);
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "final", desc: true });
   const [limit, setLimit] = useState(PAGE);
 
@@ -62,7 +64,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
         (!role || r.role === role) &&
         (!tier || r.tier === tier) &&
         (!league || r.league_code === league) &&
-        (age === null || (r.age !== undefined && r.age <= age)) &&
+        (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
         (includeLec || !r.played_lec) &&
         (!q || r.name.toLowerCase().includes(q) || r.team.toLowerCase().includes(q)),
@@ -77,9 +79,12 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
       return (va - vb) * dir;
     });
     return out;
-  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, sort]);
+  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, sort]);
 
-  useEffect(() => setLimit(PAGE), [season, role, tier, league, maxAge, minGames, search, includeLec, sort]);
+  useEffect(
+    () => setLimit(PAGE),
+    [season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, sort],
+  );
 
   const columns = STAT_COLUMNS.filter((c) => hasOe || !c.oe);
 
@@ -165,10 +170,16 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-        <label className="flex items-center gap-2 pb-2 text-sm text-ink-2">
-          <input type="checkbox" checked={includeLec} onChange={(e) => setIncludeLec(e.target.checked)} />
-          Inclure les joueurs passés par la LEC
-        </label>
+        <div className="flex flex-col gap-1 pb-1 text-sm text-ink-2">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={includeLec} onChange={(e) => setIncludeLec(e.target.checked)} />
+            Inclure les joueurs passés par la LEC
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={unknownAge} onChange={(e) => setUnknownAge(e.target.checked)} />
+            Garder les âges inconnus (filtre âge)
+          </label>
+        </div>
       </div>
 
       {error && <p className="text-sm text-critical">{error}</p>}

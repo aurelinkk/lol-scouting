@@ -34,6 +34,30 @@ def add_game_metrics(df):
     df["dmg_share"] = df["damage"] / team["damage"]
     df["gold_share"] = df["gold"] / team["gold"]
     df["kp"] = (df["kills"] + df["assists"]) / df["team_kills"].where(df["team_kills"] > 0)
+    return add_champion_adjusted(df)
+
+
+# Nombre minimum de parties sur un champion (à un poste) pour avoir une moyenne
+# fiable ; en dessous, on compare à la moyenne du poste
+MIN_CHAMPION_GAMES = 20
+
+
+def add_champion_adjusted(df):
+    """Dégâts comparés à la moyenne des joueurs du même poste sur le même champion.
+
+    Un mid qui joue Orianna ou Anivia fait naturellement moins de dégâts qu'un
+    mid LeBlanc : on mesure l'écart à ce qu'on attend du champion joué.
+    dmg_share_vs_champ = +0.03 -> 3 points de % de dégâts de plus que la moyenne
+    des joueurs sur ce champion à ce poste.
+    """
+    df["dpm_game"] = df["damage"] / df["duration_min"]
+    by_champ = df.groupby(["role", "champion"])
+    n = by_champ["game_id"].transform("count")
+    by_role = df.groupby("role")
+    for stat, out in (("dmg_share", "dmg_share_vs_champ"), ("dpm_game", "dpm_vs_champ")):
+        expected = by_champ[stat].transform("mean").where(n >= MIN_CHAMPION_GAMES,
+                                                          by_role[stat].transform("mean"))
+        df[out] = df[stat] - expected
     return df
 
 
@@ -58,6 +82,8 @@ def aggregate(df):
         "vision_min": totals["vision_score"] / totals["duration_min"],
         "kp": grouped["kp"].mean(),
         "dmg_share": grouped["dmg_share"].mean(),
+        "dmg_share_vs_champ": grouped["dmg_share_vs_champ"].mean(),
+        "dpm_vs_champ": grouped["dpm_vs_champ"].mean(),
         "gold_share": grouped["gold_share"].mean(),
         "champions": grouped["champion"].nunique(),
         "birthdate": grouped["birthdate"].first(),
@@ -172,6 +198,8 @@ def main():
                         help="saisons utilisées pour le coefficient de ligue")
     parser.add_argument("--min-games", type=int, default=10)
     parser.add_argument("--max-age", type=float, help="ex : 21 pour les moins de 21 ans")
+    parser.add_argument("--exclude-unknown-age", action="store_true",
+                        help="avec --max-age : retirer aussi les joueurs dont l'âge est inconnu")
     parser.add_argument("--role", choices=list(ROLE_WEIGHTS))
     parser.add_argument("--tier", nargs="+", help="ex : ERL1 ERL2")
     parser.add_argument("--top", type=int, default=10, help="joueurs affichés par rôle")
@@ -182,7 +210,12 @@ def main():
     ranking = ranking[~ranking["played_lec"]]
 
     if args.max_age:
-        ranking = ranking[ranking["age"] <= args.max_age]
+        # Âge inconnu : gardé par défaut (beaucoup de joueurs d'ERL n'ont pas de date
+        # de naissance sur Leaguepedia ; à compléter dans birthdates.csv)
+        keep = ranking["age"] <= args.max_age
+        if not args.exclude_unknown_age:
+            keep |= ranking["age"].isna()
+        ranking = ranking[keep]
     if args.role:
         ranking = ranking[ranking["role"] == args.role]
     if args.tier:

@@ -7,7 +7,8 @@ import { fmtStat, STAT_LABELS } from "@/lib/format";
 import type { EvolutionPoint, PlayerLine, StatKey } from "@/lib/types";
 
 const ORDER: StatKey[] = [
-  "winrate", "kda", "cs_min", "gold_min", "dpm", "dmg_share", "gold_share", "kp",
+  "winrate", "kda", "cs_min", "gold_min", "dpm", "dpm_vs_champ", "dmg_share", "dmg_share_vs_champ",
+  "gold_share", "kp",
   "vision_min", "deaths_pg", "assists_pg", "champions",
   "csd15", "gd15", "xpd15", "ahead_cs15", "fb_part", "fb_victim",
 ];

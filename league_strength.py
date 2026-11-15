@@ -124,6 +124,26 @@ def load_season(season):
     df["season"] = season
     df["league_code"] = df["league"].map(lambda l: config.get(l, (l, "?"))[0])
     df["tier"] = df["league"].map(lambda l: config.get(l, (l, "?"))[1])
+    return apply_birthdates(df)
+
+
+BIRTHDATES_FILE = "birthdates.csv"
+
+
+def apply_birthdates(df):
+    """Complète / corrige les dates de naissance avec birthdates.csv (saisie manuelle).
+
+    Leaguepedia n'a pas la date de naissance de beaucoup de joueurs d'ERL.
+    La date saisie à la main est prioritaire sur celle de Leaguepedia.
+    """
+    if not os.path.exists(BIRTHDATES_FILE):
+        return df
+    manual = pd.read_csv(BIRTHDATES_FILE, parse_dates=["birthdate"])
+    dates = dict(zip(manual["player"], manual["birthdate"]))
+    override = df["player"].map(dates)
+    if "player_link" in df:
+        override = override.fillna(df["player_link"].map(dates))
+    df["birthdate"] = override.fillna(df["birthdate"])
     return df
 
 

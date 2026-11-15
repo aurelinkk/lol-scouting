@@ -37,7 +37,7 @@ export default function Dashboard() {
   const lastPromo = promotions[promotions.length - 1];
 
   const prospects = rankings.filter(
-    (r) => r.season === season && !r.played_lec && r.age !== undefined && r.age <= MAX_AGE && r.games >= MIN_GAMES,
+    (r) => r.season === season && !r.played_lec && (r.age === undefined || r.age <= MAX_AGE) && r.games >= MIN_GAMES,
   );
 
   const leagueBars = leagues
@@ -105,7 +105,7 @@ export default function Dashboard() {
 
       <Card
         title={`Meilleurs prospects ${season} — ${MAX_AGE} ans ou moins`}
-        subtitle={`Hors joueurs passés par la LEC, au moins ${MIN_GAMES} parties. Score = perf. dans sa ligue + niveau de la ligue + EMEA Masters.`}
+        subtitle={`Hors joueurs passés par la LEC, au moins ${MIN_GAMES} parties. « âge ? » = date de naissance inconnue (à compléter dans birthdates.csv). Score = perf. dans sa ligue + niveau de la ligue + EMEA Masters.`}
       >
         <div className="grid gap-4 md:grid-cols-5">
           {ROLES.map((role) => (
@@ -129,7 +129,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-1 text-xs text-ink-3">
                             <TeamLogo team={p.team} src={p.logo} size={14} />
                             <span className="truncate">
-                              {p.league_code} · {p.age} ans
+                              {p.league_code} · {p.age !== undefined ? `${p.age} ans` : "âge ?"}
                             </span>
                           </div>
                         </div>
