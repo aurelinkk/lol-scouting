@@ -14,7 +14,7 @@ import os
 import pandas as pd
 
 from leaguepedia import cargo_query
-from leagues import LEAGUES
+from leagues import leagues_for
 
 FIELDS = {
     # Partie
@@ -69,7 +69,6 @@ def fetch_league(league, year):
         return df
 
     df = df[[c for c in FIELDS.values() if c in df.columns]].copy()
-    df["tier"] = LEAGUES.get(league, "?")
     return df
 
 
@@ -114,11 +113,24 @@ def main():
                         help="Retélécharger même les ligues déjà en cache")
     args = parser.parse_args()
 
-    leagues = [args.league] if args.league else list(LEAGUES)
+    config = leagues_for(args.year)
+    leagues = [args.league] if args.league else list(config)
 
-    frames = [fetch_league_cached(league, args.year, args.refresh) for league in leagues]
+    frames = []
+    for league in leagues:
+        df = fetch_league_cached(league, args.year, args.refresh)
+        if df.empty:
+            continue
+        # Code stable et niveau : ajoutés ici (pas dans le cache) pour
+        # pouvoir corriger leagues.py sans retélécharger
+        code, tier = config.get(league, (league, "?"))
+        df = df.drop(columns=["tier"], errors="ignore")
+        df["league_code"] = code
+        df["tier"] = tier
+        df["season"] = args.year
+        frames.append(df)
 
-    data = pd.concat([f for f in frames if not f.empty], ignore_index=True)
+    data = pd.concat(frames, ignore_index=True)
     data = clean(data)
 
     os.makedirs("data", exist_ok=True)
