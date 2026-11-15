@@ -25,7 +25,7 @@ import re
 import pandas as pd
 
 from leaguepedia import cargo_query
-from scoring import ERL2_DISCOUNT, ERL2_PARENT, SHRINK_APPEARANCES
+from scoring import ERL2_DISCOUNT, ERL2_PARENT, EXCLUDED_EM_TEAMS, SHRINK_APPEARANCES
 
 
 def fetch_em_results(seasons, refresh=False):
@@ -82,7 +82,8 @@ def team_leagues(games):
 
 
 def league_coefficients(games, seasons, verbose=False):
-    results = edition_percentiles(fetch_em_results(seasons))
+    em = fetch_em_results(seasons)
+    results = edition_percentiles(em[~em["team"].isin(EXCLUDED_EM_TEAMS)])
     results = results.merge(team_leagues(games), on=["season", "team"], how="left")
 
     unmatched = results[results["league_code"].isna()]

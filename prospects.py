@@ -19,6 +19,7 @@ import argparse
 import pandas as pd
 
 from league_strength import league_coefficients, load_games
+from oracles import OE_STATS, normalize_name, player_oe_stats
 from scoring import (EM_MIN_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
                      MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS)
 
@@ -66,7 +67,43 @@ def aggregate(df):
 
     # Âge au moment de la dernière partie de la saison
     stats["age"] = ((stats["last_game"] - stats["birthdate"]).dt.days / 365.25).round(1)
-    return stats
+    return add_oe_stats(stats)
+
+
+def add_oe_stats(stats):
+    """Ajoute les stats @15 / first blood d'Oracle's Elixir quand elles existent."""
+    frames = [player_oe_stats(s) for s in stats["season"].unique()]
+    frames = [f for f in frames if f is not None]
+    if not frames:
+        for col in OE_STATS + ["oe_games"]:
+            stats[col] = float("nan")
+        return stats
+    oe = pd.concat(frames, ignore_index=True)
+    stats["name_key"] = stats["player"].map(normalize_name)
+    stats = stats.merge(oe, on=["season", "name_key", "role"], how="left")
+    return stats.drop(columns="name_key")
+
+
+def zscores(group, role):
+    """z-score de chaque stat du rôle, par rapport au groupe (même poste, même ligue)."""
+    z = {}
+    for stat, weight in ROLE_WEIGHTS[role].items():
+        if weight == 0 or stat not in group:
+            continue
+        values = group[stat]
+        std = values.std()
+        if values.notna().sum() < MIN_PLAYERS_FOR_COMPARISON or not std or pd.isna(std):
+            continue  # stat absente pour cette ligue (ex : pas de données @15)
+        z[stat] = (values - values.mean()) / std
+    return pd.DataFrame(z, index=group.index)
+
+
+def weighted_score(z, role):
+    """Moyenne pondérée des z-scores ; une stat manquante pour un joueur est ignorée."""
+    weights = pd.Series({s: ROLE_WEIGHTS[role][s] for s in z.columns})
+    contributions = z * weights
+    used_weight = z.notna().mul(weights.abs()).sum(axis=1)
+    return contributions.sum(axis=1) / used_weight.where(used_weight > 0)
 
 
 def weighted_zscores(stats, group_keys):
@@ -77,15 +114,9 @@ def weighted_zscores(stats, group_keys):
         role = group["role"].iloc[0]
         if role not in ROLE_WEIGHTS or len(group) < MIN_PLAYERS_FOR_COMPARISON:
             continue
-        total, weight_sum = 0, 0
-        for stat, weight in ROLE_WEIGHTS[role].items():
-            std = group[stat].std()
-            if weight == 0 or not std or pd.isna(std):
-                continue
-            total = total + weight * (group[stat] - group[stat].mean()) / std
-            weight_sum += abs(weight)
-        if weight_sum:
-            stats.loc[group.index, "score"] = total / weight_sum
+        z = zscores(group, role)
+        if not z.empty:
+            stats.loc[group.index, "score"] = weighted_score(z, role)
     return stats
 
 
