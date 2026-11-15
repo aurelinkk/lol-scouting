@@ -12,6 +12,7 @@ const NAV = [
   { href: "/", label: "Indicateurs" },
   { href: "/donnees", label: "Données" },
   { href: "/montees", label: "Montées" },
+  { href: "/rosters", label: "Rosters" },
   { href: "/ladder", label: "Ladder" },
 ];
 
@@ -25,12 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="whitespace-nowrap text-base font-bold tracking-tight">
               LoL Scouting
             </Link>
-            <nav className="flex gap-1 text-sm">
+            <nav className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 text-sm [scrollbar-width:none]">
               {NAV.map((n) => (
                 <Link
                   key={n.href}
                   href={n.href}
-                  className="rounded-md px-2 py-1.5 text-ink-2 hover:bg-surface-2 hover:text-ink sm:px-3"
+                  className="shrink-0 rounded-md px-2 py-1.5 text-ink-2 hover:bg-surface-2 hover:text-ink sm:px-3"
                 >
                   {n.label}
                 </Link>

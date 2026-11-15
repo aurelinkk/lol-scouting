@@ -24,3 +24,18 @@ export const getRankings = (): RankingRow[] => {
 };
 
 export const getPlayer = (id: string): Player | undefined => getPlayers()[id];
+
+export interface MercatoSlot {
+  role: string;
+  before: { name: string; id?: string; photo?: string } | null;
+  after: { name: string; id?: string; photo?: string } | null;
+}
+export interface Mercato {
+  season: number;
+  teams: { league: string; team: string; logo?: string; slots: MercatoSlot[] }[];
+}
+
+export const getMercato = (): Mercato | null => {
+  const file = path.join(process.cwd(), "data", "mercato.json");
+  return fs.existsSync(file) ? read<Mercato>("data", "mercato.json") : null;
+};

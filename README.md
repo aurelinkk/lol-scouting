@@ -37,6 +37,14 @@ Lancer `snapshot` une fois par semaine : les évolutions (LP et parties sur 7 / 
 jours) montrent qui grind. Les comptes des pros viennent de Leaguepedia ; pour
 en ajouter ou corriger, `soloq_accounts.csv` (`player,riot_id`).
 
+## Rosters et mercato
+
+L'onglet Rosters montre les effectifs LEC + ERL1 depuis 2023 (d'après les
+parties jouées). Le mercato de la saison suivante se saisit à la main dans
+`rosters_2027.csv` (`league,team,role,player_2026,player_2027`, case vide = pas
+encore annoncé) ; il sert aussi aux montées 2026 → 2027. On peut y ajouter des
+lignes pour les ERL1 (ex : `LFL,Karmine Corp Blue,Mid,...`).
+
 ## Scripts d'analyse
 
 | Script | Rôle |
@@ -49,6 +57,8 @@ en ajouter ou corriger, `soloq_accounts.csv` (`player,riot_id`).
 | `missing_ages.py` | Joueurs classés sans date de naissance, à compléter dans `birthdates.csv` |
 | `leagues.py` | Ligues suivies par saison et leur niveau |
 | `soloq.py` | Ladder EUW, lien avec les pros, profil des non-pros |
+| `careers.py` | Carrière : périodes en club, titres, récompenses individuelles |
+| `rosters.py` | Effectifs par split, mercato saisi à la main |
 | `player_overrides.csv` | Corriger l'identité d'un joueur mal rattaché par Leaguepedia |
 
 ## Site web (Vercel)

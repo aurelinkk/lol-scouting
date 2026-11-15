@@ -17,7 +17,9 @@ import unicodedata
 
 import pandas as pd
 
+from careers import fetch_awards, fetch_titles, level_totals, stints, titles_by_player
 from images import get_image_urls
+from rosters import ROLES as ROSTER_ROLES, build_rosters, load_mercato, mercato_file, resolve_name
 from league_strength import available_seasons, coef_window, league_coefficients, load_games
 from leagues import LEAGUES
 from promotions import compute_promotions, hit_rates
@@ -170,7 +172,11 @@ def main():
 
     # --- Montées entre saisons consécutives ------------------------------
     promos = []
-    for s_from, s_to in zip(seasons, seasons[1:]):
+    pairs = list(zip(seasons, seasons[1:]))
+    # Saison suivante pas encore jouée mais mercato saisi : montées prévues
+    if os.path.exists(mercato_file(max(seasons) + 1)):
+        pairs.append((max(seasons), max(seasons) + 1))
+    for s_from, s_to in pairs:
         merged = compute_promotions(games, s_from, s_to)
         moved = merged[(merged["new_level"] == "LEC")
                        | ((merged["tier"] == "ERL2") & (merged["new_level"] == "ERL1"))]
@@ -180,9 +186,11 @@ def main():
             "players": [
                 {**record(r, ["role", "age", "team", "league_code", "tier", "games",
                               "final", "role_percentile", "tier_percentile", "em_games",
-                              "em_score", "winrate", "kda", "dpm", "new_level", "new_team"]),
+                              "em_score", "winrate", "kda", "dpm", "new_level", "new_team",
+                              "from_team", "from_league", "from_season"]),
                  "id": ids[r["player"]], "name": r["player"],
                  "photo": photos.get(r["player"]), "logo": logos.get(r["team"]),
+                 "from_logo": logos.get(r["from_team"]),
                  "new_logo": logos.get(r["new_team"])}
                 for _, r in moved.sort_values("final", ascending=False).iterrows()
             ],
@@ -198,6 +206,36 @@ def main():
                       damage=("damage", "sum"), minutes=("duration_min", "sum"),
                       kp=("kp", "mean"), dmg_share=("dmg_share", "mean"))
                  .reset_index())
+
+    # Carrière : périodes en club, titres, récompenses individuelles
+    st = stints(games)
+    st_by = {p: g for p, g in st.groupby("player")}
+    lv_by = {p: g for p, g in level_totals(st).groupby("player")}
+    tt = titles_by_player(games, fetch_titles(seasons))
+    tt_by = {p: g for p, g in tt.groupby("player")}
+    aw = fetch_awards()
+    aw_by = {p: g for p, g in aw.groupby("player")}
+
+    def career(player):
+        out = {"stints": [], "levels": {}, "titles": [], "awards": []}
+        if player in st_by:
+            out["stints"] = [
+                {**record(r, ["team", "league_code", "tier", "role", "games", "wins", "em_games"]),
+                 "start": clean(r["start"]), "end": clean(r["end"]), "logo": logos.get(r["team"])}
+                for _, r in st_by[player].iterrows()]
+        if player in lv_by:
+            out["levels"] = {r["tier"]: {"games": int(r["games"]), "days": int(r["days"])}
+                             for _, r in lv_by[player].iterrows()}
+        if player in tt_by:
+            out["titles"] = [
+                {**record(r, ["tournament", "team", "league_code", "tier", "season"]),
+                 "date": clean(r["date"]), "logo": logos.get(r["team"])}
+                for _, r in tt_by[player].iterrows()]
+        if player in aw_by:
+            out["awards"] = [
+                {**record(r, ["award", "tournament", "team", "season", "league"])}
+                for _, r in aw_by[player].sort_values("season").iterrows()]
+        return out
 
     today = pd.Timestamp(datetime.date.today())
     players = {}
@@ -226,6 +264,7 @@ def main():
             "scores": [{k: v for k, v in scores[(s, player)].items()
                         if k not in ("name", "photo", "id") and v is not None}
                        for s in seasons if (s, player) in scores],
+            "career": career(player),
             "evolution": [
                 {"season": int(e["season"]), "tournament": e["tournament"],
                  "league_code": e["league_code"], "tier": e["tier"], "role": e["role"],
@@ -258,6 +297,45 @@ def main():
                     rec["pro_team"] = current_team.get(r["pro"])
             rows.append(rec)
         write("ladder.json", {"date": ladder["snapshot_date"].iloc[0], "rows": rows}, PUBLIC_DIR)
+
+    # --- Rosters (LEC + ERL1, d'après les parties jouées) -------------------
+    rc = build_rosters(games)
+    roster_list = []
+    for (season, code, tournament), grp in rc.groupby(["season", "league_code", "tournament"]):
+        teams = []
+        for team, tg in grp.groupby("team"):
+            tg = tg.sort_values("games", ascending=False)
+            teams.append({"team": team, "logo": logos.get(team), "players": [
+                {"id": ids.get(r["player"]), "name": r["player"], "role": r["role"],
+                 "games": int(r["games"]), "photo": photos.get(r["player"])}
+                for _, r in tg.iterrows()]})
+        roster_list.append({"season": int(season), "league_code": code,
+                            "tier": grp["tier"].iloc[0], "tournament": tournament,
+                            "start": clean(grp["start"].min()),
+                            "teams": sorted(teams, key=lambda t: t["team"].lower())})
+    write("rosters.json", sorted(roster_list, key=lambda r: (r["season"], r["start"])), PUBLIC_DIR)
+
+    # --- Mercato de la saison suivante (rosters_<saison>.csv) ------------------
+    next_season = max(seasons) + 1
+    mercato = load_mercato(next_season)
+    if mercato is not None:
+        before_col, after_col = f"player_{next_season - 1}", f"player_{next_season}"
+
+        def slot(name):
+            if not name:
+                return None
+            pid = resolve_name(name, games)
+            return {"name": name, "id": ids.get(pid) if pid else None,
+                    "photo": photos.get(pid) if pid else None}
+
+        teams = []
+        for (league, team), grp in mercato.groupby(["league", "team"], sort=False):
+            teams.append({"league": league, "team": team, "logo": logos.get(team), "slots": [
+                {"role": r["role"], "before": slot(r[before_col]), "after": slot(r[after_col])}
+                for _, r in grp.iterrows()]})
+        write("mercato.json", {"season": next_season, "teams": teams})
+    elif os.path.exists(os.path.join(OUT_DIR, "mercato.json")):
+        os.remove(os.path.join(OUT_DIR, "mercato.json"))
 
     # --- Méta ------------------------------------------------------------
     write("meta.json", {

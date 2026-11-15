@@ -8,10 +8,13 @@ import type { Promotion, PromotionPlayer } from "@/lib/types";
 export const metadata = { title: "Montées · LoL Scouting" };
 
 function Move({ p }: { p: PromotionPlayer }) {
+  const from = p.from_team ?? p.team;
   return (
     <span className="flex items-center gap-1.5 whitespace-nowrap text-sm">
-      <TeamLogo team={p.team} src={p.logo} size={18} />
-      <span className="max-w-36 truncate text-ink-2">{p.team}</span>
+      <TeamLogo team={from} src={p.from_logo ?? p.logo} size={18} />
+      <span className="max-w-36 truncate text-ink-2" title={from !== p.team ? `Saison évaluée avec ${p.team}` : undefined}>
+        {from}
+      </span>
       <span className="text-ink-3">→</span>
       <TeamLogo team={p.new_team} src={p.new_logo} size={18} />
       <span className="max-w-36 truncate font-medium">{p.new_team}</span>
@@ -125,7 +128,15 @@ function PromotionSeason({ promo }: { promo: Promotion }) {
                       </div>
                       <Move p={p} />
                       <div className="text-xs text-ink-3">
-                        {p.league_code} · {p.age ? `${p.age} ans` : "âge ?"} · score{" "}
+                        {p.from_season !== undefined && p.from_season < promo.from && (
+                          <span>dernière saison en ERL : {p.from_season} · </span>
+                        )}
+                        {p.from_team && p.from_team !== p.team && (
+                          <span>
+                            évalué sur {p.league_code} {promo.from} ({p.team}) ·{" "}
+                          </span>
+                        )}
+                        {p.from_league ?? p.league_code} · {p.age ? `${p.age} ans` : "âge ?"} · score{" "}
                         <span className="font-semibold text-ink">{fmtScore(p.final)}</span> ·{" "}
                         {topPercent(p.tier_percentile)} · {p.em_games ? `${p.em_games} p. d'EM` : "pas d'EM"}
                       </div>
@@ -135,6 +146,7 @@ function PromotionSeason({ promo }: { promo: Promotion }) {
               </div>
             </section>
 
+            {erl.length > 0 && (
             <section className="rounded-lg border border-border bg-surface p-4">
               <h3 className="text-sm font-semibold">ERL2 → ERL1 · {erl.length} joueurs</h3>
               <p className="mb-3 mt-0.5 text-xs text-ink-3">
@@ -143,6 +155,7 @@ function PromotionSeason({ promo }: { promo: Promotion }) {
               </p>
               <PromotionTable players={erl} rankLabel={`Rang ERL2 ${promo.from}`} />
             </section>
+            )}
           </div>
         );
 }

@@ -79,6 +79,44 @@ export interface EvolutionPoint {
   dmg_share?: number;
 }
 
+export interface CareerStint {
+  team: string;
+  logo?: string;
+  league_code: string;
+  tier: string;
+  role?: string;
+  games: number;
+  wins?: number;
+  em_games?: number;
+  start: string;
+  end: string;
+}
+
+export interface CareerTitle {
+  tournament: string;
+  team: string;
+  logo?: string;
+  league_code: string;
+  tier: string;
+  season: number;
+  date: string;
+}
+
+export interface CareerAward {
+  award: string;
+  tournament?: string;
+  team?: string;
+  season?: number;
+  league?: string;
+}
+
+export interface Career {
+  stints: CareerStint[];
+  levels: Partial<Record<string, { games: number; days: number }>>;
+  titles: CareerTitle[];
+  awards: CareerAward[];
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -94,6 +132,7 @@ export interface Player {
   lines: PlayerLine[];
   scores: Omit<RankingRow, "id" | "name" | "photo">[];
   evolution: EvolutionPoint[];
+  career?: Career;
 }
 
 export interface League {
@@ -124,6 +163,12 @@ export interface PromotionPlayer {
   dpm: number;
   new_level: string;
   new_team: string;
+  /** Dernier club avant la montée (peut être en saison N+1) */
+  from_team?: string;
+  from_league?: string;
+  from_logo?: string;
+  /** Saison du profil évalué (N, ou N-1 s'il n'a pas joué en ERL en N) */
+  from_season?: number;
   photo?: string;
   logo?: string;
   new_logo?: string;

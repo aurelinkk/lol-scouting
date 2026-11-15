@@ -19,6 +19,12 @@
   --good-text: #006300;
   --critical: #d03b3b;
   --grid: #e9e8e4;
+  /* Niveaux de compétition */
+  --tier-lec: #eda100;
+  --tier-erl1: #2a78d6;
+  --tier-erl2: #eb6834;
+  --tier-em: #1baf7a;
+  --gold: #c98500;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,6 +46,11 @@
     --good-text: #4cc94c;
     --critical: #e66767;
     --grid: #2a2a28;
+    --tier-lec: #c98500;
+    --tier-erl1: #3987e5;
+    --tier-erl2: #d95926;
+    --tier-em: #199e70;
+    --gold: #eda100;
   }
 }
 
@@ -61,6 +72,11 @@
   --good-text: #4cc94c;
   --critical: #e66767;
   --grid: #2a2a28;
+  --tier-lec: #c98500;
+  --tier-erl1: #3987e5;
+  --tier-erl2: #d95926;
+  --tier-em: #199e70;
+  --gold: #eda100;
 }
 
 @theme inline {

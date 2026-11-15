@@ -54,7 +54,24 @@ def destination(games_next):
             .sort_values(["level", "first_game"])
             .drop_duplicates("player"))
     return best.rename(columns={"tier": "new_level", "team": "new_team"})[
-        ["player", "new_level", "new_team"]]
+        ["player", "new_level", "new_team", "first_game"]]
+
+
+def previous_club(games, promoted):
+    """Dernier club (hors EMEA Masters et tournois de promotion) avant la première
+    partie au nouveau niveau, en saison N ou en début de saison N+1.
+
+    Ex : Vladi = Nativz (NLC 2023) -> KC Blue (LFL, printemps 2024) -> Karmine Corp
+    (LEC, été 2024) : le club d'origine affiché est KC Blue.
+    """
+    order = {"LEC": 0, "ERL1": 1, "ERL2": 2}
+    g = games[games["tier"].isin(order)
+              & ~games["tournament"].str.contains(PROMOTION_PATTERN, case=False, na=False)]
+    g = g.merge(promoted[["player", "new_level", "first_game"]], on="player")
+    g = g[(g["date"] < g["first_game"]) & (g["tier"].map(order) > g["new_level"].map(order))]
+    last = g.sort_values("date").groupby("player").last()
+    return last[["team", "league_code", "tier"]].rename(columns={
+        "team": "from_team", "league_code": "from_league", "tier": "from_tier"}).reset_index()
 
 
 def summary(label, moved, percentile="role_percentile"):
@@ -80,8 +97,37 @@ def compute_promotions(games, season_from, season_to, coef_seasons=None, min_gam
     before = before[~before["played_lec"]].copy()
     before["tier_percentile"] = (before.groupby(["tier", "role"])["final"]
                                  .rank(pct=True).round(3))
-    after = destination(games[games["season"] == season_to])
-    return before.merge(after, on="player", how="left")
+    next_games = games[games["season"] == season_to]
+    if next_games.empty:
+        # Saison pas encore jouée : on utilise le mercato saisi à la main
+        from rosters import mercato_destination
+        after = mercato_destination(season_to, games)
+        if after is None:
+            raise SystemExit(f"Pas de parties ni de rosters_{season_to}.csv pour {season_to}")
+    else:
+        after = destination(next_games)
+    merged = before.merge(after, on="player", how="left")
+    merged["from_season"] = season_from
+
+    # Montés sans avoir joué en ERL la saison N (ex : Feisty, Zest pour 2027) :
+    # on prend leur profil de la saison N-1 s'ils ne sont pas passés par la LEC en N
+    missing = after[(after["new_level"] == "LEC") & ~after["player"].isin(before["player"])]
+    lec_n = set(games.loc[(games["season"] == season_from) & (games["tier"] == "LEC"), "player"])
+    missing = missing[~missing["player"].isin(lec_n)]
+    if not missing.empty and (games["season"] == season_from - 1).any():
+        prev = build_ranking(games, season_from - 1, coef_window(season_from - 1), min_games)
+        prev = prev[~prev["played_lec"]].copy()
+        prev["tier_percentile"] = prev.groupby(["tier", "role"])["final"].rank(pct=True).round(3)
+        prev = prev[prev["player"].isin(missing["player"])].merge(missing, on="player")
+        prev["from_season"] = season_from - 1
+        merged = pd.concat([merged, prev], ignore_index=True)
+
+    both = games[games["season"].isin([season_from - 1, season_from, season_to])]
+    merged = merged.merge(previous_club(both, after), on="player", how="left")
+    # Par défaut, l'équipe de la saison N
+    merged["from_team"] = merged["from_team"].fillna(merged["team"])
+    merged["from_league"] = merged["from_league"].fillna(merged["league_code"])
+    return merged
 
 
 def hit_rates(merged):

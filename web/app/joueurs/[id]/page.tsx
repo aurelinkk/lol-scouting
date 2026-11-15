@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar, TeamLogo } from "@/components/Images";
+import { CareerTimeline, LevelSummary, Trophies } from "@/components/Career";
+import { TIER_COLOR, TIER_NAME } from "@/lib/tiers";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
 import { getMeta, getPlayer, getRankings } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
@@ -39,6 +41,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   })();
 
   const scores = [...player.scores].sort((a, b) => b.season - a.season);
+  const career = player.career;
 
   return (
     <div className="space-y-6">
@@ -46,49 +49,100 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         ← Données
       </Link>
 
-      <header className="flex flex-col items-start gap-4 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:gap-5">
-        <Avatar name={player.name} src={player.photo} size={104} />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{pseudo}</h1>
-            {realName && <div className="text-sm text-ink-3">{realName}</div>}
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <TeamLogo team={player.team} src={player.logo} size={28} />
-            <span className="font-medium">{player.team}</span>
-            <span className="text-ink-3">
-              · {player.league_code} ({player.tier})
-            </span>
-          </div>
-          <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+      <header
+        className="relative overflow-hidden rounded-xl border border-border bg-surface"
+        style={{ borderTop: `4px solid ${TIER_COLOR[player.tier] ?? "var(--accent)"}` }}
+      >
+        {/* Logo du club en filigrane */}
+        {player.logo && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-6 -top-6 h-56 w-56 bg-contain bg-center bg-no-repeat opacity-[0.07]"
+            style={{ backgroundImage: `url("${player.logo}")` }}
+          />
+        )}
+        <div className="relative flex flex-col items-start gap-5 p-5 sm:flex-row sm:items-center">
+          <Avatar name={player.name} src={player.photo} size={128} />
+          <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <dt className="inline text-ink-3">Poste </dt>
-              <dd className="inline font-medium">{player.role}</dd>
-            </div>
-            <div>
-              <dt className="inline text-ink-3">Âge </dt>
-              <dd className="inline font-medium">
-                {player.age ? `${Math.floor(player.age)} ans` : "inconnu"}
-                {player.birthdate && <span className="text-ink-3"> (né le {player.birthdate})</span>}
-              </dd>
-            </div>
-            {player.country && (
-              <div>
-                <dt className="inline text-ink-3">Pays </dt>
-                <dd className="inline font-medium">{player.country}</dd>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-bold tracking-tight">{pseudo}</h1>
+                <span
+                  className="rounded px-2 py-0.5 text-xs font-semibold text-[#111]"
+                  style={{ background: TIER_COLOR[player.tier] ?? "var(--surface-2)" }}
+                >
+                  {player.league_code === player.tier
+                    ? player.league_code
+                    : `${player.league_code} · ${TIER_NAME[player.tier] ?? player.tier}`}
+                </span>
+                <span className="rounded border border-border px-2 py-0.5 text-xs font-medium">{player.role}</span>
               </div>
-            )}
-          </dl>
+              {realName && <div className="text-sm text-ink-3">{realName}</div>}
+            </div>
+            <div className="flex items-center gap-3">
+              <TeamLogo team={player.team} src={player.logo} size={40} />
+              <div>
+                <div className="font-semibold">{player.team}</div>
+                <div className="text-xs text-ink-3">Club actuel</div>
+              </div>
+            </div>
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              <div>
+                <dt className="inline text-ink-3">Âge </dt>
+                <dd className="inline font-medium">
+                  {player.age ? `${Math.floor(player.age)} ans` : "inconnu"}
+                  {player.birthdate && <span className="text-ink-3"> (né le {player.birthdate})</span>}
+                </dd>
+              </div>
+              {player.country && (
+                <div>
+                  <dt className="inline text-ink-3">Pays </dt>
+                  <dd className="inline font-medium">{player.country}</dd>
+                </div>
+              )}
+              <a
+                href={`https://lol.fandom.com/wiki/${encodeURIComponent(player.name.replace(/ /g, "_"))}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent hover:underline"
+              >
+                Page Leaguepedia ↗
+              </a>
+            </dl>
+          </div>
+          {career && (
+            <div className="grid grid-cols-3 gap-2 text-center sm:w-72">
+              <div className="rounded-lg bg-surface-2 p-2">
+                <div className="text-xl font-bold">{career.titles.length}</div>
+                <div className="text-[11px] text-ink-3">titres</div>
+              </div>
+              <div className="rounded-lg bg-surface-2 p-2">
+                <div className="text-xl font-bold">{career.awards.length}</div>
+                <div className="text-[11px] text-ink-3">récompenses</div>
+              </div>
+              <div className="rounded-lg bg-surface-2 p-2">
+                <div className="text-xl font-bold">{new Set(career.stints.map((s) => s.team)).size}</div>
+                <div className="text-[11px] text-ink-3">clubs</div>
+              </div>
+            </div>
+          )}
         </div>
-        <a
-          href={`https://lol.fandom.com/wiki/${encodeURIComponent(player.name.replace(/ /g, "_"))}`}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-accent hover:underline"
-        >
-          Page Leaguepedia ↗
-        </a>
       </header>
+
+      {career && career.stints.length > 0 && (
+        <Section title="Carrière">
+          <div className="space-y-5">
+            <LevelSummary career={career} />
+            <CareerTimeline career={career} />
+          </div>
+        </Section>
+      )}
+
+      {career && (
+        <Section title="Palmarès">
+          <Trophies career={career} />
+        </Section>
+      )}
 
       {scores.length > 0 && (
         <Section title="Score de prospect">
