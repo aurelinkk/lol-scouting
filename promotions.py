@@ -16,7 +16,7 @@ import argparse
 
 import pandas as pd
 
-from league_strength import load_games
+from league_strength import coef_window, load_games
 from prospects import build_ranking
 
 COLUMNS = ["player", "role", "age", "league_code", "tier", "team", "games",
@@ -24,25 +24,34 @@ COLUMNS = ["player", "role", "age", "league_code", "tier", "team", "games",
            "em_score", "em_games", "winrate", "new_level", "new_team"]
 
 
-# Une équipe ne compte comme équipe de LEC que si elle y a joué au moins ce
-# nombre de parties : exclut les équipes invitées (ex : LEC Versus 2026,
-# où Los Ratones et Karmine Corp Blue n'ont joué que 11 parties)
-MIN_LEC_TEAM_GAMES = 15
+# Une équipe ne compte comme équipe d'un niveau que si elle y a joué au moins
+# ce nombre de parties (hors tournois de promotion / relégation). Exclut :
+#  - les équipes invitées (LEC Versus 2026 : Los Ratones et KC Blue, 11 parties ;
+#    LFL Invitational : équipes d'ERL2) ;
+#  - les tournois de promotion rangés dans la ligue supérieure (PRM 1st
+#    Division Promotion avec des équipes d'ERL2).
+MIN_TEAM_GAMES = {"LEC": 15, "ERL1": 10, "ERL2": 10}
+PROMOTION_PATTERN = "Promotion|Relegation|Qualifier"
 
 
 def destination(games_next):
-    """Plus haut niveau atteint par chaque joueur en saison N+1."""
+    """Plus haut niveau atteint par chaque joueur en saison N+1, et le premier
+    club avec lequel il l'a atteint (le club qu'il a rejoint en montant).
+
+    Ex : Sayn 2026 = ERL1, BK ROG Esports (janvier), même s'il a ensuite joué
+    plus de parties avec FN Esports puis Verdant.
+    """
     order = {"LEC": 0, "ERL1": 1, "ERL2": 2}
     g = games_next[games_next["tier"].isin(order)].copy()
+    g = g[~g["tournament"].str.contains(PROMOTION_PATTERN, case=False, na=False)]
 
-    lec = g[g["tier"] == "LEC"]
-    lec_team_games = lec.groupby("team")["game_id"].nunique()
-    guests = set(lec_team_games[lec_team_games < MIN_LEC_TEAM_GAMES].index)
-    g = g[~((g["tier"] == "LEC") & g["team"].isin(guests))]
+    team_games = g.groupby(["tier", "team"])["game_id"].nunique().reset_index(name="n")
+    team_games["ok"] = team_games["n"] >= team_games["tier"].map(MIN_TEAM_GAMES)
+    g = g.merge(team_games[team_games["ok"]][["tier", "team"]], on=["tier", "team"])
 
-    best = (g.groupby(["player", "tier", "team"]).size().reset_index(name="n")
+    best = (g.groupby(["player", "tier", "team"])["date"].min().reset_index(name="first_game")
             .assign(level=lambda d: d["tier"].map(order))
-            .sort_values(["level", "n"], ascending=[True, False])
+            .sort_values(["level", "first_game"])
             .drop_duplicates("player"))
     return best.rename(columns={"tier": "new_level", "team": "new_team"})[
         ["player", "new_level", "new_team"]]
@@ -66,7 +75,8 @@ def compute_promotions(games, season_from, season_to, coef_seasons=None, min_gam
     Colonnes ajoutées : new_level / new_team (NaN si plus en ERL/LEC en N+1),
     tier_percentile (rang dans son rôle parmi les joueurs du même niveau en N).
     """
-    before = build_ranking(games, season_from, coef_seasons or [season_from], min_games)
+    # Coefficient de ligue sur les 2 ans qui précèdent la montée (pas d'info du futur)
+    before = build_ranking(games, season_from, coef_seasons or coef_window(season_from), min_games)
     before = before[~before["played_lec"]].copy()
     before["tier_percentile"] = (before.groupby(["tier", "role"])["final"]
                                  .rank(pct=True).round(3))
@@ -93,7 +103,7 @@ def main():
     parser.add_argument("--from", dest="season_from", type=int, default=2025)
     parser.add_argument("--to", dest="season_to", type=int, default=2026)
     parser.add_argument("--coef-seasons", type=int, nargs="+",
-                        help="par défaut : uniquement la saison de départ")
+                        help="par défaut : la saison de départ et la précédente")
     parser.add_argument("--min-games", type=int, default=10)
     args = parser.parse_args()
 

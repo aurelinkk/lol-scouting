@@ -18,7 +18,7 @@ import argparse
 
 import pandas as pd
 
-from league_strength import league_coefficients, load_games
+from league_strength import coef_window, league_coefficients, load_games
 from oracles import OE_STATS, attach_oe
 from scoring import (EM_MIN_GAMES, EM_SHRINK_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
                      MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS, SAMPLE_SHRINK_GAMES)
@@ -199,8 +199,8 @@ def build_ranking(games, season, coef_seasons, min_games=10):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", type=int, default=2026)
-    parser.add_argument("--coef-seasons", type=int, nargs="+", default=[2025, 2026],
-                        help="saisons utilisées pour le coefficient de ligue")
+    parser.add_argument("--coef-seasons", type=int, nargs="+",
+                        help="saisons du coefficient de ligue (défaut : la saison et la précédente)")
     parser.add_argument("--min-games", type=int, default=10)
     parser.add_argument("--max-age", type=float, help="ex : 21 pour les moins de 21 ans")
     parser.add_argument("--exclude-unknown-age", action="store_true",
@@ -211,7 +211,8 @@ def main():
     args = parser.parse_args()
 
     games = load_games([args.season])
-    ranking = build_ranking(games, args.season, args.coef_seasons, args.min_games)
+    ranking = build_ranking(games, args.season, args.coef_seasons or coef_window(args.season),
+                            args.min_games)
     ranking = ranking[~ranking["played_lec"]]
 
     if args.max_age:

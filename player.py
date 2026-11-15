@@ -9,7 +9,7 @@ import argparse
 
 import pandas as pd
 
-from league_strength import league_coefficients, load_games
+from league_strength import coef_window, league_coefficients, load_games
 from prospects import add_game_metrics, aggregate, build_ranking, weighted_score, zscores
 from scoring import EM_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
@@ -72,7 +72,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("name")
     parser.add_argument("--season", type=int, default=2026)
-    parser.add_argument("--coef-seasons", type=int, nargs="+", default=[2025, 2026])
+    parser.add_argument("--coef-seasons", type=int, nargs="+",
+                        help="défaut : la saison et la précédente")
     parser.add_argument("--min-games", type=int, default=10)
     args = parser.parse_args()
 
@@ -85,8 +86,9 @@ def main():
         print("Plusieurs joueurs correspondent :", ", ".join(sorted(rows["player"].unique())))
         raise SystemExit("Précise le nom exact.")
 
-    coefs = league_coefficients(load_games(args.coef_seasons), args.coef_seasons)
-    ranking = build_ranking(games, args.season, args.coef_seasons, args.min_games)
+    coef_seasons = args.coef_seasons or coef_window(args.season)
+    coefs = league_coefficients(load_games(coef_seasons), coef_seasons)
+    ranking = build_ranking(games, args.season, coef_seasons, args.min_games)
     pd.set_option("display.width", 200)
 
     for _, row in rows.sort_values("games", ascending=False).iterrows():
@@ -125,7 +127,7 @@ def main():
               f"{EM_WEIGHT * (0 if pd.isna(em) else em):+.2f}   "
               f"({'pas d EM' if pd.isna(em) else f'{r.em_score_raw:+.2f} réduit à {em:+.2f} pour {r.em_games} parties'})")
         print(f"  = FINAL                      {r['final']:+.2f}   "
-              f"(top {100 * (1 - r['role_percentile']):.0f} % des {r['role']} d'ERL)")
+              f"(top {max(1, round(100 * (1 - r['role_percentile'])))} % des {r['role']} d'ERL)")
         if r["played_lec"]:
             print("  (a joué en LEC cette saison : exclu du classement des prospects)")
 

@@ -31,6 +31,10 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   photo?: string;
   logo?: string;
   country?: string;
+  /** Club actuel (dernière partie, toutes saisons) */
+  current_team?: string;
+  current_logo?: string;
+  current_league?: string;
 }
 
 export interface PeerStat {

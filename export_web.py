@@ -1,7 +1,7 @@
 """Exporte les données calculées en JSON pour la web app (dossier web/data/).
 
 Usage :
-    python export_web.py                    # saisons 2025 et 2026
+    python export_web.py                    # toutes les saisons téléchargées
     python export_web.py --seasons 2025 2026
 
 À relancer après chaque fetch_pro.py, puis commit + push : Vercel redéploie
@@ -18,7 +18,7 @@ import unicodedata
 import pandas as pd
 
 from images import get_image_urls
-from league_strength import league_coefficients, load_games
+from league_strength import available_seasons, coef_window, league_coefficients, load_games
 from leagues import LEAGUES
 from promotions import compute_promotions, hit_rates
 from prospects import add_game_metrics, aggregate, build_ranking
@@ -102,9 +102,9 @@ def peer_percentiles(stats):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seasons", type=int, nargs="+", default=[2025, 2026])
+    parser.add_argument("--seasons", type=int, nargs="+", help="par défaut : toutes celles téléchargées")
     args = parser.parse_args()
-    seasons = sorted(args.seasons)
+    seasons = sorted(args.seasons or available_seasons())
 
     games = load_games(seasons)
     games = add_game_metrics(games)
@@ -123,7 +123,8 @@ def main():
     print("Export web :")
 
     # --- Coefficients de ligue -------------------------------------------
-    coefs = league_coefficients(games, seasons)
+    # Coefficient affiché : les 2 dernières saisons
+    coefs = league_coefficients(games, coef_window(max(seasons)))
     names = league_names()
     write("leagues.json", [
         {**names.get(code, {"code": code, "tier": "?", "names": {}}),
@@ -131,6 +132,11 @@ def main():
          "raw_mean": clean(r["raw_mean"])}
         for code, r in coefs.iterrows()
     ])
+
+    # Club actuel = club de la dernière partie (hors EMEA Masters), toutes saisons
+    club_games = games[games["tier"] != "EM"].sort_values("date")
+    current_team = club_games.groupby("player")["team"].last().to_dict()
+    current_league = club_games.groupby("player")["league_code"].last().to_dict()
 
     # --- Classements par saison --------------------------------------------
     rank_fields = ["season", "role", "team", "league_code", "tier", "age", "games",
@@ -140,12 +146,15 @@ def main():
     rankings = []
     scores = {}  # (season, player) -> détail du score
     for season in seasons:
-        ranking = build_ranking(games, season, seasons)
+        ranking = build_ranking(games, season, coef_window(season))
         for _, r in ranking.iterrows():
             rec = record(r, rank_fields)
             rec.update(id=ids[r["player"]], name=r["player"], played_lec=bool(r["played_lec"]))
+            cur = current_team.get(r["player"], r["team"])
             for key, value in (("photo", photos.get(r["player"])), ("logo", logos.get(r["team"])),
-                               ("country", clean(r.get("country")))):
+                               ("country", clean(r.get("country"))),
+                               ("current_team", cur), ("current_logo", logos.get(cur)),
+                               ("current_league", current_league.get(r["player"]))):
                 if value:
                     rec[key] = value
             rankings.append(rec)

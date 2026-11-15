@@ -97,6 +97,7 @@ ERL2_DISCOUNT = 0.30
 ERL2_PARENT = {
     "PRM2": "PRM", "LFL2": "LFL", "ES2": "ES", "HM2": "HM",
     "ROL2": "ROL", "HLL2": "HLL", "AL2": "AL",
+    "NLC2": "NLC", "RL2": "RL", "TCL2": "TCL", "LPLOL2": "LPLOL", "LIT2": "LIT",
 }
 
 # ---------------------------------------------------------------------------

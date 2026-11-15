@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Avatar, PlayerName, TeamLogo } from "@/components/Images";
+import SeasonTabs from "@/components/SeasonTabs";
 import { getPromotions } from "@/lib/data";
 import { fmtScore, fmtStat, topPercent } from "@/lib/format";
-import type { PromotionPlayer } from "@/lib/types";
+import type { Promotion, PromotionPlayer } from "@/lib/types";
 
 export const metadata = { title: "Montées · LoL Scouting" };
 
@@ -83,15 +84,23 @@ export default function MonteesPage() {
         </p>
       </div>
 
-      {promotions.map((promo) => {
+      <SeasonTabs
+        items={promotions.map((promo) => ({
+          key: `${promo.from}-${promo.to}`,
+          label: `${promo.from} → ${promo.to}`,
+          content: <PromotionSeason promo={promo} />,
+        }))}
+      />
+    </div>
+  );
+}
+
+function PromotionSeason({ promo }: { promo: Promotion }) {
         const lec = promo.players.filter((p) => p.new_level === "LEC");
         const erl = promo.players.filter((p) => p.tier === "ERL2" && p.new_level === "ERL1");
         const top10 = (list: PromotionPlayer[]) => list.filter((p) => p.tier_percentile >= 0.9).length;
         return (
-          <div key={`${promo.from}-${promo.to}`} className="space-y-6">
-            <h2 className="text-lg font-semibold">
-              {promo.from} → {promo.to}
-            </h2>
+          <div className="space-y-6">
 
             <section className="rounded-lg border border-border bg-surface p-4">
               <h3 className="text-sm font-semibold">ERL1 → LEC · {lec.length} joueurs</h3>
@@ -136,7 +145,4 @@ export default function MonteesPage() {
             </section>
           </div>
         );
-      })}
-    </div>
-  );
 }

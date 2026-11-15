@@ -147,6 +147,19 @@ def apply_birthdates(df):
     return df
 
 
+def available_seasons():
+    """Saisons configurées dans leagues.py dont le fichier de parties existe."""
+    from leagues import LEAGUES
+    return sorted(s for s in LEAGUES if os.path.exists(f"data/pro_games_{s}.csv"))
+
+
+def coef_window(season, years=2):
+    """Saisons utilisées pour le coefficient de ligue d'une saison : fenêtre
+    glissante de 2 ans (la saison et la précédente), parmi celles disponibles."""
+    window = [s for s in available_seasons() if season - years < s <= season]
+    return window or [season]
+
+
 def load_games(seasons):
     frames = [df for df in map(load_season, seasons) if df is not None]
     if not frames:
@@ -156,10 +169,12 @@ def load_games(seasons):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seasons", type=int, nargs="+", default=[2025, 2026])
+    parser.add_argument("--seasons", type=int, nargs="+",
+                        help="défaut : les 2 dernières saisons téléchargées")
     args = parser.parse_args()
 
-    coefs = league_coefficients(load_games(args.seasons), args.seasons, verbose=True)
+    seasons = args.seasons or coef_window(max(available_seasons()))
+    coefs = league_coefficients(load_games(seasons), seasons, verbose=True)
     print(coefs.round(3).to_string())
 
 

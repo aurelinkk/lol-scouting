@@ -67,7 +67,10 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
         (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
         (includeLec || !r.played_lec) &&
-        (!q || r.name.toLowerCase().includes(q) || r.team.toLowerCase().includes(q)),
+        (!q ||
+          r.name.toLowerCase().includes(q) ||
+          r.team.toLowerCase().includes(q) ||
+          (r.current_team ?? "").toLowerCase().includes(q)),
     );
     const dir = sort.desc ? -1 : 1;
     out.sort((a, b) => {
@@ -197,8 +200,10 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                 <tr>
                   <th className="px-2 py-2 text-left font-medium">#</th>
                   <th className="px-2 py-2 text-left font-medium">Joueur</th>
-                  <th className="px-2 py-2 text-left font-medium">Équipe</th>
-                  <th className="px-2 py-2 text-left font-medium">Ligue</th>
+                  <th className="px-2 py-2 text-left font-medium">Club actuel</th>
+                  <th className="px-2 py-2 text-left font-medium" title="Ligue sur laquelle la saison est évaluée">
+                    Ligue (saison)
+                  </th>
                   {header("age", "Âge")}
                   {header("games", "Parties")}
                   {header("final", "Score", "Score final")}
@@ -222,12 +227,25 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                       </Link>
                     </td>
                     <td className="px-2 py-1.5">
-                      <span className="flex items-center gap-1.5 whitespace-nowrap text-ink-2">
-                        <TeamLogo team={r.team} src={r.logo} size={18} />
-                        <span className="max-w-40 truncate">{r.team}</span>
+                      <span
+                        className="flex items-center gap-1.5 whitespace-nowrap text-ink-2"
+                        title={
+                          r.current_team && r.current_team !== r.team
+                            ? `Club actuel. En ${r.season} (ligue évaluée) : ${r.team}`
+                            : undefined
+                        }
+                      >
+                        <TeamLogo team={r.current_team ?? r.team} src={r.current_logo ?? r.logo} size={18} />
+                        <span className="max-w-40 truncate">{r.current_team ?? r.team}</span>
+                        {r.current_league && r.current_league !== r.league_code && (
+                          <span className="text-xs text-ink-3">{r.current_league}</span>
+                        )}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-2 py-1.5 text-ink-2">
+                    <td
+                      className="whitespace-nowrap px-2 py-1.5 text-ink-2"
+                      title={r.current_team && r.current_team !== r.team ? `Avec ${r.team}` : undefined}
+                    >
                       {r.league_code} <span className="text-xs text-ink-3">{r.tier}</span>
                     </td>
                     <td className="px-2 py-1.5 text-right">{r.age ?? "–"}</td>
