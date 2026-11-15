@@ -38,8 +38,23 @@ OE_LEAGUE_MAP = {
     "NL": "LFL2",      # Nexus League (2026)
     "LFL2": "LFL2",    # LFL Division 2 (2025)
     "LVP SL": "ES",    # LVP SuperLiga (2025, avant la LES)
-    "NEXO": "ES2",     # Liga Nexo (2025)
+    "NEXO": "ES2",     # Liga Nexo (2e division espagnole depuis 2025)
 }
+
+# Différences par saison (None = ligue qui n'est pas dans nos ligues cette saison)
+_LEGACY_OE = {
+    "ESLOL": "ROL",    # Elite Series (Benelux)
+    "GLL": "HLL",      # Greek Legends League
+    "UL": "RL",        # Ultraliga (Pologne)
+    "PGN": "LIT",      # PG Nationals (Italie, 2023)
+    "NEXO": None,      # Liga Nexo = 3e division espagnole avant 2025
+}
+OE_LEAGUE_MAP_BY_SEASON = {2023: _LEGACY_OE, 2024: _LEGACY_OE}
+
+
+def league_map(season):
+    mapping = {**OE_LEAGUE_MAP, **OE_LEAGUE_MAP_BY_SEASON.get(season, {})}
+    return {k: v for k, v in mapping.items() if v}
 
 OE_COLUMNS = [
     "gameid", "datacompleteness", "league", "date", "position", "playername",
@@ -83,7 +98,7 @@ def load_oe(season):
     df = pd.read_csv(path, usecols=lambda c: c in OE_COLUMNS, low_memory=False)
     df = df[df["position"].isin(ROLE_MAP)].copy()
     df["role"] = df["position"].map(ROLE_MAP)
-    df["league_code"] = df["league"].map(OE_LEAGUE_MAP)
+    df["league_code"] = df["league"].map(league_map(season))
     for col in NUMERIC:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["day"] = pd.to_datetime(df["date"], errors="coerce").dt.normalize()
@@ -186,7 +201,7 @@ def match_report(season):
 
     not_covered = sorted(set(games["league_code"]) - covered)
     print("\nNos ligues absentes d'Oracle's Elixir :", ", ".join(not_covered) or "aucune")
-    unmapped = set(oe["league"]) - set(OE_LEAGUE_MAP)
+    unmapped = set(oe["league"]) - set(league_map(season))
     print("Ligues Oracle's Elixir non utilisées :", ", ".join(sorted(unmapped)))
 
 
