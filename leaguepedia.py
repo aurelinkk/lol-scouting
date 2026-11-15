@@ -3,19 +3,58 @@
 Leaguepedia expose ses tables (matchs, joueurs, tournois...) via des requêtes
 proches du SQL. Doc des tables : https://lol.fandom.com/wiki/Special:CargoTables
 """
+import os
 import time
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 API_URL = "https://lol.fandom.com/api.php"
-PAGE_SIZE = 500  # maximum autorisé par requête pour un utilisateur anonyme
+PAGE_SIZE = 500  # maximum autorisé par requête
 
 session = requests.Session()
 session.headers["User-Agent"] = "lol-scouting/0.1 (projet perso d'analyse de prospects)"
+_logged_in = False
+
+
+def login():
+    """Connexion avec un bot password (LEAGUEPEDIA_USER / LEAGUEPEDIA_PASSWORD dans .env).
+
+    Connecté, les limites de requêtes sont bien plus hautes qu'en anonyme.
+    Sans identifiants, on continue en anonyme.
+    """
+    global _logged_in
+    if _logged_in:
+        return
+    _logged_in = True  # une seule tentative par exécution
+
+    user = os.getenv("LEAGUEPEDIA_USER")
+    password = os.getenv("LEAGUEPEDIA_PASSWORD")
+    if not user or not password:
+        print("Leaguepedia : pas d'identifiants dans .env, mode anonyme (plus lent)")
+        return
+
+    token = session.get(API_URL, params={
+        "action": "query", "meta": "tokens", "type": "login", "format": "json",
+    }, timeout=60).json()["query"]["tokens"]["logintoken"]
+
+    result = session.post(API_URL, data={
+        "action": "login", "lgname": user, "lgpassword": password,
+        "lgtoken": token, "format": "json",
+    }, timeout=60).json()["login"]
+
+    if result["result"] == "Success":
+        print(f"Leaguepedia : connecté en tant que {result['lgusername']}")
+    else:
+        print(f"Leaguepedia : échec de connexion ({result.get('reason', result['result'])}), "
+              "mode anonyme")
 
 
 def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=2.0):
     """Exécute une requête Cargo et renvoie toutes les lignes (pagination incluse)."""
+    login()
     rows = []
     offset = 0
 
