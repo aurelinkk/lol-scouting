@@ -60,6 +60,34 @@ def summary(label, moved, percentile="role_percentile"):
     print(moved[COLUMNS].round(2).to_string(index=False))
 
 
+def compute_promotions(games, season_from, season_to, coef_seasons=None, min_games=10):
+    """Tous les joueurs d'ERL de la saison N (hors LEC), avec leur niveau en N+1.
+
+    Colonnes ajoutées : new_level / new_team (NaN si plus en ERL/LEC en N+1),
+    tier_percentile (rang dans son rôle parmi les joueurs du même niveau en N).
+    """
+    before = build_ranking(games, season_from, coef_seasons or [season_from], min_games)
+    before = before[~before["played_lec"]].copy()
+    before["tier_percentile"] = (before.groupby(["tier", "role"])["final"]
+                                 .rank(pct=True).round(3))
+    after = destination(games[games["season"] == season_to])
+    return before.merge(after, on="player", how="left")
+
+
+def hit_rates(merged):
+    """Taux de montée par tranche de rang (dans son niveau) en saison N."""
+    rows = []
+    buckets = [(0.9, 1.01, "top 10 %"), (0.75, 0.9, "top 10-25 %"),
+               (0.5, 0.75, "top 25-50 %"), (0, 0.5, "moitié basse")]
+    for tier, targets in [("ERL1", {"LEC"}), ("ERL2", {"LEC", "ERL1"})]:
+        t = merged[merged["tier"] == tier]
+        for lo, hi, label in buckets:
+            b = t[(t["tier_percentile"] >= lo) & (t["tier_percentile"] < hi)]
+            up = b["new_level"].isin(targets).sum()
+            rows.append({"from": tier, "bucket": label, "promoted": int(up), "total": len(b)})
+    return pd.DataFrame(rows)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--from", dest="season_from", type=int, default=2025)
@@ -69,29 +97,23 @@ def main():
     parser.add_argument("--min-games", type=int, default=10)
     args = parser.parse_args()
 
-    coef_seasons = args.coef_seasons or [args.season_from]
     games = load_games([args.season_from, args.season_to])
-
-    before = build_ranking(games, args.season_from, coef_seasons, args.min_games)
-    before = before[~before["played_lec"]]
-    after = destination(games[games["season"] == args.season_to])
-    merged = before.merge(after, on="player", how="inner")
+    merged = compute_promotions(games, args.season_from, args.season_to,
+                                args.coef_seasons, args.min_games)
 
     pd.set_option("display.width", 250)
     pd.set_option("display.max_columns", None)
+    COLUMNS.insert(COLUMNS.index("role_percentile") + 1, "tier_percentile")
 
     summary(f"Montés en LEC ({args.season_from} -> {args.season_to})",
             merged[merged["new_level"] == "LEC"].sort_values("final", ascending=False))
-    # Pour les ERL2 : rang parmi les joueurs d'ERL2 du même poste
-    erl2 = before["tier"] == "ERL2"
-    before.loc[erl2, "erl2_percentile"] = (before[erl2].groupby("role")["final"]
-                                           .rank(pct=True).round(3))
-    merged = merged.merge(before[["player", "erl2_percentile"]], on="player", how="left")
-    COLUMNS.insert(COLUMNS.index("role_percentile") + 1, "erl2_percentile")
     summary(f"Montés d'ERL2 en ERL1 ({args.season_from} -> {args.season_to})",
             merged[(merged["tier"] == "ERL2") & (merged["new_level"] == "ERL1")]
             .sort_values("final", ascending=False),
-            percentile="erl2_percentile")
+            percentile="tier_percentile")
+
+    print("\n=== Taux de montée selon le rang en saison N (dans son niveau) ===")
+    print(hit_rates(merged).to_string(index=False))
 
     path = f"data/promotions_{args.season_from}_{args.season_to}.csv"
     merged.to_csv(path, index=False)
