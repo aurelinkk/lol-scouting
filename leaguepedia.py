@@ -14,7 +14,7 @@ session = requests.Session()
 session.headers["User-Agent"] = "lol-scouting/0.1 (projet perso d'analyse de prospects)"
 
 
-def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=1.0):
+def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=2.0):
     """Exécute une requête Cargo et renvoie toutes les lignes (pagination incluse)."""
     rows = []
     offset = 0
@@ -46,8 +46,8 @@ def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=1
         time.sleep(pause)  # on reste poli avec le wiki
 
 
-def _get_with_retry(params, max_attempts=6):
-    wait = 5
+def _get_with_retry(params, max_attempts=10, max_wait=120):
+    wait = 10
     for attempt in range(1, max_attempts + 1):
         response = session.get(API_URL, params=params, timeout=60)
         response.raise_for_status()
@@ -61,7 +61,7 @@ def _get_with_retry(params, max_attempts=6):
         if error.get("code") == "ratelimited" and attempt < max_attempts:
             print(f"  Rate limit Leaguepedia, nouvelle tentative dans {wait}s...")
             time.sleep(wait)
-            wait *= 2
+            wait = min(wait * 2, max_wait)
             continue
 
         raise RuntimeError(f"Erreur Leaguepedia : {error}")

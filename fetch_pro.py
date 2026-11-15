@@ -86,20 +86,37 @@ def clean(df):
     return df.drop_duplicates(subset=["game_id", "player", "team"])
 
 
+def fetch_league_cached(league, year, refresh=False):
+    """Télécharge une ligue, ou la relit depuis data/raw/ si déjà téléchargée."""
+    cache_dir = f"data/raw/{year}"
+    os.makedirs(cache_dir, exist_ok=True)
+    path = os.path.join(cache_dir, league.replace("/", "_") + ".csv")
+
+    if os.path.exists(path) and not refresh:
+        print(f"{league} ({year}) : déjà en cache")
+        try:
+            return pd.read_csv(path, dtype=str, keep_default_na=False)
+        except pd.errors.EmptyDataError:  # ligue sans aucune partie
+            return pd.DataFrame()
+
+    print(f"{league} ({year})...")
+    df = fetch_league(league, year)
+    df.to_csv(path, index=False)
+    print(f"  {df['game_id'].nunique() if not df.empty else 0} parties")
+    return df
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--year", type=int, default=datetime.date.today().year)
     parser.add_argument("--league", help="Une seule ligue (nom Leaguepedia)")
+    parser.add_argument("--refresh", action="store_true",
+                        help="Retélécharger même les ligues déjà en cache")
     args = parser.parse_args()
 
     leagues = [args.league] if args.league else list(LEAGUES)
 
-    frames = []
-    for league in leagues:
-        print(f"{league} ({args.year})...")
-        df = fetch_league(league, args.year)
-        print(f"  {df['game_id'].nunique() if not df.empty else 0} parties")
-        frames.append(df)
+    frames = [fetch_league_cached(league, args.year, args.refresh) for league in leagues]
 
     data = pd.concat([f for f in frames if not f.empty], ignore_index=True)
     data = clean(data)
