@@ -12,7 +12,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_URL = "https://lol.fandom.com/api.php"
-PAGE_SIZE = 500  # maximum autorisé par requête
+# Lignes demandées par requête. En anonyme Leaguepedia plafonne à 500 ;
+# un compte avec le droit "High API limits" peut en obtenir jusqu'à 5000.
+# Si le serveur plafonne, on s'adapte automatiquement.
+MAX_PAGE_SIZE = 5000
+ANONYMOUS_PAGE_SIZE = 500
 
 session = requests.Session()
 session.headers["User-Agent"] = "lol-scouting/0.1 (projet perso d'analyse de prospects)"
@@ -57,6 +61,7 @@ def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=2
     login()
     rows = []
     offset = 0
+    page_size = MAX_PAGE_SIZE
 
     while True:
         params = {
@@ -64,7 +69,7 @@ def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=2
             "format": "json",
             "tables": tables,
             "fields": fields,
-            "limit": PAGE_SIZE,
+            "limit": page_size,
             "offset": offset,
         }
         if where:
@@ -78,10 +83,14 @@ def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=2
         page = [item["title"] for item in data.get("cargoquery", [])]
         rows.extend(page)
 
-        if len(page) < PAGE_SIZE:
+        # Le serveur a plafonné la page à 500 : on continue par pages de 500
+        if page_size > ANONYMOUS_PAGE_SIZE and len(page) == ANONYMOUS_PAGE_SIZE:
+            page_size = ANONYMOUS_PAGE_SIZE
+
+        if len(page) < page_size:
             return rows
 
-        offset += PAGE_SIZE
+        offset += len(page)
         time.sleep(pause)  # on reste poli avec le wiki
 
 
