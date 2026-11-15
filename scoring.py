@@ -127,4 +127,7 @@ EM_SHRINK_GAMES = 10
 # Bonus = SOLOQ_WEIGHT x (1 - (rang EUW - 1) / taille du relevé).
 # Ex : 1er EUW -> +0.10, 500e sur 1000 -> +0.05, hors top 1000 -> 0.
 # Volontairement minime : la soloQ sert surtout à repérer qui grind.
-SOLOQ_WEIGHT = 0.1
+# Désactivé (0) par défaut : pendant l'intersaison beaucoup de pros ne jouent
+# pas (et les Master+ perdent des LP par inactivité), le rang du moment ne
+# reflète donc pas leur niveau. À remettre à ~0.1 en pleine saison.
+SOLOQ_WEIGHT = 0.0

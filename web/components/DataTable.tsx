@@ -41,12 +41,20 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "final", desc: true });
   const [limit, setLimit] = useState(PAGE);
 
+  // Une saison = un fichier (chargé à la demande)
   useEffect(() => {
-    fetch("/data/rankings.json")
-      .then((r) => r.json())
+    setRows(null);
+    fetch(`/data/rankings_${season}.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .catch(() =>
+        // Ancien format : un seul fichier pour toutes les saisons
+        fetch("/data/rankings.json")
+          .then((r) => r.json())
+          .then((all: RankingRow[]) => all.filter((x) => x.season === season)),
+      )
       .then(setRows)
       .catch(() => setError("Impossible de charger les données."));
-  }, []);
+  }, [season]);
 
   const leagues = useMemo(
     () => [...new Set((rows ?? []).filter((r) => r.season === season).map((r) => r.league_code))].sort(),

@@ -161,7 +161,12 @@ def main():
                     rec[key] = value
             rankings.append(rec)
             scores[(season, r["player"])] = rec
-    write("rankings.json", rankings, PUBLIC_DIR)
+    # Un fichier par saison : l'onglet Données ne charge que la saison choisie
+    for season in seasons:
+        write(f"rankings_{season}.json", [r for r in rankings if r["season"] == season], PUBLIC_DIR)
+    old = os.path.join(PUBLIC_DIR, "rankings.json")
+    if os.path.exists(old):
+        os.remove(old)
 
     # --- Montées entre saisons consécutives ------------------------------
     promos = []
