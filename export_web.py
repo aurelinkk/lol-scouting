@@ -134,7 +134,8 @@ def main():
 
     # --- Classements par saison --------------------------------------------
     rank_fields = ["season", "role", "team", "league_code", "tier", "age", "games",
-                   "final", "league_score", "league_bonus", "em_score", "em_games",
+                   "final", "league_score", "league_score_raw", "sample_factor",
+                   "league_bonus", "em_score", "em_score_raw", "em_games",
                    "role_percentile", "played_lec"] + STATS
     rankings = []
     scores = {}  # (season, player) -> détail du score

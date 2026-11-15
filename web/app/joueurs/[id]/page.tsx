@@ -104,7 +104,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 <table className="tabular mt-2 w-full text-sm">
                   <tbody>
                     <tr>
-                      <td className="py-0.5 text-ink-2">Performance dans sa ligue</td>
+                      <td className="py-0.5 text-ink-2">
+                        Performance dans sa ligue{" "}
+                        {s.league_score_raw !== undefined && s.sample_factor !== undefined && (
+                          <span className="text-ink-3">
+                            ({fmtScore(s.league_score_raw)} × {s.sample_factor.toFixed(2)} pour {s.games} parties)
+                          </span>
+                        )}
+                      </td>
                       <td className="text-right">{fmtScore(s.league_score)}</td>
                     </tr>
                     <tr>
@@ -115,7 +122,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       <td className="py-0.5 text-ink-2">
                         {meta.em_weight} × EMEA Masters{" "}
                         <span className="text-ink-3">
-                          {s.em_games ? `(${s.em_games} parties, z = ${fmtScore(s.em_score)})` : "(pas d'EM)"}
+                          {s.em_games
+                            ? `(${fmtScore(s.em_score_raw ?? s.em_score)} réduit à ${fmtScore(s.em_score)} pour ${s.em_games} parties)`
+                            : "(pas d'EM)"}
                         </span>
                       </td>
                       <td className="text-right">{fmtScore(meta.em_weight * (s.em_score ?? 0))}</td>

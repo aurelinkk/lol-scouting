@@ -20,8 +20,11 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   games: number;
   final: number;
   league_score: number;
+  league_score_raw?: number;
+  sample_factor?: number;
   league_bonus: number;
   em_score?: number;
+  em_score_raw?: number;
   em_games: number;
   role_percentile: number;
   played_lec: boolean;

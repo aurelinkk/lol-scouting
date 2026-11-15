@@ -20,8 +20,8 @@ import pandas as pd
 
 from league_strength import league_coefficients, load_games
 from oracles import OE_STATS, attach_oe
-from scoring import (EM_MIN_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
-                     MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS)
+from scoring import (EM_MIN_GAMES, EM_SHRINK_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
+                     MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS, SAMPLE_SHRINK_GAMES)
 
 DISPLAY = ["player", "team", "league_code", "tier", "age", "games", "final",
            "league_score", "league_bonus", "em_score", "em_games",
@@ -145,7 +145,11 @@ def build_ranking(games, season, coef_seasons, min_games=10):
     # Score dans sa ligue (on ne garde que les échantillons suffisants)
     league_rows = stats[stats["tier"].isin(["ERL1", "ERL2"]) & (stats["games"] >= min_games)]
     league_rows = weighted_zscores(league_rows, ["league_code", "role"])
-    league_rows = league_rows.rename(columns={"score": "league_score"})
+    # Réduction selon le nombre de parties (voir SAMPLE_SHRINK_GAMES)
+    league_rows["league_score_raw"] = league_rows["score"]
+    league_rows["sample_factor"] = league_rows["games"] / (league_rows["games"] + SAMPLE_SHRINK_GAMES)
+    league_rows["league_score"] = league_rows["score"] * league_rows["sample_factor"]
+    league_rows = league_rows.drop(columns="score")
 
     # Ligue principale d'un joueur = celle où il a le plus de parties
     ranking = (league_rows.dropna(subset=["league_score"])
@@ -165,8 +169,10 @@ def build_ranking(games, season, coef_seasons, min_games=10):
     em = stats[(stats["tier"] == "EM") & (stats["games"] >= EM_MIN_GAMES)]
     em = weighted_zscores(em, ["role"])
     em = em.sort_values("games", ascending=False).drop_duplicates("player")
+    em["em_score_raw"] = em["score"]
+    em["em_score"] = em["score"] * em["games"] / (em["games"] + EM_SHRINK_GAMES)
     ranking = ranking.merge(
-        em[["player", "score", "games"]].rename(columns={"score": "em_score", "games": "em_games"}),
+        em[["player", "em_score", "em_score_raw", "games"]].rename(columns={"games": "em_games"}),
         on="player", how="left")
     ranking["em_games"] = ranking["em_games"].fillna(0).astype(int)
 

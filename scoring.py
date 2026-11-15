@@ -109,3 +109,13 @@ EM_WEIGHT = 0.5
 # Équipes de l'EM à ne pas compter dans le coefficient (exceptions)
 EXCLUDED_EM_TEAMS = {"Witchcraft"}
 EM_MIN_GAMES = 5
+
+# ---------------------------------------------------------------------------
+# 4. Taille d'échantillon
+# ---------------------------------------------------------------------------
+# Sur peu de parties, les stats sont très variables : les extrêmes ressortent
+# par hasard. Le score est donc multiplié par parties / (parties + N) :
+#   10 parties -> 40 % du score, 30 -> 67 %, 60 -> 80 %, 100 -> 87 %.
+# Plus N est grand, plus on exige un gros volume de parties pour être en haut.
+SAMPLE_SHRINK_GAMES = 15
+EM_SHRINK_GAMES = 10

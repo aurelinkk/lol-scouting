@@ -117,12 +117,13 @@ def main():
         coef = coefs["coef"].get(r["league_code"], float("nan"))
         em = r["em_score"]
         print(f"\n--- Score final (ligue principale : {r['league_code']}) ---")
-        print(f"  Score dans la ligue          {r['league_score']:+.2f}")
+        print(f"  Score dans la ligue          {r['league_score']:+.2f}   "
+              f"({r['league_score_raw']:+.2f} x {r['sample_factor']:.2f} pour {r['games']} parties)")
         print(f"  Bonus niveau de ligue        {r['league_bonus']:+.2f}   "
               f"(coef EM de la ligue : {coef:.2f})")
         print(f"  {EM_WEIGHT} x score EMEA Masters    "
               f"{EM_WEIGHT * (0 if pd.isna(em) else em):+.2f}   "
-              f"({'pas d EM' if pd.isna(em) else f'z = {em:+.2f} sur {r.em_games} parties'})")
+              f"({'pas d EM' if pd.isna(em) else f'{r.em_score_raw:+.2f} réduit à {em:+.2f} pour {r.em_games} parties'})")
         print(f"  = FINAL                      {r['final']:+.2f}   "
               f"(top {100 * (1 - r['role_percentile']):.0f} % des {r['role']} d'ERL)")
         if r["played_lec"]:
