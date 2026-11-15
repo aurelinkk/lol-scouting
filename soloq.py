@@ -1,0 +1,351 @@
+"""SoloQ EUW : relevé du ladder, lien avec les pros, profil des non-pros.
+
+Usage (clé RIOT_API_KEY dans .env) :
+    python soloq.py snapshot              # relevé du top 1000 EUW + Riot ID + lien pros
+    python soloq.py snapshot --top 500
+    python soloq.py profiles --top 300    # poste principal / champions des non-pros
+    python soloq.py show                  # dernier relevé dans le terminal
+
+Lancer `snapshot` régulièrement (ex : une fois par semaine) : la progression
+de LP et le volume de parties entre deux relevés montrent qui grind.
+
+Fichiers (dans data/soloq/, non versionnés) :
+    snapshots/AAAA-MM-JJ.csv   un relevé du ladder
+    accounts.csv               cache puuid -> Riot ID
+    profiles.csv               cache poste / champions (non-pros)
+    matches/                   cache des parties lues
+Fichier versionné : soloq_accounts.csv (player,riot_id) pour lier à la main
+un pro à son compte (ex : "Panda (Hamza Siala),KCB Panda#EUW").
+"""
+import argparse
+import datetime
+import json
+import os
+import re
+import unicodedata
+
+import pandas as pd
+
+import riot_api
+
+DIR = "data/soloq"
+SNAP_DIR = os.path.join(DIR, "snapshots")
+ACCOUNTS = os.path.join(DIR, "accounts.csv")
+PROFILES = os.path.join(DIR, "profiles.csv")
+MATCH_DIR = os.path.join(DIR, "matches")
+MANUAL_LINKS = "soloq_accounts.csv"
+
+TIER_ORDER = {"CHALLENGER": 0, "GRANDMASTER": 1, "MASTER": 2}
+ROLE_MAP = {"TOP": "Top", "JUNGLE": "Jungle", "MIDDLE": "Mid", "BOTTOM": "Bot", "UTILITY": "Support"}
+
+
+# --------------------------------------------------------------------------
+# Relevé du ladder
+# --------------------------------------------------------------------------
+
+def fetch_ladder(top=1000):
+    rows = []
+    for tier in ("challenger", "grandmaster", "master"):
+        entries = riot_api.get_apex_league(tier)
+        print(f"  {tier} : {len(entries)} joueurs")
+        for e in entries:
+            rows.append({
+                "puuid": e.get("puuid"), "tier": tier.upper(), "lp": e.get("leaguePoints", 0),
+                "wins": e.get("wins", 0), "losses": e.get("losses", 0),
+                "hot_streak": e.get("hotStreak", False), "inactive": e.get("inactive", False),
+            })
+        if len(rows) >= top and tier != "challenger":
+            break
+    df = pd.DataFrame(rows).dropna(subset=["puuid"])
+    df["tier_order"] = df["tier"].map(TIER_ORDER)
+    df = df.sort_values(["tier_order", "lp"], ascending=[True, False]).head(top)
+    df["rank"] = range(1, len(df) + 1)
+    df["games"] = df["wins"] + df["losses"]
+    df["winrate"] = (df["wins"] / df["games"].where(df["games"] > 0)).round(3)
+    return df.drop(columns="tier_order")
+
+
+def resolve_accounts(puuids):
+    """puuid -> Riot ID (nom#tag), avec cache local."""
+    cache = pd.read_csv(ACCOUNTS) if os.path.exists(ACCOUNTS) else pd.DataFrame(
+        columns=["puuid", "game_name", "tag_line"])
+    known = set(cache["puuid"])
+    todo = [p for p in puuids if p not in known]
+    if todo:
+        print(f"  Riot ID à récupérer : {len(todo)} (environ {len(todo) * 1.2 / 60:.0f} min)")
+    new = []
+    for i, puuid in enumerate(todo, 1):
+        acc = riot_api.get_account_by_puuid(puuid) or {}
+        new.append({"puuid": puuid, "game_name": acc.get("gameName"), "tag_line": acc.get("tagLine")})
+        if i % 50 == 0:
+            print(f"    {i}/{len(todo)}")
+            _save_accounts(cache, new)
+    cache = _save_accounts(cache, new)
+    return cache
+
+
+def _save_accounts(cache, new):
+    os.makedirs(DIR, exist_ok=True)
+    out = pd.concat([cache, pd.DataFrame(new)], ignore_index=True).drop_duplicates("puuid", keep="last")
+    out.to_csv(ACCOUNTS, index=False)
+    return out
+
+
+# --------------------------------------------------------------------------
+# Lien avec les pros (comptes listés par Leaguepedia + saisie manuelle)
+# --------------------------------------------------------------------------
+
+def norm(name):
+    """Nom comparable : sans accents, minuscules, sans espaces ni ponctuation."""
+    text = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def parse_soloq_ids(text):
+    """Extrait les noms de comptes EUW du champ SoloqueueIds de Leaguepedia.
+
+    Exemples : "'''EUW:''' AbbedaggÆ <br> Mein Königreich <br> '''NA:''' babadagge"
+               "greasy hypernerd (EUW), mTouck (EUW)"
+    """
+    if not isinstance(text, str) or not text.strip():
+        return []
+    text = re.sub(r"'{2,}", "", text)
+    names, region = [], "EUW"
+    for part in re.split(r"<br\s*/?>|,|\n|;", text):
+        part = part.strip()
+        m = re.match(r"^([A-Z]{2,4})\s*:\s*(.*)$", part)
+        if m:
+            region, part = m.group(1), m.group(2)
+        for chunk in re.split(r"\)\s+", part):
+            chunk = chunk.strip()
+            r = re.search(r"\((EUW|EUNE|NA|KR|TR|RU|BR|LAN|LAS|OCE|JP)\)?$", chunk)
+            chunk_region = r.group(1) if r else region
+            chunk = re.sub(r"\((EUW|EUNE|NA|KR|TR|RU|BR|LAN|LAS|OCE|JP)\)?$", "", chunk).strip()
+            if chunk and chunk_region == "EUW":
+                names.append(chunk)
+    return names
+
+
+def pro_accounts(season_files=None):
+    """Table (player, name_key, tag_key) des comptes connus des pros."""
+    from league_strength import available_seasons, load_season
+    rows = []
+    seasons = season_files or available_seasons()[-2:]
+    for season in seasons:
+        games = load_season(season)
+        if games is None or "soloq_ids" not in games:
+            continue
+        for player, text in games.drop_duplicates("player")[["player", "soloq_ids"]].itertuples(index=False):
+            for name in parse_soloq_ids(text):
+                game, _, tag = name.partition("#")
+                rows.append({"player": player, "name_key": norm(game), "tag_key": norm(tag)})
+    if os.path.exists(MANUAL_LINKS):
+        manual = pd.read_csv(MANUAL_LINKS)
+        for player, riot_id in manual[["player", "riot_id"]].itertuples(index=False):
+            game, _, tag = str(riot_id).partition("#")
+            rows.append({"player": player, "name_key": norm(game), "tag_key": norm(tag), "manual": True})
+    df = pd.DataFrame(rows, columns=["player", "name_key", "tag_key", "manual"])
+    return df[df["name_key"] != ""].drop_duplicates()
+
+
+def link_pros(ladder, accounts):
+    df = ladder.merge(accounts, on="puuid", how="left")
+    df["riot_id"] = df["game_name"].fillna("?") + "#" + df["tag_line"].fillna("?")
+    df["name_key"] = df["game_name"].map(norm)
+    df["tag_key"] = df["tag_line"].map(norm)
+
+    pros = pro_accounts()
+    # 1) correspondance exacte nom + tag (Riot ID complet), 2) nom seul s'il est unique
+    full = pros[pros["tag_key"] != ""].drop_duplicates(["name_key", "tag_key"])
+    df = df.merge(full[["name_key", "tag_key", "player"]], on=["name_key", "tag_key"], how="left")
+    by_name = pros.drop_duplicates(["name_key", "player"])
+    by_name = by_name[~by_name.duplicated("name_key", keep=False)][["name_key", "player"]]
+    df = df.merge(by_name.rename(columns={"player": "player_by_name"}), on="name_key", how="left")
+    df["pro"] = df["player"].fillna(df["player_by_name"])
+    return df.drop(columns=["player", "player_by_name", "name_key", "tag_key"])
+
+
+# --------------------------------------------------------------------------
+# Évolution entre relevés
+# --------------------------------------------------------------------------
+
+def snapshots():
+    if not os.path.isdir(SNAP_DIR):
+        return []
+    return sorted(f for f in os.listdir(SNAP_DIR) if f.endswith(".csv"))
+
+
+def load_snapshot(name):
+    return pd.read_csv(os.path.join(SNAP_DIR, name))
+
+
+def with_trends(latest_name, days=(7, 30)):
+    latest = load_snapshot(latest_name)
+    latest_date = datetime.date.fromisoformat(latest_name[:10])
+    for d in days:
+        target = latest_date - datetime.timedelta(days=d)
+        older = [s for s in snapshots() if datetime.date.fromisoformat(s[:10]) <= target]
+        if not older:
+            latest[f"lp_{d}d"] = float("nan")
+            latest[f"games_{d}d"] = float("nan")
+            continue
+        old = load_snapshot(older[-1])[["puuid", "lp", "games"]]
+        merged = latest[["puuid"]].merge(old, on="puuid", how="left")
+        latest[f"lp_{d}d"] = (latest["lp"] - merged["lp"].values)
+        latest[f"games_{d}d"] = (latest["games"] - merged["games"].values)
+    return latest
+
+
+# --------------------------------------------------------------------------
+# Profil des non-pros (poste principal, champions)
+# --------------------------------------------------------------------------
+
+def match_details(match_id):
+    os.makedirs(MATCH_DIR, exist_ok=True)
+    path = os.path.join(MATCH_DIR, f"{match_id}.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    data = riot_api.get_match_by_id(match_id)
+    if data:
+        # On ne garde que l'utile pour limiter la place sur le disque
+        slim = {"info": {"gameDuration": data["info"]["gameDuration"],
+                         "participants": [{k: p.get(k) for k in (
+                             "puuid", "teamPosition", "championName", "kills", "deaths",
+                             "assists", "totalMinionsKilled", "neutralMinionsKilled", "win")}
+                             for p in data["info"]["participants"]]}}
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(slim, f)
+        return slim
+    return None
+
+
+def build_profile(puuid, n_matches):
+    ids = riot_api.get_match_ids_by_puuid(puuid, count=n_matches)
+    rows = []
+    for match_id in ids:
+        match = match_details(match_id)
+        if not match:
+            continue
+        minutes = match["info"]["gameDuration"] / 60
+        for p in match["info"]["participants"]:
+            if p["puuid"] == puuid:
+                rows.append({"role": ROLE_MAP.get(p.get("teamPosition") or "", None),
+                             "champion": p["championName"], "win": p["win"],
+                             "kda": (p["kills"] + p["assists"]) / max(p["deaths"], 1),
+                             "cs_min": (p["totalMinionsKilled"] + p["neutralMinionsKilled"]) / minutes})
+    if not rows:
+        return {"puuid": puuid, "recent_games": 0}
+    df = pd.DataFrame(rows)
+    roles = df["role"].value_counts(normalize=True)
+    champs = df["champion"].value_counts()
+    return {
+        "puuid": puuid, "recent_games": len(df),
+        "main_role": roles.index[0] if len(roles) else None,
+        "main_role_share": round(float(roles.iloc[0]), 2) if len(roles) else None,
+        "top_champions": ", ".join(f"{c} ({n})" for c, n in champs.head(3).items()),
+        "recent_winrate": round(float(df["win"].mean()), 3),
+        "recent_kda": round(float(df["kda"].mean()), 2),
+        "recent_cs_min": round(float(df["cs_min"].mean()), 2),
+        "profiled_at": datetime.date.today().isoformat(),
+    }
+
+
+def update_profiles(top, n_matches, max_age_days=14):
+    names = snapshots()
+    if not names:
+        raise SystemExit("Aucun relevé : lance d'abord `python soloq.py snapshot`")
+    ladder = load_snapshot(names[-1])
+    targets = ladder[ladder["pro"].isna()].head(top)
+    cache = pd.read_csv(PROFILES) if os.path.exists(PROFILES) else pd.DataFrame(columns=["puuid", "profiled_at"])
+    fresh = cache[pd.to_datetime(cache["profiled_at"]) >= pd.Timestamp.today() - pd.Timedelta(days=max_age_days)]
+    todo = [p for p in targets["puuid"] if p not in set(fresh["puuid"])]
+    print(f"Profils à calculer : {len(todo)} non-pros (~{n_matches + 1} requêtes chacun, "
+          f"moins grâce au cache des parties)")
+    new = []
+    for i, puuid in enumerate(todo, 1):
+        new.append(build_profile(puuid, n_matches))
+        if i % 10 == 0 or i == len(todo):
+            print(f"  {i}/{len(todo)}")
+            out = pd.concat([cache, pd.DataFrame(new)]).drop_duplicates("puuid", keep="last")
+            out.to_csv(PROFILES, index=False)
+
+
+def latest_ladder():
+    """Dernier relevé enrichi (évolutions 7 / 30 jours, profils), ou None."""
+    names = snapshots()
+    if not names:
+        return None
+    df = with_trends(names[-1])
+    df["snapshot_date"] = names[-1][:10]
+    if os.path.exists(PROFILES):
+        df = df.merge(pd.read_csv(PROFILES).drop(columns=["profiled_at"], errors="ignore"),
+                      on="puuid", how="left")
+    return df
+
+
+def pro_soloq():
+    """Meilleur compte du dernier relevé pour chaque pro reconnu, ou None."""
+    df = latest_ladder()
+    if df is None:
+        return None
+    pros = df[df["pro"].notna()].sort_values("rank").drop_duplicates("pro")
+    out = pros[["pro", "riot_id", "tier", "lp", "rank", "games", "winrate",
+                "lp_7d", "games_7d", "snapshot_date"]].rename(columns={"pro": "player"})
+    out["ladder_size"] = len(df)
+    return out.add_prefix("soloq_").rename(columns={"soloq_player": "player"})
+
+
+# --------------------------------------------------------------------------
+
+def snapshot(top):
+    print("Ladder EUW...")
+    ladder = fetch_ladder(top)
+    accounts = resolve_accounts(ladder["puuid"].tolist())
+    ladder = link_pros(ladder, accounts)
+    os.makedirs(SNAP_DIR, exist_ok=True)
+    path = os.path.join(SNAP_DIR, f"{datetime.date.today().isoformat()}.csv")
+    ladder.to_csv(path, index=False)
+    n_pro = ladder["pro"].notna().sum()
+    print(f"\n{len(ladder)} joueurs -> {path} ({n_pro} reconnus comme pros)")
+
+
+def show(top=40, non_pro=False):
+    names = snapshots()
+    if not names:
+        raise SystemExit("Aucun relevé : lance d'abord `python soloq.py snapshot`")
+    df = with_trends(names[-1])
+    if os.path.exists(PROFILES):
+        df = df.merge(pd.read_csv(PROFILES), on="puuid", how="left")
+    if non_pro:
+        df = df[df["pro"].isna()]
+    cols = [c for c in ["rank", "riot_id", "tier", "lp", "games", "winrate", "lp_7d", "games_7d",
+                        "pro", "main_role", "top_champions"] if c in df]
+    pd.set_option("display.width", 220)
+    print(f"Relevé du {names[-1][:10]} ({len(names)} relevé(s) au total)\n")
+    print(df[cols].head(top).to_string(index=False))
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("snapshot", help="relevé du ladder EUW")
+    p.add_argument("--top", type=int, default=1000)
+    p = sub.add_parser("profiles", help="poste / champions des non-pros")
+    p.add_argument("--top", type=int, default=300)
+    p.add_argument("--matches", type=int, default=15)
+    p = sub.add_parser("show", help="afficher le dernier relevé")
+    p.add_argument("--top", type=int, default=40)
+    p.add_argument("--non-pro", action="store_true")
+    args = parser.parse_args()
+
+    if args.cmd == "snapshot":
+        snapshot(args.top)
+    elif args.cmd == "profiles":
+        update_profiles(args.top, args.matches)
+    else:
+        show(args.top, args.non_pro)
+
+
+if __name__ == "__main__":
+    main()

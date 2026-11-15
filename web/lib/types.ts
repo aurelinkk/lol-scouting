@@ -25,6 +25,15 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   league_bonus: number;
   em_score?: number;
   em_score_raw?: number;
+  soloq_bonus?: number;
+  soloq_riot_id?: string;
+  soloq_tier?: string;
+  soloq_lp?: number;
+  soloq_rank?: number;
+  soloq_games?: number;
+  soloq_winrate?: number;
+  soloq_lp_7d?: number;
+  soloq_games_7d?: number;
   em_games: number;
   role_percentile: number;
   played_lec: boolean;

@@ -24,6 +24,19 @@ relancer `python export_web.py`.
 Pour accélérer Leaguepedia, mettre un bot password dans `.env` :
 `LEAGUEPEDIA_USER` et `LEAGUEPEDIA_PASSWORD`.
 
+## SoloQ (clé RIOT_API_KEY dans .env)
+
+```bash
+python soloq.py snapshot            # relevé du top 1000 EUW (~20 min la 1re fois : Riot ID)
+python soloq.py profiles --top 300  # poste / champions des non-pros (long, optionnel)
+python soloq.py show --non-pro      # aperçu dans le terminal
+python export_web.py                # onglet Ladder + soloQ sur les fiches
+```
+
+Lancer `snapshot` une fois par semaine : les évolutions (LP et parties sur 7 / 30
+jours) montrent qui grind. Les comptes des pros viennent de Leaguepedia ; pour
+en ajouter ou corriger, `soloq_accounts.csv` (`player,riot_id`).
+
 ## Scripts d'analyse
 
 | Script | Rôle |
@@ -35,6 +48,8 @@ Pour accélérer Leaguepedia, mettre un bot password dans `.env` :
 | `scoring.py` | Tous les poids du score (à ajuster) |
 | `missing_ages.py` | Joueurs classés sans date de naissance, à compléter dans `birthdates.csv` |
 | `leagues.py` | Ligues suivies par saison et leur niveau |
+| `soloq.py` | Ladder EUW, lien avec les pros, profil des non-pros |
+| `player_overrides.csv` | Corriger l'identité d'un joueur mal rattaché par Leaguepedia |
 
 ## Site web (Vercel)
 

@@ -126,6 +126,10 @@ def main():
         print(f"  {EM_WEIGHT} x score EMEA Masters    "
               f"{EM_WEIGHT * (0 if pd.isna(em) else em):+.2f}   "
               f"({'pas d EM' if pd.isna(em) else f'{r.em_score_raw:+.2f} réduit à {em:+.2f} pour {r.em_games} parties'})")
+        if r.get("soloq_bonus"):
+            print(f"  SoloQ                        {r['soloq_bonus']:+.2f}   "
+                  f"({r['soloq_riot_id']} : {r['soloq_tier'].title()} {r['soloq_lp']:.0f} LP, "
+                  f"#{r['soloq_rank']:.0f} EUW, {r['soloq_games']:.0f} parties)")
         print(f"  = FINAL                      {r['final']:+.2f}   "
               f"(top {max(1, round(100 * (1 - r['role_percentile'])))} % des {r['role']} d'ERL)")
         if r["played_lec"]:

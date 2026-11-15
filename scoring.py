@@ -120,3 +120,11 @@ EM_MIN_GAMES = 5
 # Plus N est grand, plus on exige un gros volume de parties pour être en haut.
 SAMPLE_SHRINK_GAMES = 15
 EM_SHRINK_GAMES = 10
+
+# ---------------------------------------------------------------------------
+# 5. SoloQ (saison en cours uniquement, d'après le dernier relevé soloq.py)
+# ---------------------------------------------------------------------------
+# Bonus = SOLOQ_WEIGHT x (1 - (rang EUW - 1) / taille du relevé).
+# Ex : 1er EUW -> +0.10, 500e sur 1000 -> +0.05, hors top 1000 -> 0.
+# Volontairement minime : la soloQ sert surtout à repérer qui grind.
+SOLOQ_WEIGHT = 0.1

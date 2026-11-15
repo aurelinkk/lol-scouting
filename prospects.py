@@ -21,7 +21,8 @@ import pandas as pd
 from league_strength import coef_window, league_coefficients, load_games
 from oracles import OE_STATS, attach_oe
 from scoring import (EM_MIN_GAMES, EM_SHRINK_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
-                     MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS, SAMPLE_SHRINK_GAMES)
+                     MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS, SAMPLE_SHRINK_GAMES,
+                     SOLOQ_WEIGHT)
 
 DISPLAY = ["player", "team", "league_code", "tier", "age", "games", "final",
            "league_score", "league_bonus", "em_score", "em_games",
@@ -188,8 +189,18 @@ def build_ranking(games, season, coef_seasons, min_games=10):
     lec_players = set(stats.loc[stats["tier"] == "LEC", "player"])
     ranking["played_lec"] = ranking["player"].isin(lec_players)
 
+    # SoloQ : seulement pour la saison en cours (le relevé est d'aujourd'hui)
+    ranking["soloq_bonus"] = 0.0
+    if season == pd.Timestamp.today().year:
+        from soloq import pro_soloq
+        sq = pro_soloq()
+        if sq is not None:
+            ranking = ranking.merge(sq, on="player", how="left")
+            ranking["soloq_bonus"] = (SOLOQ_WEIGHT * (1 - (ranking["soloq_rank"] - 1)
+                                                      / ranking["soloq_ladder_size"])).fillna(0)
+
     ranking["final"] = (ranking["league_score"] + ranking["league_bonus"]
-                        + EM_WEIGHT * ranking["em_score"].fillna(0))
+                        + EM_WEIGHT * ranking["em_score"].fillna(0) + ranking["soloq_bonus"])
 
     # Rang (percentile) dans son rôle parmi tous les joueurs d'ERL
     ranking["role_percentile"] = ranking.groupby("role")["final"].rank(pct=True).round(3)

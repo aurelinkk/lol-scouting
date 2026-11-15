@@ -129,6 +129,19 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       </td>
                       <td className="text-right">{fmtScore(meta.em_weight * (s.em_score ?? 0))}</td>
                     </tr>
+                    {s.soloq_bonus ? (
+                      <tr>
+                        <td className="py-0.5 text-ink-2">
+                          SoloQ{" "}
+                          <span className="text-ink-3">
+                            ({s.soloq_riot_id} · {s.soloq_tier} {s.soloq_lp} LP · #{s.soloq_rank} EUW ·{" "}
+                            {s.soloq_games} parties
+                            {s.soloq_games_7d ? ` · ${s.soloq_games_7d} sur 7 j` : ""})
+                          </span>
+                        </td>
+                        <td className="text-right">{fmtScore(s.soloq_bonus)}</td>
+                      </tr>
+                    ) : null}
                     <tr className="border-t border-border font-semibold">
                       <td className="pt-1">Score final</td>
                       <td className="pt-1 text-right">{fmtScore(s.final)}</td>

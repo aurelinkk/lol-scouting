@@ -142,6 +142,8 @@ def main():
     rank_fields = ["season", "role", "team", "league_code", "tier", "age", "games",
                    "final", "league_score", "league_score_raw", "sample_factor",
                    "league_bonus", "em_score", "em_score_raw", "em_games",
+                   "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
+                   "soloq_games", "soloq_winrate", "soloq_lp_7d", "soloq_games_7d",
                    "role_percentile", "played_lec"] + STATS
     rankings = []
     scores = {}  # (season, player) -> détail du score
@@ -234,6 +236,24 @@ def main():
         }
     write("players.json", players)
 
+    # --- Ladder soloQ EUW (dernier relevé de soloq.py) ------------------------
+    from soloq import latest_ladder
+    ladder = latest_ladder()
+    if ladder is not None:
+        fields = ["rank", "riot_id", "tier", "lp", "games", "winrate", "hot_streak",
+                  "lp_7d", "games_7d", "lp_30d", "games_30d", "main_role", "main_role_share",
+                  "top_champions", "recent_games", "recent_winrate", "recent_kda", "recent_cs_min"]
+        rows = []
+        for _, r in ladder.iterrows():
+            rec = record(r, fields)
+            if isinstance(r.get("pro"), str):
+                rec["pro"] = r["pro"]
+                if r["pro"] in ids:
+                    rec["pro_id"] = ids[r["pro"]]
+                    rec["pro_team"] = current_team.get(r["pro"])
+            rows.append(rec)
+        write("ladder.json", {"date": ladder["snapshot_date"].iloc[0], "rows": rows}, PUBLIC_DIR)
+
     # --- Méta ------------------------------------------------------------
     write("meta.json", {
         "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -244,6 +264,7 @@ def main():
         "weights": ROLE_WEIGHTS, "league_weight": LEAGUE_WEIGHT, "em_weight": EM_WEIGHT,
         "stat_labels": STAT_LABELS,
         "has_oe": bool((stats["oe_games"] > 0).any()),
+        "has_soloq": ladder is not None,
     })
 
 
