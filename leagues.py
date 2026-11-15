@@ -34,7 +34,7 @@ LEAGUES = {
     # "Prime League 1st Division" = la "2nd Division" depuis 2026 (ERL2)
     "Prime League 1st Division": "ERL2",
     # En 2026 la LFL Division 2 ne contient plus que la promotion ;
-    # la 2e division française est la Nexus League (à confirmer)
+    # la 2e division française est la Nexus League (successeur de la Div 2)
     "Nexus League": "ERL2",
     "La Ligue Française Division 2": "ERL2",
     "Hitpoint Challengers": "ERL2",
