@@ -80,7 +80,7 @@ def add_oe_stats(stats):
         return stats
     oe = pd.concat(frames, ignore_index=True)
     stats["name_key"] = stats["player"].map(normalize_name)
-    stats = stats.merge(oe, on=["season", "name_key", "role"], how="left")
+    stats = stats.merge(oe, on=["season", "name_key", "role", "league_code"], how="left")
     return stats.drop(columns="name_key")
 
 
