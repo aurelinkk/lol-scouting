@@ -24,11 +24,22 @@ COLUMNS = ["player", "role", "age", "league_code", "tier", "team", "games",
            "em_score", "em_games", "winrate", "new_level", "new_team"]
 
 
+# Une équipe ne compte comme équipe de LEC que si elle y a joué au moins ce
+# nombre de parties : exclut les équipes invitées (ex : LEC Versus 2026,
+# où Los Ratones et Karmine Corp Blue n'ont joué que 11 parties)
+MIN_LEC_TEAM_GAMES = 15
+
+
 def destination(games_next):
     """Plus haut niveau atteint par chaque joueur en saison N+1."""
     order = {"LEC": 0, "ERL1": 1, "ERL2": 2}
     g = games_next[games_next["tier"].isin(order)].copy()
-    g["level"] = g["tier"].map(order)
+
+    lec = g[g["tier"] == "LEC"]
+    lec_team_games = lec.groupby("team")["game_id"].nunique()
+    guests = set(lec_team_games[lec_team_games < MIN_LEC_TEAM_GAMES].index)
+    g = g[~((g["tier"] == "LEC") & g["team"].isin(guests))]
+
     best = (g.groupby(["player", "tier", "team"]).size().reset_index(name="n")
             .assign(level=lambda d: d["tier"].map(order))
             .sort_values(["level", "n"], ascending=[True, False])
@@ -37,11 +48,11 @@ def destination(games_next):
         ["player", "new_level", "new_team"]]
 
 
-def summary(label, moved):
+def summary(label, moved, percentile="role_percentile"):
     if moved.empty:
         print(f"\n{label} : aucun joueur trouvé")
         return
-    p = moved["role_percentile"]
+    p = moved[percentile]
     print(f"\n=== {label} : {len(moved)} joueurs ===")
     print(f"Rang médian dans leur rôle la saison précédente : top {100 * (1 - p.median()):.0f} %")
     print(f"Dans le top 10 % de leur rôle : {(p >= 0.9).sum()} / {len(moved)}"
@@ -70,9 +81,17 @@ def main():
     pd.set_option("display.max_columns", None)
 
     summary(f"Montés en LEC ({args.season_from} -> {args.season_to})",
-            merged[merged["new_level"] == "LEC"])
+            merged[merged["new_level"] == "LEC"].sort_values("final", ascending=False))
+    # Pour les ERL2 : rang parmi les joueurs d'ERL2 du même poste
+    erl2 = before["tier"] == "ERL2"
+    before.loc[erl2, "erl2_percentile"] = (before[erl2].groupby("role")["final"]
+                                           .rank(pct=True).round(3))
+    merged = merged.merge(before[["player", "erl2_percentile"]], on="player", how="left")
+    COLUMNS.insert(COLUMNS.index("role_percentile") + 1, "erl2_percentile")
     summary(f"Montés d'ERL2 en ERL1 ({args.season_from} -> {args.season_to})",
-            merged[(merged["tier"] == "ERL2") & (merged["new_level"] == "ERL1")])
+            merged[(merged["tier"] == "ERL2") & (merged["new_level"] == "ERL1")]
+            .sort_values("final", ascending=False),
+            percentile="erl2_percentile")
 
     path = f"data/promotions_{args.season_from}_{args.season_to}.csv"
     merged.to_csv(path, index=False)
