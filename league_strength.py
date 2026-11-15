@@ -25,6 +25,7 @@ import re
 import pandas as pd
 
 from leaguepedia import cargo_query
+from leagues import leagues_for
 from scoring import ERL2_DISCOUNT, ERL2_PARENT, EXCLUDED_EM_TEAMS, SHRINK_APPEARANCES
 
 
@@ -107,10 +108,27 @@ def league_coefficients(games, seasons, verbose=False):
     return coefs.sort_values("coef", ascending=False)
 
 
+def load_season(season):
+    """Charge data/pro_games_<saison>.csv, ou None s'il n'existe pas.
+
+    Les colonnes season / league_code / tier sont (re)calculées depuis
+    leagues.py : les fichiers créés par une ancienne version de fetch_pro.py
+    restent utilisables, et une correction de leagues.py s'applique sans
+    retélécharger.
+    """
+    path = f"data/pro_games_{season}.csv"
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path, parse_dates=["date", "birthdate"])
+    config = leagues_for(season)
+    df["season"] = season
+    df["league_code"] = df["league"].map(lambda l: config.get(l, (l, "?"))[0])
+    df["tier"] = df["league"].map(lambda l: config.get(l, (l, "?"))[1])
+    return df
+
+
 def load_games(seasons):
-    frames = [pd.read_csv(f"data/pro_games_{s}.csv", parse_dates=["date", "birthdate"])
-              for s in seasons
-              if os.path.exists(f"data/pro_games_{s}.csv")]
+    frames = [df for df in map(load_season, seasons) if df is not None]
     if not frames:
         raise SystemExit("Aucune donnée : lance d'abord fetch_pro.py")
     return pd.concat(frames, ignore_index=True)

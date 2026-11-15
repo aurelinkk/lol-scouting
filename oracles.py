@@ -115,11 +115,15 @@ def coverage(season):
 
 def match_report(season):
     """Pour chaque ligue couverte : % de joueurs Leaguepedia retrouvés dans Oracle's Elixir."""
-    games_path = f"data/pro_games_{season}.csv"
+    from league_strength import load_season  # import local : évite un import circulaire
+
     oe = player_oe_stats(season)
-    if oe is None or not os.path.exists(games_path):
+    games = load_season(season)
+    if oe is None or games is None:
+        if games is None:
+            print(f"\n(data/pro_games_{season}.csv absent : lance fetch_pro.py "
+                  "pour voir quels joueurs sont retrouvés)")
         return
-    games = pd.read_csv(games_path)
     players = (games.groupby(["player", "role", "league_code"]).size()
                .reset_index(name="games"))
     players = players[players["games"] >= 5]
