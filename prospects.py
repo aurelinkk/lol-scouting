@@ -66,6 +66,7 @@ def add_champion_adjusted(df):
 def aggregate(df):
     """Une ligne par saison / joueur / ligue / rôle."""
     keys = ["season", "player", "league_code", "tier", "role"]
+    df = df.sort_values("date")  # pour que "last" = la partie la plus récente
     grouped = df.groupby(keys)
     totals = grouped[["kills", "deaths", "assists", "cs", "gold", "damage",
                       "vision_score", "duration_min"]].sum()
@@ -97,7 +98,9 @@ def aggregate(df):
     }).reset_index()
 
     # Âge au moment de la dernière partie de la saison
-    stats["age"] = ((stats["last_game"] - stats["birthdate"]).dt.days / 365.25).round(1)
+    # (dernière partie de la saison, toutes ligues confondues)
+    season_end = stats.groupby(["season", "player"])["last_game"].transform("max")
+    stats["age"] = ((season_end - stats["birthdate"]).dt.days / 365.25).round(1)
     return stats
 
 
@@ -151,10 +154,15 @@ def build_ranking(games, season, coef_seasons, min_games=10):
     league_rows["league_score"] = league_rows["score"] * league_rows["sample_factor"]
     league_rows = league_rows.drop(columns="score")
 
-    # Ligue principale d'un joueur = celle où il a le plus de parties
+    # Ligue principale d'un joueur : la plus haute qu'il a jouée avec assez de
+    # parties (ERL1 avant ERL2), puis la plus récente. Ex : Looki 2026 =
+    # LFL avec KC Blue, pas la PRM2 de l'automne 2025 avec DKB.
+    tier_order = {"ERL1": 0, "ERL2": 1}
     ranking = (league_rows.dropna(subset=["league_score"])
-               .sort_values("games", ascending=False)
-               .drop_duplicates("player"))
+               .assign(_tier=lambda d: d["tier"].map(tier_order))
+               .sort_values(["_tier", "last_game"], ascending=[True, False])
+               .drop_duplicates("player")
+               .drop(columns="_tier"))
 
     # Bonus de niveau de ligue
     coefs = league_coefficients(load_games(coef_seasons), coef_seasons)

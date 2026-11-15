@@ -187,7 +187,8 @@ def main():
     players = {}
     for player, rows in stats.groupby("player"):
         rows = rows.sort_values(["season", "games"], ascending=[True, False])
-        latest = rows[rows["season"] == rows["season"].max()].iloc[0]
+        # Situation actuelle = la ligne de sa partie la plus récente
+        latest = rows.loc[rows["last_game"].idxmax()]
         birth = rows["birthdate"].dropna()
         evo = evolution[evolution["player"] == player].sort_values("date")
         players[ids[player]] = {
