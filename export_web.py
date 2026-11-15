@@ -187,8 +187,11 @@ def main():
     players = {}
     for player, rows in stats.groupby("player"):
         rows = rows.sort_values(["season", "games"], ascending=[True, False])
-        # Situation actuelle = la ligne de sa partie la plus récente
-        latest = rows.loc[rows["last_game"].idxmax()]
+        # Situation actuelle = la ligne de sa partie la plus récente, hors EMEA
+        # Masters (on veut la ligue de son club, pas le tournoi international)
+        club_rows = rows[rows["tier"] != "EM"]
+        latest = (club_rows if len(club_rows) else rows)
+        latest = latest.loc[latest["last_game"].idxmax()]
         birth = rows["birthdate"].dropna()
         evo = evolution[evolution["player"] == player].sort_values("date")
         players[ids[player]] = {
