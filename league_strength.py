@@ -124,7 +124,31 @@ def load_season(season):
     df["season"] = season
     df["league_code"] = df["league"].map(lambda l: config.get(l, (l, "?"))[0])
     df["tier"] = df["league"].map(lambda l: config.get(l, (l, "?"))[1])
-    return apply_birthdates(df)
+    return apply_birthdates(apply_player_overrides(df))
+
+
+OVERRIDES_FILE = "player_overrides.csv"
+
+
+def apply_player_overrides(df):
+    """Corrige l'identité des joueurs que Leaguepedia a mal rattachés.
+
+    player_overrides.csv : player_link,player
+      - player_link : le nom tel qu'écrit dans le match (colonne player_link)
+      - player      : le joueur auquel ces parties appartiennent vraiment
+    Ex : "BOOSHI,BOOSHI (BK ROG)" sépare BOOSHI de BK ROG du Booshi de ZYB,
+    que la jointure de Leaguepedia (insensible à la casse) avait fusionnés.
+    """
+    if not os.path.exists(OVERRIDES_FILE) or "player_link" not in df:
+        return df
+    overrides = pd.read_csv(OVERRIDES_FILE)
+    mapping = dict(zip(overrides["player_link"], overrides["player"]))
+    mask = df["player_link"].isin(mapping)
+    df.loc[mask, "player"] = df.loc[mask, "player_link"].map(mapping)
+    # La date de naissance / le pays venaient de l'autre joueur : on les retire
+    df.loc[mask, "birthdate"] = pd.NaT
+    df.loc[mask, "country"] = None
+    return df
 
 
 BIRTHDATES_FILE = "birthdates.csv"

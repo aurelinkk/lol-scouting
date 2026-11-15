@@ -60,7 +60,6 @@ _LEGACY_ERL = {   # 2023-2024
     "Greek Legends League": ("HLL", "ERL1"),
     "Esports Balkan League": ("EBL", "ERL1"),
     "Arabian League": ("AL", "ERL1"),
-    "European Pro League": ("EPL", "ERL1"),  # à confirmer
     # ERL2
     "La Ligue Française Division 2": ("LFL2", "ERL2"),
     "Prime League 1st Division": ("PRM2", "ERL2"),
