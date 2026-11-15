@@ -19,7 +19,7 @@ import argparse
 import pandas as pd
 
 from league_strength import league_coefficients, load_games
-from oracles import OE_STATS, normalize_name, player_oe_stats
+from oracles import OE_STATS, attach_oe
 from scoring import (EM_MIN_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
                      MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS)
 
@@ -34,7 +34,9 @@ def add_game_metrics(df):
     df["dmg_share"] = df["damage"] / team["damage"]
     df["gold_share"] = df["gold"] / team["gold"]
     df["kp"] = (df["kills"] + df["assists"]) / df["team_kills"].where(df["team_kills"] > 0)
-    return add_champion_adjusted(df)
+    df = add_champion_adjusted(df)
+    # Stats @15 / first blood d'Oracle's Elixir, rattachées partie par partie
+    return attach_oe(df)
 
 
 # Nombre minimum de parties sur un champion (à un poste) pour avoir une moyenne
@@ -86,6 +88,9 @@ def aggregate(df):
         "dpm_vs_champ": grouped["dpm_vs_champ"].mean(),
         "gold_share": grouped["gold_share"].mean(),
         "champions": grouped["champion"].nunique(),
+        # Oracle's Elixir : moyenne sur les parties retrouvées
+        **{stat: grouped[stat].mean() for stat in OE_STATS},
+        "oe_games": grouped["oe_match"].sum(),
         "birthdate": grouped["birthdate"].first(),
         "last_game": grouped["date"].max(),
         "country": grouped["country"].first(),
@@ -93,21 +98,7 @@ def aggregate(df):
 
     # Âge au moment de la dernière partie de la saison
     stats["age"] = ((stats["last_game"] - stats["birthdate"]).dt.days / 365.25).round(1)
-    return add_oe_stats(stats)
-
-
-def add_oe_stats(stats):
-    """Ajoute les stats @15 / first blood d'Oracle's Elixir quand elles existent."""
-    frames = [player_oe_stats(s) for s in stats["season"].unique()]
-    frames = [f for f in frames if f is not None]
-    if not frames:
-        for col in OE_STATS + ["oe_games"]:
-            stats[col] = float("nan")
-        return stats
-    oe = pd.concat(frames, ignore_index=True)
-    stats["name_key"] = stats["player"].map(normalize_name)
-    stats = stats.merge(oe, on=["season", "name_key", "role", "league_code"], how="left")
-    return stats.drop(columns="name_key")
+    return stats
 
 
 def zscores(group, role):

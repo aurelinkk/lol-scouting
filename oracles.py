@@ -10,7 +10,11 @@ Téléchargement (manuel : le site est protégé contre les robots) :
    2026_LoL_esports_match_data_from_OraclesElixir.csv
 3. Le placer dans data/oracles/
 
-Les stats sont rattachées aux joueurs de Leaguepedia par (saison, nom du joueur).
+Rattachement aux parties Leaguepedia : partie par partie, sans utiliser les
+pseudos (qui diffèrent souvent entre les deux sources). Une ligne joueur est
+identifiée par le jour du match, le poste, le champion et le K/D/A ; à défaut
+(nom de champion écrit différemment), par le jour, le poste, le K/D/A et le
+gold total ; enfin en tolérant un jour d'écart (fuseaux horaires).
 """
 import glob
 import os
@@ -23,40 +27,44 @@ OE_DIR = "data/oracles"
 ROLE_MAP = {"top": "Top", "jng": "Jungle", "mid": "Mid", "bot": "Bot", "sup": "Support"}
 
 # Code de ligue Oracle's Elixir -> code stable de leagues.py
-# (vérifié sur le fichier 2026 ; pour une autre saison, lancer
+# (vérifié sur les fichiers 2025 et 2026 ; pour une autre saison, lancer
 #  `python oracles.py <saison>` et compléter si une ligue manque)
 OE_LEAGUE_MAP = {
     "LEC": "LEC", "EM": "EM",
     "LFL": "LFL", "PRM": "PRM", "LES": "ES", "NLC": "NLC", "LIT": "LIT",
     "RL": "RL", "ROL": "ROL", "HM": "HM", "TCL": "TCL", "LPLOL": "LPLOL",
     "HLL": "HLL", "EBL": "EBL", "AL": "AL",
-    "HC": "HM2",   # Hitpoint Challengers
-    "NL": "LFL2",  # Nexus League
-    "SL": "ES",    # LVP SuperLiga (saisons avant la LES)
-    "LFL2": "LFL2",
+    "HC": "HM2",       # Hitpoint Challengers
+    "NL": "LFL2",      # Nexus League (2026)
+    "LFL2": "LFL2",    # LFL Division 2 (2025)
+    "LVP SL": "ES",    # LVP SuperLiga (2025, avant la LES)
+    "NEXO": "ES2",     # Liga Nexo (2025)
 }
 
-# Colonnes Oracle's Elixir utilisées
 OE_COLUMNS = [
-    "gameid", "datacompleteness", "league", "year", "position", "playername",
-    "teamname", "firstbloodkill", "firstbloodassist", "firstbloodvictim",
-    "csdiffat15", "golddiffat15", "xpdiffat15", "csat15", "goldat15", "xpat15",
+    "gameid", "datacompleteness", "league", "date", "position", "playername",
+    "teamname", "champion", "kills", "deaths", "assists", "totalgold",
+    "firstbloodkill", "firstbloodassist", "firstbloodvictim",
+    "csdiffat15", "golddiffat15", "xpdiffat15",
 ]
+NUMERIC = ["kills", "deaths", "assists", "totalgold", "firstbloodkill", "firstbloodassist",
+           "firstbloodvictim", "csdiffat15", "golddiffat15", "xpdiffat15"]
 
-# Stats produites (moyenne par joueur), utilisables dans scoring.py
+# Stats produites (par partie, puis moyennées par joueur), utilisables dans scoring.py
 OE_STATS = ["csd15", "gd15", "xpd15", "ahead_cs15", "fb_part", "fb_victim"]
 
-
-# Pseudos différents entre Leaguepedia et Oracle's Elixir :
-# "pseudo Oracle's Elixir": "pseudo Leaguepedia" (voir `python oracles.py 2026`)
-NAME_ALIASES = {
-}
+_cache = {}
 
 
 def normalize_name(name):
-    """'Koala (Alexis Gonzalez)' -> 'koala' pour rapprocher les deux sources."""
-    name = NAME_ALIASES.get(str(name), str(name))
-    return re.sub(r"\s*\(.*\)\s*$", "", name).strip().lower()
+    """'Koala (Alexis Gonzalez)' -> 'koala'."""
+    return re.sub(r"\s*\(.*\)\s*$", "", str(name)).strip().lower()
+
+
+def champion_key(name):
+    """Nom de champion comparable entre les sources : "Kai'Sa" -> "kaisa"."""
+    key = re.sub(r"[^a-z0-9]", "", str(name).lower())
+    return "nunu" if key.startswith("nunu") else key
 
 
 def oe_file(season):
@@ -65,47 +73,85 @@ def oe_file(season):
 
 
 def load_oe(season):
+    """Lignes joueurs d'Oracle's Elixir (sans les lignes "team"), ou None."""
+    if season in _cache:
+        return _cache[season]
     path = oe_file(season)
     if not path:
+        _cache[season] = None
         return None
     df = pd.read_csv(path, usecols=lambda c: c in OE_COLUMNS, low_memory=False)
-    df = df[df["position"].isin(ROLE_MAP)]  # on retire les lignes "team"
+    df = df[df["position"].isin(ROLE_MAP)].copy()
     df["role"] = df["position"].map(ROLE_MAP)
     df["league_code"] = df["league"].map(OE_LEAGUE_MAP)
-    df["name_key"] = df["playername"].map(normalize_name)
-    for col in OE_COLUMNS[7:]:
+    for col in NUMERIC:
         df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["day"] = pd.to_datetime(df["date"], errors="coerce").dt.normalize()
+    df["champ_key"] = df["champion"].map(champion_key)
+
+    # Stats par partie (seules les parties "complete" ont les données @15)
+    complete = df["datacompleteness"] == "complete"
+    df["csd15"] = df["csdiffat15"].where(complete)
+    df["gd15"] = df["golddiffat15"].where(complete)
+    df["xpd15"] = df["xpdiffat15"].where(complete)
+    df["ahead_cs15"] = (df["csdiffat15"] > 0).astype(float).where(df["csd15"].notna())
+    df["fb_part"] = ((df["firstbloodkill"] == 1) | (df["firstbloodassist"] == 1)).astype(float)
+    df["fb_part"] = df["fb_part"].where(df["firstbloodkill"].notna())
+    df["fb_victim"] = df["firstbloodvictim"]
+    _cache[season] = df
     return df
 
 
-def player_oe_stats(season):
-    """Une ligne par joueur et rôle, ou None si pas de fichier pour la saison."""
-    df = load_oe(season)
-    if df is None:
-        return None
+def _unique(df, keys):
+    """Ne garde que les lignes dont la clé est unique (évite les faux rattachements)."""
+    return df[~df.duplicated(keys, keep=False)]
 
-    # Les parties "partial" n'ont pas les données à 15 min
-    complete = df[df["datacompleteness"] == "complete"].copy()
-    complete["ahead_cs15"] = (complete["csdiffat15"] > 0).astype(float)
-    complete["fb_part"] = ((complete["firstbloodkill"] == 1)
-                           | (complete["firstbloodassist"] == 1)).astype(float)
 
-    complete = complete.dropna(subset=["league_code"])
-    stats = complete.groupby(["name_key", "role", "league_code"]).agg(
-        oe_games=("gameid", "nunique"),
-        csd15=("csdiffat15", "mean"),
-        gd15=("golddiffat15", "mean"),
-        xpd15=("xpdiffat15", "mean"),
-        ahead_cs15=("ahead_cs15", "mean"),
-        fb_part=("fb_part", "mean"),
-        fb_victim=("firstbloodvictim", "mean"),
-    ).reset_index()
-    stats["season"] = season
-    return stats
+def attach_oe(games):
+    """Ajoute aux parties Leaguepedia les stats Oracle's Elixir de la même partie.
+
+    `games` : une ligne par joueur et par partie (colonnes date, role, champion,
+    kills, deaths, assists, gold, season). Ajoute OE_STATS (NaN si pas trouvé).
+    """
+    games = games.copy()
+    for col in OE_STATS:
+        games[col] = float("nan")
+    games["oe_match"] = False
+
+    for season in games["season"].unique():
+        oe = load_oe(int(season))
+        if oe is None:
+            continue
+        mask = games["season"] == season
+        g = games.loc[mask, ["date", "role", "champion", "kills", "deaths", "assists", "gold"]].copy()
+        g["day"] = pd.to_datetime(g["date"], errors="coerce").dt.normalize()
+        g["champ_key"] = g["champion"].map(champion_key)
+        g["totalgold"] = g["gold"]
+        found = pd.DataFrame(index=g.index, columns=OE_STATS, dtype=float)
+        matched = pd.Series(False, index=g.index)
+
+        passes = [
+            (["day", "role", "champ_key", "kills", "deaths", "assists"], 0),
+            (["day", "role", "kills", "deaths", "assists", "totalgold"], 0),
+            (["day", "role", "champ_key", "kills", "deaths", "assists"], 1),
+            (["day", "role", "champ_key", "kills", "deaths", "assists"], -1),
+        ]
+        for keys, shift in passes:
+            left = _unique(g[~matched], keys).reset_index()
+            right = oe[keys + OE_STATS].copy()
+            right["day"] = right["day"] + pd.Timedelta(days=shift)
+            right = _unique(right, keys)
+            m = left.merge(right, on=keys, how="inner").set_index("index")
+            found.loc[m.index, OE_STATS] = m[OE_STATS].values
+            matched.loc[m.index] = True
+
+        games.loc[mask, OE_STATS] = found.values
+        games.loc[mask, "oe_match"] = matched.values
+    return games
 
 
 def coverage(season):
-    """Nombre de parties complètes par ligue dans le fichier (pour vérifier)."""
+    """Nombre de parties par ligue dans le fichier (pour vérifier)."""
     df = load_oe(season)
     if df is None:
         return None
@@ -114,35 +160,34 @@ def coverage(season):
 
 
 def match_report(season):
-    """Pour chaque ligue couverte : % de joueurs Leaguepedia retrouvés dans Oracle's Elixir."""
+    """% des parties Leaguepedia retrouvées dans Oracle's Elixir, par ligue."""
     from league_strength import load_season  # import local : évite un import circulaire
 
-    oe = player_oe_stats(season)
     games = load_season(season)
-    if oe is None or games is None:
-        if games is None:
-            print(f"\n(data/pro_games_{season}.csv absent : lance fetch_pro.py "
-                  "pour voir quels joueurs sont retrouvés)")
+    if games is None:
+        print(f"\n(data/pro_games_{season}.csv absent : lance fetch_pro.py "
+              "pour voir quelles parties sont retrouvées)")
         return
-    players = (games.groupby(["player", "role", "league_code"]).size()
-               .reset_index(name="games"))
-    players = players[players["games"] >= 5]
-    players["name_key"] = players["player"].map(normalize_name)
-    covered = players[players["league_code"].isin(oe["league_code"].unique())]
-    merged = covered.merge(oe, on=["name_key", "role", "league_code"], how="left")
+    games = attach_oe(games)
+    oe = load_oe(season)
+    covered = set(oe["league_code"].dropna())
+    g = games[games["league_code"].isin(covered)]
 
-    print("\nJoueurs retrouvés (au moins 5 parties) :")
-    rate = merged.groupby("league_code")["oe_games"].agg(lambda s: s.notna().mean())
+    print("\nLignes joueur-partie Leaguepedia retrouvées dans Oracle's Elixir :")
+    rate = g.groupby("league_code")["oe_match"].mean().sort_values()
     print((100 * rate).round(0).astype(int).astype(str).add(" %").to_string())
 
-    missing = merged[merged["oe_games"].isna()]
+    per_player = g.groupby(["player", "league_code", "role"])["oe_match"].agg(["sum", "count"])
+    missing = per_player[(per_player["count"] >= 5) & (per_player["sum"] == 0)]
     if not missing.empty:
-        print(f"\n{len(missing)} joueurs non retrouvés (pseudo différent ?) :")
-        for code, g in missing.groupby("league_code"):
-            print(f"  {code}: " + ", ".join(f"{p} ({r})" for p, r in zip(g["player"], g["role"])))
+        print(f"\n{len(missing)} joueurs (5+ parties) sans aucune partie retrouvée :")
+        for code, grp in missing.reset_index().groupby("league_code"):
+            print(f"  {code}: " + ", ".join(f"{p} ({r})" for p, r in zip(grp["player"], grp["role"])))
 
-    unmapped = set(load_oe(season)["league"]) - set(OE_LEAGUE_MAP)
-    print("\nLigues Oracle's Elixir non utilisées :", ", ".join(sorted(unmapped)))
+    not_covered = sorted(set(games["league_code"]) - covered)
+    print("\nNos ligues absentes d'Oracle's Elixir :", ", ".join(not_covered) or "aucune")
+    unmapped = set(oe["league"]) - set(OE_LEAGUE_MAP)
+    print("Ligues Oracle's Elixir non utilisées :", ", ".join(sorted(unmapped)))
 
 
 if __name__ == "__main__":

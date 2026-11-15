@@ -101,7 +101,7 @@ def main():
         print(f"Âge : {age} | Parties : {row['games']} ({wins}W - {row['games'] - wins}L) "
               f"| Comparé à {len(peers)} joueurs {row['role']} de la ligue "
               f"(min. {args.min_games} parties)")
-        if pd.isna(row.get("oe_games")):
+        if not row.get("oe_games"):
             print("Stats @15 / first blood : indisponibles (pas de données Oracle's Elixir)")
         print()
 

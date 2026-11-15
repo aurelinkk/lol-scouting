@@ -229,7 +229,7 @@ def main():
         "leagues": int(games["league_code"].nunique()),
         "weights": ROLE_WEIGHTS, "league_weight": LEAGUE_WEIGHT, "em_weight": EM_WEIGHT,
         "stat_labels": STAT_LABELS,
-        "has_oe": bool(stats["oe_games"].notna().any()),
+        "has_oe": bool((stats["oe_games"] > 0).any()),
     })
 
 
