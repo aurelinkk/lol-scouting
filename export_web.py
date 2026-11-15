@@ -17,7 +17,10 @@ import unicodedata
 
 import pandas as pd
 
-from careers import fetch_awards, fetch_titles, level_totals, stints, titles_by_player
+import glob
+
+from careers import (fetch_awards, fetch_titles, level_totals, outside_stints, stints,
+                     titles_by_player)
 from images import get_image_urls
 from rosters import ROLES as ROSTER_ROLES, build_rosters, load_mercato, mercato_file, resolve_name
 from league_strength import available_seasons, coef_window, league_coefficients, load_games
@@ -209,8 +212,16 @@ def main():
 
     # Carrière : périodes en club, titres, récompenses individuelles
     st = stints(games)
+    # Périodes hors EMEA déjà relevées (ex : LØS en CBLOL pour Zest et Feisty)
+    outside_files = glob.glob("data/raw/outside_*.csv")
+    if outside_files:
+        from careers import fetch_outside_games
+        out_games = pd.concat([fetch_outside_games(
+            pd.read_csv(f)["player"].dropna().unique().tolist(), int(f[-8:-4])) for f in outside_files])
+        st = pd.concat([st, outside_stints(out_games)], ignore_index=True)
+    st = st.sort_values(["player", "start"])
     st_by = {p: g for p, g in st.groupby("player")}
-    lv_by = {p: g for p, g in level_totals(st).groupby("player")}
+    lv_by = {p: g for p, g in level_totals(st[st["tier"] != "OTHER"]).groupby("player")}
     tt = titles_by_player(games, fetch_titles(seasons))
     tt_by = {p: g for p, g in tt.groupby("player")}
     aw = fetch_awards()

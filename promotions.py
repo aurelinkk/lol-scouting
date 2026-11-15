@@ -122,11 +122,32 @@ def compute_promotions(games, season_from, season_to, coef_seasons=None, min_gam
         prev["from_season"] = season_from - 1
         merged = pd.concat([merged, prev], ignore_index=True)
 
+    # Venus d'une autre région (pas des montées d'ERL) : ex. Zest et Feisty, LØS
+    # (CBLOL) en 2026 avant la LEC en 2027
+    merged["origin"] = "ERL"
+    candidates = merged.loc[merged["from_season"] < season_from, "player"].tolist()
+    if candidates:
+        try:
+            from careers import fetch_outside_games
+            outside = fetch_outside_games(candidates, season_from)
+            domestic = outside[~outside["international"]]
+            if not domestic.empty:
+                main = (domestic.sort_values("date").groupby("player")
+                        .agg(team=("team", "last"), league=("league_code", "last")))
+                mask = merged["player"].isin(main.index)
+                merged.loc[mask, "origin"] = "other_region"
+                merged.loc[mask, "other_team"] = merged.loc[mask, "player"].map(main["team"])
+                merged.loc[mask, "other_league"] = merged.loc[mask, "player"].map(main["league"])
+        except Exception as e:  # pas de réseau : on garde la montée telle quelle
+            print(f"  (vérification des autres régions impossible : {e})")
+
     both = games[games["season"].isin([season_from - 1, season_from, season_to])]
     merged = merged.merge(previous_club(both, after), on="player", how="left")
     # Par défaut, l'équipe de la saison N
     merged["from_team"] = merged["from_team"].fillna(merged["team"])
     merged["from_league"] = merged["from_league"].fillna(merged["league_code"])
+    # Arrivées d'une autre ligue majeure : ce ne sont pas des montées, on les retire
+    merged = merged[merged["origin"] != "other_region"]
     return merged
 
 
@@ -135,6 +156,8 @@ def hit_rates(merged):
     rows = []
     buckets = [(0.9, 1.01, "top 10 %"), (0.75, 0.9, "top 10-25 %"),
                (0.5, 0.75, "top 25-50 %"), (0, 0.5, "moitié basse")]
+    if "from_season" in merged:
+        merged = merged[merged["from_season"] == merged["from_season"].max()]
     for tier, targets in [("ERL1", {"LEC"}), ("ERL2", {"LEC", "ERL1"})]:
         t = merged[merged["tier"] == tier]
         for lo, hi, label in buckets:

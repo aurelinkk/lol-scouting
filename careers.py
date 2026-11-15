@@ -103,3 +103,66 @@ def level_totals(st):
     """Parties et durée (jours) par niveau, par joueur."""
     st = st.assign(days=(st["end"] - st["start"]).dt.days + 1)
     return st.groupby(["player", "tier"]).agg(games=("games", "sum"), days=("days", "sum")).reset_index()
+
+
+# --------------------------------------------------------------------------
+# Parties hors EMEA (joueurs venus d'une autre région : ex. Zest et Feisty,
+# LØS en CBLOL en 2026, avant de rejoindre la LEC en 2027)
+# --------------------------------------------------------------------------
+OUTSIDE = "data/raw/outside_{season}.csv"
+INTERNATIONAL = r"World Championship|Mid-Season Invitational|Esports World Cup|First Stand|Asian Games"
+LEAGUE_SHORT = {
+    "Circuit Brazilian League of Legends": "CBLOL",
+    "LoL Champions Korea": "LCK",
+    "LoL Champions Korea Challengers League": "LCK CL",
+    "Tencent LoL Pro League": "LPL",
+    "League of Legends Championship Series": "LCS",
+    "League of Legends Championship of The Americas": "LTA",
+    "LTA North": "LTA N", "LTA South": "LTA S",
+    "League of Legends Championship Pacific": "LCP",
+    "North American Challengers League": "NACL",
+    "Liga Latinoamérica": "LLA",
+}
+
+
+def fetch_outside_games(players, season, refresh=False):
+    """Parties de `players` hors EMEA pendant `season` (cache par saison)."""
+    path = OUTSIDE.format(season=season)
+    cached = pd.read_csv(path) if os.path.exists(path) and not refresh else pd.DataFrame(
+        columns=["player", "team", "league", "region", "tournament", "date", "game_id"])
+    todo = sorted(set(players) - set(cached.get("checked", cached["player"]).dropna()))
+    if todo:
+        rows = []
+        for i in range(0, len(todo), 20):
+            quoted = ",".join("'" + p.replace("'", "\\'") + "'" for p in todo[i:i + 20])
+            rows += cargo_query(
+                tables="ScoreboardPlayers=SP,ScoreboardGames=SG,Tournaments=T,PlayerRedirects=PR",
+                join_on="SP.GameId=SG.GameId,SG.OverviewPage=T.OverviewPage,SP.Link=PR.AllName",
+                fields="PR.OverviewPage=player,SP.Team=team,T.League=league,T.Region=region,"
+                       "T.Name=tournament,SG.DateTime_UTC=date,SG.GameId=game_id",
+                where=f"PR.OverviewPage IN ({quoted}) AND T.Year={season} AND T.Region!='EMEA'")
+        new = pd.DataFrame(rows, columns=["player", "team", "league", "region", "tournament", "date", "game_id"])
+        # On note aussi les joueurs vérifiés sans partie hors EMEA (pour ne pas redemander)
+        checked = pd.DataFrame({"checked": todo})
+        cached = pd.concat([cached, new, checked], ignore_index=True)
+        os.makedirs("data/raw", exist_ok=True)
+        cached.to_csv(path, index=False)
+    out = cached.dropna(subset=["player"]).copy()
+    out["date"] = pd.to_datetime(out["date"], errors="coerce")
+    out["league_code"] = out["league"].map(LEAGUE_SHORT).fillna(out["league"])
+    out["international"] = (out["region"].eq("International")
+                            | out["league"].str.contains(INTERNATIONAL, case=False, na=False)
+                            | out["tournament"].str.contains(INTERNATIONAL, case=False, na=False))
+    return out[out["player"].isin(players)]
+
+
+def outside_stints(outside):
+    """Périodes en club hors EMEA (ligues domestiques, pas les tournois internationaux)."""
+    g = outside[~outside["international"]].sort_values(["player", "date"])
+    if g.empty:
+        return pd.DataFrame(columns=["player", "team", "league_code", "tier", "start", "end", "games"])
+    out = (g.groupby(["player", "team", "league_code"])
+           .agg(start=("date", "min"), end=("date", "max"), games=("game_id", "nunique"))
+           .reset_index())
+    out["tier"] = "OTHER"
+    return out

@@ -87,6 +87,11 @@ export function CareerTimeline({ career }: { career: Career }) {
             <span className="h-2.5 w-2.5 rounded-sm" style={{ background: TIER_COLOR[t] }} /> {TIER_NAME[t]}
           </span>
         ))}
+        {career.stints.some((s) => s.tier === "OTHER") && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: TIER_COLOR.OTHER }} /> Autre région
+          </span>
+        )}
         <span className="flex items-center gap-1.5">🏆 titre</span>
       </div>
 
