@@ -15,6 +15,8 @@ LEAGUES = {
 
     # ERL1 (ligues régionales principales)
     "La Ligue Française": "ERL1",
+    # Attention : Leaguepedia garde les anciens noms de la Prime League.
+    # "Prime League Pro Division" = la "1st Division" depuis 2026 (ERL1)
     "Prime League Pro Division": "ERL1",
     "Liga Española de League of Legends": "ERL1",
     "Northern League of Legends Championship": "ERL1",
@@ -29,7 +31,11 @@ LEAGUES = {
     "Arabian League": "ERL1",
 
     # ERL2 (deuxièmes divisions)
+    # "Prime League 1st Division" = la "2nd Division" depuis 2026 (ERL2)
     "Prime League 1st Division": "ERL2",
+    # En 2026 la LFL Division 2 ne contient plus que la promotion ;
+    # la 2e division française est la Nexus League (à confirmer)
+    "Nexus League": "ERL2",
     "La Ligue Française Division 2": "ERL2",
     "Hitpoint Challengers": "ERL2",
     "Benelux Ascend Series": "ERL2",
