@@ -149,8 +149,48 @@ def pro_accounts(season_files=None):
     return df[df["name_key"] != ""].drop_duplicates()
 
 
-def link_pros(ladder, accounts):
-    df = ladder.merge(accounts, on="puuid", how="left")
+def pro_pseudos(seasons=None):
+    """Pseudo -> joueur pro, pour les pseudos portés par un seul pro actif (2 dernières saisons)."""
+    from league_strength import available_seasons, load_season
+    players = set()
+    for season in seasons or available_seasons()[-2:]:
+        games = load_season(season)
+        if games is not None:
+            players |= set(games["player"].unique())
+    keys = pd.DataFrame({"player": sorted(players)})
+    keys["key"] = keys["player"].map(lambda p: norm(re.sub(r"\s*\(.*\)$", "", p)))
+    keys = keys[keys["key"].str.len() >= 4]
+    unique = keys[~keys["key"].duplicated(keep=False)]
+    return dict(zip(unique["key"], unique["player"]))
+
+
+COMMON_TAGS = {"euw", "euw1", "eune", "0000", "000", "1111", "123", "2003", "lol", "fr"}
+
+
+def link_by_pseudo(df, pseudos):
+    """3e passe : nom du compte = pseudo d'un pro (« Theocacs#EUW »), éventuellement
+    précédé du tag de l'équipe (« LR Velja »), ou tag = pseudo (« ...#PANDA »)."""
+    def guess(name, tag):
+        name = str(name or "")
+        candidates = [norm(name)]
+        parts = name.split()
+        if len(parts) >= 2 and 2 <= len(parts[0]) <= 4 and parts[0].isupper():
+            candidates.append(norm(" ".join(parts[1:])))     # "LR Velja" -> velja
+        for c in candidates:
+            if c in pseudos:
+                return pseudos[c]
+        t = norm(tag)
+        if t and t not in COMMON_TAGS and t in pseudos:          # "#PANDA"
+            return pseudos[t]
+        return None
+    missing = df["pro"].isna()
+    df.loc[missing, "pro"] = [guess(n, t) for n, t in zip(df.loc[missing, "game_name"],
+                                                          df.loc[missing, "tag_line"])]
+    return df
+
+
+def link_pros(ladder, accounts=None):
+    df = ladder.merge(accounts, on="puuid", how="left") if accounts is not None else ladder.copy()
     df["riot_id"] = df["game_name"].fillna("?") + "#" + df["tag_line"].fillna("?")
     df["name_key"] = df["game_name"].map(norm)
     df["tag_key"] = df["tag_line"].map(norm)
@@ -163,7 +203,12 @@ def link_pros(ladder, accounts):
     by_name = by_name[~by_name.duplicated("name_key", keep=False)][["name_key", "player"]]
     df = df.merge(by_name.rename(columns={"player": "player_by_name"}), on="name_key", how="left")
     df["pro"] = df["player"].fillna(df["player_by_name"])
-    return df.drop(columns=["player", "player_by_name", "name_key", "tag_key"])
+    df = df.drop(columns=["player", "player_by_name", "name_key", "tag_key"])
+    try:
+        df = link_by_pseudo(df, pro_pseudos())
+    except Exception as e:  # pas de données de matchs pros
+        print(f"  (reconnaissance par pseudo impossible : {e})")
+    return df
 
 
 # --------------------------------------------------------------------------
@@ -294,6 +339,8 @@ def update_profiles(top, n_matches, since=None, max_age_days=14):
     if not names:
         raise SystemExit("Aucun relevé : lance d'abord `python soloq.py snapshot`")
     ladder = load_snapshot(names[-1])
+    if "game_name" in ladder:  # lien avec les pros recalculé (reconnaissance par pseudo)
+        ladder = link_pros(ladder.drop(columns=["pro", "riot_id"], errors="ignore"))
     targets = ladder[ladder["pro"].isna()].head(top)
     since = since or f"{datetime.date.today().year}-01-01"
     cache = pd.read_csv(PROFILES) if os.path.exists(PROFILES) else pd.DataFrame(columns=["puuid", "profiled_at"])
@@ -374,6 +421,9 @@ def latest_ladder():
         return None
     df = with_trends(names[-1])
     df["snapshot_date"] = names[-1][:10]
+    # On refait le lien avec les pros à la lecture (améliorations, soloq_accounts.csv)
+    if "game_name" in df:
+        df = link_pros(df.drop(columns=["pro", "riot_id"], errors="ignore"))
     if os.path.exists(PROFILES):
         df = df.merge(pd.read_csv(PROFILES).drop(columns=["profiled_at"], errors="ignore"),
                       on="puuid", how="left")
