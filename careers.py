@@ -70,6 +70,12 @@ def stints(games):
     g = games[(games["tier"] != "EM")
               & ~games["tournament"].str.contains(NOT_TITLE_PATTERN + "|Invitational",
                                                   case=False, na=False)]
+    # Équipes invitées en LEC (ex : KC Blue en LEC Versus 2026) : pas une période en LEC
+    lec = g[g["tier"] == "LEC"]
+    special = lec["tournament"].str.contains(r"Versus|Showmatch|All-Star", case=False, na=False)
+    regular = set(zip(lec.loc[~special, "season"], lec.loc[~special, "team"]))
+    guest = (g["tier"] == "LEC") & ~pd.Series(list(zip(g["season"], g["team"])), index=g.index).isin(regular)
+    g = g[~guest]
     g = g.sort_values(["player", "date"])
     key = g["team"].astype(str) + "|" + g["league_code"].astype(str)
     new_stint = (key != key.groupby(g["player"]).shift()) | (g["player"] != g["player"].shift())
