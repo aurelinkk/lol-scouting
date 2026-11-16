@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Avatar, TeamLogo } from "@/components/Images";
 import { CareerTimeline, LevelSummary, Trophies } from "@/components/Career";
 import { TIER_COLOR, TIER_NAME } from "@/lib/tiers";
+import DeepButton from "@/components/DeepButton";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
 import { getMeta, getPlayer, getRankings } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
@@ -102,6 +103,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                   <dt className="inline text-ink-3">Pays </dt>
                   <dd className="inline font-medium">{player.country}</dd>
                 </div>
+              )}
+              {scores.find((x) => x.soloq_riot_id)?.soloq_riot_id && (
+                <DeepButton riotId={scores.find((x) => x.soloq_riot_id)!.soloq_riot_id!} />
               )}
               <a
                 href={`https://lol.fandom.com/wiki/${encodeURIComponent(player.name.replace(/ /g, "_"))}`}

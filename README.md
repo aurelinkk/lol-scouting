@@ -1,95 +1,75 @@
 # LoL Scouting
 
-Repérage des prospects européens de League of Legends à partir des matchs pros
-(LEC, EMEA Masters, ERL1, ERL2) des saisons 2025 et 2026.
+Outil privé de scouting League of Legends : repérer les **prospects européens**
+(ERL1, ERL2, EMEA Masters, soloQ) **avant** qu'ils montent en LEC, en croisant
+les matchs pros de 2023 à aujourd'hui, la soloQ EUW et le mercato.
 
-## Mise à jour des données
+## Ce que fait le site
 
-```bash
-pip install -r requirements.txt
-python fetch_pro.py --year 2025     # matchs Leaguepedia (cache dans data/raw/)
-python fetch_pro.py --year 2026
-python export_web.py                # JSON pour le site (web/data/, web/public/data/)
-```
-
-Les stats @15 et first blood viennent d'Oracle's Elixir : télécharger les CSV
-sur oracleselixir.com/tools/downloads et les placer dans `data/oracles/`
-(`python oracles.py 2026` vérifie la couverture).
-
-Âges : Leaguepedia n'a pas la date de naissance de beaucoup de joueurs d'ERL.
-`python missing_ages.py` liste les joueurs classés sans âge (du mieux classé au
-moins bien) ; compléter `birthdates.csv` (`player,birthdate,source`), puis
-relancer `python export_web.py`. Si on ne connaît que l'âge (ex : « 22 ans » en
-2026), une année seule est acceptée (`2004`) : l'âge s'affiche « ~22 ans ».
-
-Pour accélérer Leaguepedia, mettre un bot password dans `.env` :
-`LEAGUEPEDIA_USER` et `LEAGUEPEDIA_PASSWORD`.
-
-## SoloQ (clé RIOT_API_KEY dans .env)
-
-```bash
-python soloq.py snapshot            # relevé du top 1000 EUW (~20 min la 1re fois : Riot ID)
-python soloq.py profiles            # stats soloQ de l'année des 200 meilleurs non-pros
-                                    # (50 parties chacun ; long la 1re fois, reprend où il s'arrête)
-python soloq.py show --non-pro --by-score   # ceux qui se démarquent
-python soloq.py show --non-pro      # aperçu dans le terminal
-python export_web.py                # onglet Ladder + soloQ sur les fiches
-```
-
-Lancer `snapshot` une fois par semaine : les évolutions (LP et parties sur 7 / 30
-jours) montrent qui grind, et le pic de LP se construit au fil des relevés (l'API
-Riot ne donne pas l'historique : pas de pic avant notre premier relevé).
-Le score soloQ compare chaque non-pro aux joueurs du même poste (poids dans
-`scoring.py`, section 6) ; il est séparé du score pro. Les comptes des pros viennent de Leaguepedia ; pour
-en ajouter ou corriger, `soloq_accounts.csv` (`player,riot_id`).
-
-## Rosters et mercato
-
-L'onglet Rosters montre les effectifs LEC + ERL1 depuis 2023 (d'après les
-parties jouées) et le mercato de la saison suivante, **construit
-automatiquement** depuis Leaguepedia : effectif de fin de saison, puis
-transferts officiels (RosterChanges) et rumeurs (RosterRumors, qui reprend
-Sheep Esports, X...). Les joueurs sans nouvelle dont le contrat (base GCD de
-Riot, table Contracts) se termine au plus tard le 16/11 sont retirés.
-Il sert aussi aux montées vers la saison suivante.
-
-```bash
-python mercato.py --refresh          # mettre à jour rumeurs / transferts
-python mercato.py --league LFL       # aperçu d'une ligue
-```
-
-Pour corriger un poste à la main (prioritaire sur l'automatique) :
-`rosters_2027.csv` (`league,team,role,player_2026,player_2027`).
-
-## Scripts d'analyse
-
-| Script | Rôle |
+| Onglet | À quoi ça sert |
 |---|---|
-| `prospects.py` | Classement des prospects (filtres âge, poste, niveau) |
-| `player.py <pseudo>` | Fiche joueur : chaque stat vs son poste, détail du score |
-| `promotions.py` | Qui est monté (ERL2→ERL1, ERL1→LEC) et son profil l'année d'avant |
-| `league_strength.py` | Coefficient des ligues d'après les placements à l'EMEA Masters |
-| `scoring.py` | Tous les poids du score (à ajuster) |
-| `missing_ages.py` | Joueurs classés sans date de naissance, à compléter dans `birthdates.csv` |
-| `leagues.py` | Ligues suivies par saison et leur niveau |
-| `soloq.py` | Ladder EUW, lien avec les pros, profil des non-pros |
-| `careers.py` | Carrière : périodes en club, titres, récompenses individuelles |
-| `rosters.py` | Effectifs par split |
-| `mercato.py` | Mercato automatique (Leaguepedia : transferts + rumeurs) |
-| `player_overrides.csv` | Corriger l'identité d'un joueur mal rattaché par Leaguepedia |
+| **Indicateurs** | Meilleurs prospects par poste (21 ans ou moins), niveau des ligues, taux de montée selon le rang |
+| **Données** | Classement complet filtrable (saison, poste, ligue, âge, club actuel…), avec ou sans le niveau de ligue |
+| **Fiche joueur** | Photo, club, âge, carrière en frise (LEC / ERL1 / ERL2 / autres régions), titres, récompenses, chaque stat vs son poste, détail du score, évolution par tournoi |
+| **Montées** | Par saison : qui est monté (ERL2 → ERL1, ERL1 → LEC) et son profil l'année d'avant. Valide le score : 9 montés en LEC sur 11 étaient dans notre top 10 % |
+| **Rosters** | Effectifs LEC + ERL1 depuis 2023 et **mercato automatique** de la saison suivante (transferts officiels, rumeurs Sheep Esports / X, fins de contrat GCD, pistes non tranchées) |
+| **Ladder** | Top 1000 soloQ EUW : non-pros à scouter, progression de LP, volume de jeu, score soloQ par poste (⭐ = top 5 %) |
+| **Analyses** | Analyse soloQ approfondie d'un joueur ciblé (toutes ses parties de l'année) lancée depuis le site, rapport prêt en ~20 min |
 
-## Site web (Vercel)
+## Comment le score est calculé
 
-Application Next.js dans `web/`. Elle lit les JSON produits par `export_web.py`.
+**Score = performance dans sa ligue + niveau de la ligue + EMEA Masters − malus ex-LEC**
+
+- **Performance dans sa ligue** : chaque stat comparée aux joueurs **du même poste dans la même ligue**. On privilégie la phase de lane (écarts de CS, gold et XP à 15 min), puis les dégâts comparés au champion joué, le KDA, la participation aux kills… Le score est réduit quand le joueur a peu de parties.
+- **Niveau de la ligue** : d'après le placement de ses équipes à l'EMEA Masters sur 2 ans (la LFL vaut plus que la Liga Portuguesa).
+- **EMEA Masters** : performance face aux joueurs de toutes les ligues.
+- **Ex-LEC** : petit malus pour les joueurs déjà passés par la LEC, qui remontent un peu plus rarement.
+
+Tous les poids sont dans `scoring.py` et se règlent sans rien retélécharger.
+Le score soloQ des non-pros est séparé du score pro (pas de matchs officiels à comparer).
+
+## Mettre les données à jour (sur le PC)
+
+Prérequis : `pip install -r requirements.txt` ; dans `.env` : `LEAGUEPEDIA_USER`,
+`LEAGUEPEDIA_PASSWORD` (bot password Leaguepedia) et `RIOT_API_KEY` ; les CSV
+d'[Oracle's Elixir](https://oracleselixir.com/tools/downloads) dans `data/oracles/`.
 
 ```bash
-cd web
-npm install
-npm run dev        # http://localhost:3000
+python fetch_pro.py --year 2026        # matchs pros (cache : rapide les fois suivantes)
+python soloq.py snapshot               # relevé du ladder EUW (1 fois / semaine)
+python soloq.py profiles               # stats soloQ de l'année des non-pros (long, reprend où il s'arrête)
+python mercato.py --refresh            # rumeurs, transferts, contrats
+python export_web.py                   # génère les données du site
+git add web/data web/public/data && git commit -m "Données" && git push   # Vercel redéploie
 ```
 
-Déploiement : importer le dépôt sur vercel.com et choisir **`web`** comme
-*Root Directory*. Ensuite, chaque `git push` (après `python export_web.py`)
-redéploie le site.
+Corrections à la main (prioritaires sur les données automatiques) :
 
-Données : Leaguepedia (CC BY-SA 3.0), Oracle's Elixir.
+| Fichier | Pour |
+|---|---|
+| `birthdates.csv` | Âges manquants (`joueur,2004-06-28,source` ; une année seule = âge approximatif « ~22 ans ») — `python missing_ages.py` liste les prioritaires |
+| `rosters_2027.csv` | Corriger un poste du mercato |
+| `soloq_accounts.csv` | Lier un pro à son compte soloQ (`joueur,Pseudo#TAG`) |
+| `player_overrides.csv` | Séparer deux joueurs que Leaguepedia a confondus |
+| `leagues.py` | Ligues suivies par saison et leur niveau (ERL1 / ERL2) |
+
+Outils en ligne de commande : `prospects.py` (classement), `player.py <pseudo>`
+(fiche détaillée), `promotions.py` (montées), `league_strength.py` (coefficients),
+`oracles.py <saison>` (couverture Oracle's Elixir).
+
+## Site (Vercel)
+
+Application Next.js dans `web/` (Root Directory `web` sur Vercel), déployée à
+chaque push sur `main`. Pour les **Analyses** lancées depuis le site :
+
+1. Vercel → Storage / Marketplace → **Upstash Redis** → connecter au projet (gratuit).
+2. Vercel → Settings → Environment Variables : `RIOT_API_KEY` (secrète) et,
+   conseillé, `DEEP_ACCESS_CODE` (code demandé avant de lancer une analyse).
+3. Redéployer. Une analyse avance tant qu'un onglet du site est ouvert.
+
+Développement local : `cd web && npm install && npm run dev`.
+
+## Sources
+
+Leaguepedia (CC BY-SA 3.0) : matchs, joueurs, titres, récompenses, rumeurs,
+transferts, contrats (GCD) · Oracle's Elixir : stats à 15 min · API Riot : soloQ.

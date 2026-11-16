@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import DeepButton from "./DeepButton";
 import { ROLES } from "@/lib/types";
 
 interface LadderRow {
@@ -186,6 +187,9 @@ export default function LadderTable() {
               <tr key={r.riot_id + r.rank} className="border-b border-border last:border-0 hover:bg-surface-2">
                 <td className="px-2 py-1.5 text-right text-ink-3">{r.rank}</td>
                 <td className="whitespace-nowrap px-2 py-1.5 font-medium">
+                  <span className="mr-1.5">
+                    <DeepButton riotId={r.riot_id} compact />
+                  </span>
                   {r.riot_id}
                   {r.hot_streak && <span title="Série de victoires"> 🔥</span>}
                 </td>

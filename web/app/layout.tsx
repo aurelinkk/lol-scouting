@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import DeepRunner from "@/components/DeepRunner";
 import { getMeta } from "@/lib/data";
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ const NAV = [
   { href: "/montees", label: "Montées" },
   { href: "/rosters", label: "Rosters" },
   { href: "/ladder", label: "Ladder" },
+  { href: "/analyses", label: "Analyses" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -43,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+        <DeepRunner />
         <footer className="mx-auto max-w-7xl px-4 pb-8 pt-4 text-xs text-ink-3">
           Données : Leaguepedia (CC BY-SA 3.0)
           {meta.has_oe ? ", Oracle's Elixir" : ""}. Photos et logos affichés depuis Leaguepedia.
