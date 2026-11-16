@@ -76,7 +76,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
         (!league || r.league_code === league) &&
         (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
-        (includeLec || !r.played_lec) &&
+        (includeLec || (!r.played_lec && !r.ex_lec)) &&
         (!q ||
           r.name.toLowerCase().includes(q) ||
           r.team.toLowerCase().includes(q) ||
@@ -190,7 +190,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
         <div className="flex flex-col gap-1 pb-1 text-sm text-ink-2">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={includeLec} onChange={(e) => setIncludeLec(e.target.checked)} />
-            Inclure les joueurs passés par la LEC
+            Inclure les joueurs passés par la LEC (cette saison ou avant)
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={unknownAge} onChange={(e) => setUnknownAge(e.target.checked)} />
@@ -245,6 +245,14 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                           <PlayerName name={r.name} />
                         </span>
                         <span className="text-xs text-ink-3">{r.role}</span>
+                        {(r.ex_lec || r.played_lec) && (
+                          <span
+                            className="rounded border border-border px-1 text-[10px] text-ink-3"
+                            title={r.played_lec ? "A joué en LEC cette saison" : `Ancien joueur de LEC : ${r.ex_lec}`}
+                          >
+                            {r.played_lec ? "LEC" : "ex-LEC"}
+                          </span>
+                        )}
                       </Link>
                     </td>
                     <td className="px-2 py-1.5">

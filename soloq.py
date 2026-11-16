@@ -22,6 +22,7 @@ import datetime
 import json
 import os
 import re
+import time
 import unicodedata
 
 import pandas as pd
@@ -303,13 +304,24 @@ def update_profiles(top, n_matches, since=None, max_age_days=14):
     print(f"Profils à calculer : {len(todo)} non-pros, jusqu'à {n_matches} parties classées depuis "
           f"le {since} chacun (~{n_matches + 1} requêtes max par joueur, moins grâce au cache ; "
           f"on peut interrompre et relancer)")
-    new = []
+    names = dict(zip(ladder["puuid"], ladder.get("riot_id", ladder["puuid"])))
+    new, started = [], time.monotonic()
+    calls_before = riot_api.CALL_COUNT["n"]
     for i, puuid in enumerate(todo, 1):
-        new.append(build_profile(puuid, n_matches, since))
-        if i % 10 == 0 or i == len(todo):
-            print(f"  {i}/{len(todo)}")
-            out = pd.concat([cache, pd.DataFrame(new)]).drop_duplicates("puuid", keep="last")
-            out.to_csv(PROFILES, index=False)
+        before = riot_api.CALL_COUNT["n"]
+        profile = build_profile(puuid, n_matches, since)
+        new.append(profile)
+        # sauvegarde après chaque joueur : Ctrl+C ne fait rien perdre
+        out = pd.concat([cache, pd.DataFrame(new)]).drop_duplicates("puuid", keep="last")
+        out.to_csv(PROFILES, index=False)
+        elapsed = time.monotonic() - started
+        eta = elapsed / i * (len(todo) - i)
+        print(f"  {i}/{len(todo)} · {names.get(puuid, puuid)} · {profile.get('recent_games', 0)} parties "
+              f"({riot_api.CALL_COUNT['n'] - before} requêtes, le reste en cache) · "
+              f"reste ~{int(eta // 3600)} h {int(eta % 3600 // 60):02d} min", flush=True)
+    if todo:
+        print(f"Terminé : {riot_api.CALL_COUNT['n'] - calls_before} requêtes en "
+              f"{(time.monotonic() - started) / 60:.0f} min")
 
 
 def peak_lp():

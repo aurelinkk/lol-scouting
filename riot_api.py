@@ -23,6 +23,7 @@ REGION = "https://europe.api.riotgames.com"   # comptes, historique de parties
 RATE_LIMITS = [(20, 1.0), (100, 120.0)]
 _calls = collections.deque()
 session = requests.Session()
+CALL_COUNT = {"n": 0}  # nombre total de requêtes faites (pour les estimations de durée)
 
 
 def _wait_for_rate_limit():
@@ -47,6 +48,7 @@ def get(url, params=None, max_attempts=5):
         raise SystemExit("RIOT_API_KEY manquante : ajoute-la dans le fichier .env")
     for attempt in range(1, max_attempts + 1):
         _wait_for_rate_limit()
+        CALL_COUNT["n"] += 1
         response = session.get(url, params=params, headers={"X-Riot-Token": API_KEY}, timeout=30)
         if response.status_code == 200:
             return response.json()
@@ -54,7 +56,12 @@ def get(url, params=None, max_attempts=5):
             return None
         if response.status_code == 429 or response.status_code >= 500:
             wait = int(response.headers.get("Retry-After", 5 * attempt))
-            print(f"  API Riot : {response.status_code}, nouvelle tentative dans {wait}s...")
+            if response.status_code == 429:
+                print(f"  Limite de requêtes Riot atteinte (normal si la clé a servi juste avant) : "
+                      f"pause de {wait}s demandée par Riot, puis ça reprend tout seul...", flush=True)
+            else:
+                print(f"  API Riot : erreur {response.status_code}, nouvelle tentative dans {wait}s...",
+                      flush=True)
             time.sleep(wait)
             continue
         if response.status_code in (401, 403):

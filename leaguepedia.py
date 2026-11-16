@@ -56,7 +56,7 @@ def login():
               "mode anonyme")
 
 
-def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=2.0):
+def cargo_query(tables, fields, where=None, join_on=None, order_by=None, group_by=None, pause=2.0):
     """Exécute une requête Cargo et renvoie toutes les lignes (pagination incluse)."""
     login()
     rows = []
@@ -78,6 +78,8 @@ def cargo_query(tables, fields, where=None, join_on=None, order_by=None, pause=2
             params["join_on"] = join_on
         if order_by:
             params["order_by"] = order_by
+        if group_by:
+            params["group_by"] = group_by
 
         data = _get_with_retry(params)
         page = [item["title"] for item in data.get("cargoquery", [])]

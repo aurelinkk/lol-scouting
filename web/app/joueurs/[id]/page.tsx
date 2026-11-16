@@ -183,6 +183,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       </td>
                       <td className="text-right">{fmtScore(meta.em_weight * (s.em_score ?? 0))}</td>
                     </tr>
+                    {s.ex_lec_malus ? (
+                      <tr>
+                        <td className="py-0.5 text-ink-2">
+                          Ancien joueur de LEC <span className="text-ink-3">({s.ex_lec})</span>
+                        </td>
+                        <td className="text-right">{fmtScore(s.ex_lec_malus)}</td>
+                      </tr>
+                    ) : null}
                     {s.soloq_bonus ? (
                       <tr>
                         <td className="py-0.5 text-ink-2">

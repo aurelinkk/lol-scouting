@@ -37,7 +37,12 @@ export default function Dashboard() {
   const lastPromo = promotions[promotions.length - 1];
 
   const prospects = rankings.filter(
-    (r) => r.season === season && !r.played_lec && (r.age === undefined || r.age <= MAX_AGE) && r.games >= MIN_GAMES,
+    (r) =>
+      r.season === season &&
+      !r.played_lec &&
+      !r.ex_lec &&
+      (r.age === undefined || r.age <= MAX_AGE) &&
+      r.games >= MIN_GAMES,
   );
 
   const leagueBars = leagues
@@ -105,7 +110,7 @@ export default function Dashboard() {
 
       <Card
         title={`Meilleurs prospects ${season} — ${MAX_AGE} ans ou moins`}
-        subtitle={`Hors joueurs passés par la LEC, au moins ${MIN_GAMES} parties. « âge ? » = date de naissance inconnue (à compléter dans birthdates.csv). Score = perf. dans sa ligue + niveau de la ligue + EMEA Masters.`}
+        subtitle={`Hors joueurs déjà passés par la LEC, au moins ${MIN_GAMES} parties. « âge ? » = date de naissance inconnue (à compléter dans birthdates.csv). Score = perf. dans sa ligue + niveau de la ligue + EMEA Masters.`}
       >
         <div className="grid gap-4 md:grid-cols-5">
           {ROLES.map((role) => (

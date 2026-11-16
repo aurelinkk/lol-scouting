@@ -124,7 +124,14 @@ function PromotionSeason({ promo }: { promo: Promotion }) {
                         <span className="truncate text-sm">
                           <PlayerName name={p.name} />
                         </span>
-                        <span className="text-xs text-ink-3">{p.role}</span>
+                        <span className="text-xs text-ink-3">
+                          {p.ex_lec && (
+                            <span className="mr-1 rounded border border-border px-1" title={`Déjà en LEC : ${p.ex_lec}`}>
+                              retour
+                            </span>
+                          )}
+                          {p.role}
+                        </span>
                       </div>
                       <Move p={p} />
                       <div className="text-xs text-ink-3">

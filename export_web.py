@@ -147,7 +147,7 @@ def main():
     rank_fields = ["season", "role", "team", "league_code", "tier", "age", "games",
                    "final", "league_score", "league_score_raw", "sample_factor",
                    "league_bonus", "em_score", "em_score_raw", "em_games",
-                   "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
+                   "ex_lec", "ex_lec_malus", "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
                    "soloq_games", "soloq_winrate", "soloq_lp_7d", "soloq_games_7d",
                    "role_percentile", "played_lec"] + STATS
     rankings = []
@@ -190,7 +190,7 @@ def main():
                 {**record(r, ["role", "age", "team", "league_code", "tier", "games",
                               "final", "role_percentile", "tier_percentile", "em_games",
                               "em_score", "winrate", "kda", "dpm", "new_level", "new_team",
-                              "from_team", "from_league", "from_season"]),
+                              "from_team", "from_league", "from_season", "ex_lec"]),
                  "id": ids[r["player"]], "name": r["player"],
                  "photo": photos.get(r["player"]), "logo": logos.get(r["team"]),
                  "from_logo": logos.get(r["from_team"]),
