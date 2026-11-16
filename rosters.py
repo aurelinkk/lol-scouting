@@ -67,17 +67,21 @@ def tier_of(league_code):
 
 
 def mercato_destination(season, games):
-    """Niveau et club en `season` d'après rosters_<season>.csv (joueurs, pas les coachs)."""
-    mercato = load_mercato(season)
-    if mercato is None:
+    """Niveau et club en `season` d'après le mercato (automatique + corrections
+    manuelles, voir mercato.py). Joueurs uniquement, pas les coachs."""
+    from mercato import build_mercato
+    try:
+        board = build_mercato(games, season)
+    except Exception as e:  # pas de réseau et pas de cache
+        print(f"  (mercato {season} indisponible : {e})")
         return None
-    col = f"player_{season}"
+    board = board[board["role"].isin(ROLES) & board["after"].notna()]
     rows = []
-    for _, r in mercato[mercato["role"].isin(ROLES)].iterrows():
-        player = resolve_name(r[col], games)
+    for _, r in board.iterrows():
+        player = resolve_name(r["after"], games)
         if player:
-            rows.append({"player": player, "new_level": tier_of(r["league"]),
-                         "new_team": r["team"], "first_game": pd.Timestamp.max})
+            rows.append({"player": player, "new_level": r["tier"], "new_team": r["team"],
+                         "first_game": pd.Timestamp.max})
     df = pd.DataFrame(rows, columns=["player", "new_level", "new_team", "first_game"])
     order = {"LEC": 0, "ERL1": 1, "ERL2": 2}
     return (df.assign(level=df["new_level"].map(order)).sort_values("level")

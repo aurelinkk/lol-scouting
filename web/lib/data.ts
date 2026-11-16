@@ -25,14 +25,10 @@ export const getRankings = (): RankingRow[] => {
 
 export const getPlayer = (id: string): Player | undefined => getPlayers()[id];
 
-export interface MercatoSlot {
-  role: string;
-  before: { name: string; id?: string; photo?: string } | null;
-  after: { name: string; id?: string; photo?: string } | null;
-}
+import type { MercatoTeam } from "@/components/MercatoBoard";
 export interface Mercato {
   season: number;
-  teams: { league: string; team: string; logo?: string; slots: MercatoSlot[] }[];
+  teams: MercatoTeam[];
 }
 
 export const getMercato = (): Mercato | null => {

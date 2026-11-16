@@ -22,7 +22,7 @@ import glob
 from careers import (fetch_awards, fetch_titles, level_totals, outside_stints, stints,
                      titles_by_player)
 from images import get_image_urls
-from rosters import ROLES as ROSTER_ROLES, build_rosters, load_mercato, mercato_file, resolve_name
+from rosters import build_rosters, resolve_name
 from league_strength import available_seasons, coef_window, league_coefficients, load_games
 from leagues import LEAGUES
 from promotions import compute_promotions, hit_rates
@@ -176,9 +176,9 @@ def main():
     # --- Montées entre saisons consécutives ------------------------------
     promos = []
     pairs = list(zip(seasons, seasons[1:]))
-    # Saison suivante pas encore jouée mais mercato saisi : montées prévues
-    if os.path.exists(mercato_file(max(seasons) + 1)):
-        pairs.append((max(seasons), max(seasons) + 1))
+    # Saison suivante pas encore jouée : montées prévues d'après le mercato
+    # (rumeurs + transferts officiels de Leaguepedia, corrections manuelles)
+    pairs.append((max(seasons), max(seasons) + 1))
     for s_from, s_to in pairs:
         merged = compute_promotions(games, s_from, s_to)
         moved = merged[(merged["new_level"] == "LEC")
@@ -326,24 +326,30 @@ def main():
                             "teams": sorted(teams, key=lambda t: t["team"].lower())})
     write("rosters.json", sorted(roster_list, key=lambda r: (r["season"], r["start"])), PUBLIC_DIR)
 
-    # --- Mercato de la saison suivante (rosters_<saison>.csv) ------------------
+    # --- Mercato de la saison suivante (automatique, voir mercato.py) ------------
     next_season = max(seasons) + 1
-    mercato = load_mercato(next_season)
-    if mercato is not None:
-        before_col, after_col = f"player_{next_season - 1}", f"player_{next_season}"
-
+    from mercato import build_mercato
+    try:
+        board = build_mercato(games, next_season)
+    except Exception as e:
+        print(f"  (mercato indisponible : {e})")
+        board = None
+    if board is not None and not board.empty:
         def slot(name):
-            if not name:
+            if not isinstance(name, str) or not name:
                 return None
             pid = resolve_name(name, games)
-            return {"name": name, "id": ids.get(pid) if pid else None,
-                    "photo": photos.get(pid) if pid else None}
+            return {"name": name, "id": ids.get(pid) if pid else None}
 
         teams = []
-        for (league, team), grp in mercato.groupby(["league", "team"], sort=False):
-            teams.append({"league": league, "team": team, "logo": logos.get(team), "slots": [
-                {"role": r["role"], "before": slot(r[before_col]), "after": slot(r[after_col])}
-                for _, r in grp.iterrows()]})
+        for (league, tier, team), grp in board.groupby(["league", "tier", "team"], sort=False):
+            changed = any(st not in ("inchangé", "") for st in grp["status"])
+            teams.append({"league": league, "tier": tier, "team": team, "logo": logos.get(team),
+                          "changed": changed, "slots": [
+                {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
+                 "status": r["status"], "source": r["source"] or None}
+                for _, r in grp.iterrows()
+                if r["role"] != "Coach" or isinstance(r["before"], str) or isinstance(r["after"], str)]})
         write("mercato.json", {"season": next_season, "teams": teams})
     elif os.path.exists(os.path.join(OUT_DIR, "mercato.json")):
         os.remove(os.path.join(OUT_DIR, "mercato.json"))

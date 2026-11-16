@@ -1,0 +1,176 @@
+"""Mercato automatique : effectifs de la saison suivante d'après Leaguepedia.
+
+Point de départ : l'effectif de chaque équipe de LEC / ERL1 lors de son dernier
+split de la saison (d'après les parties jouées). On applique ensuite, dans
+l'ordre chronologique :
+  - RosterChanges : arrivées / départs officialisés (statut "confirmé")
+  - RosterRumors  : rumeurs (Sheep Esports, X...), sauf celles marquées
+                    "ne se fera pas" (statut "rumeur")
+Les corrections saisies dans rosters_<saison>.csv sont prioritaires (statut
+"manuel"), une ligne par poste : league,team,role,player_<saison-1>,player_<saison>
+
+Usage :
+    python mercato.py                # aperçu du mercato LEC
+    python mercato.py --league LFL
+"""
+import argparse
+import os
+
+import pandas as pd
+
+from leaguepedia import cargo_query
+from rosters import ROLES, build_rosters, load_mercato
+
+CACHE = "data/raw/mercato_{season}_{kind}.csv"
+SLOTS = ROLES + ["Coach"]
+COACH_ROLES = {"Coach", "Head Coach"}
+
+
+def _role(r):
+    r = str(r or "").strip()
+    if r in COACH_ROLES:
+        return "Coach"
+    return r if r in ROLES else None
+
+
+def fetch_events(season, refresh=False):
+    """Rumeurs et changements officiels depuis septembre de la saison précédente."""
+    since = f"{season - 1}-09-01"
+    paths = {k: CACHE.format(season=season, kind=k) for k in ("rumors", "changes")}
+    fresh = all(os.path.exists(p) for p in paths.values()) and not refresh
+    if fresh:
+        return pd.read_csv(paths["rumors"]), pd.read_csv(paths["changes"])
+    rumors = pd.DataFrame(cargo_query(
+        tables="RosterRumors",
+        fields="Date=date,Player=player,TeamStart=team_start,TeamEnd=team_end,"
+               "RoleEnd=role,Status=status,NotHappening=not_happening,SourceSite=source",
+        where=f"Date>='{since}'"),
+        columns=["date", "player", "team_start", "team_end", "role", "status", "not_happening", "source"])
+    changes = pd.DataFrame(cargo_query(
+        tables="RosterChanges",
+        fields="Date_Sort=date,Player=player,Team=team,Direction=direction,Role=role",
+        where=f"Date_Sort>='{since}'"),
+        columns=["date", "player", "team", "direction", "role"])
+    os.makedirs("data/raw", exist_ok=True)
+    rumors.to_csv(paths["rumors"], index=False)
+    changes.to_csv(paths["changes"], index=False)
+    return rumors, changes
+
+
+def base_rosters(games, season):
+    """Titulaires de chaque équipe LEC / ERL1 lors de son dernier split de `season`."""
+    rc = build_rosters(games[games["season"] == season])
+    # Équipes invitées (Los Ratones en LEC Versus, KC Blue Stars en LFL
+    # Invitational...) : pas de vraie place dans la ligue
+    team_games = (games[games["season"] == season].groupby(["league_code", "team"])["game_id"]
+                  .nunique().reset_index(name="n"))
+    team_games["min"] = team_games["league_code"].map(lambda lg: 15 if lg == "LEC" else 10)
+    real = team_games[team_games["n"] >= team_games["min"]][["league_code", "team"]]
+    rc = rc.merge(real, on=["league_code", "team"])
+    last = (rc.sort_values("start").groupby(["league_code", "team"])["tournament"].last()
+            .reset_index())
+    rc = rc.merge(last, on=["league_code", "team", "tournament"])
+    starters = (rc.sort_values("games", ascending=False)
+                .drop_duplicates(["league_code", "team", "role"]))
+    rows = []
+    for (league, team, tier), grp in starters.groupby(["league_code", "team", "tier"]):
+        by_role = dict(zip(grp["role"], grp["player"]))
+        for role in SLOTS:
+            rows.append({"league": league, "tier": tier, "team": team, "role": role,
+                         "before": by_role.get(role)})
+    return pd.DataFrame(rows)
+
+
+def build_mercato(games, season):
+    """Effectif projeté de `season` pour chaque équipe LEC / ERL1 de `season - 1`."""
+    board = base_rosters(games, season - 1)
+    board["after"] = board["before"]
+    board["status"] = board["before"].map(lambda p: "inchangé" if p else "")
+    board["source"] = ""
+    rumors, changes = fetch_events(season)
+    teams = set(board["team"])
+
+    # Noms parfois en minuscules dans Leaguepedia ("kyeahoo") : on reprend
+    # l'écriture de nos données quand elle existe
+    known = {str(p).lower(): p for p in pd.concat([games["player"], board["before"].dropna()]).unique()}
+    canon = lambda name: known.get(str(name).lower(), name)
+    rumors["player"] = rumors["player"].map(canon)
+    changes["player"] = changes["player"].map(canon)
+
+    events = []
+    for _, c in changes.iterrows():
+        role = _role(c["role"])
+        if role and c["team"] in teams:
+            events.append((str(c["date"])[:10], 1, c["direction"], c["player"], c["team"], role,
+                           "confirmé", "Leaguepedia"))
+    for _, r in rumors.iterrows():
+        if str(r["not_happening"]) in ("1", "True", "true"):
+            continue
+        role = _role(r["role"])
+        if not role:
+            continue
+        status = "confirmé" if r["status"] == "Confirmed" else "rumeur"
+        if r["team_start"] in teams and r["team_start"] != r["team_end"]:
+            events.append((str(r["date"])[:10], 0, "Leave", r["player"], r["team_start"], role,
+                           status, r["source"]))
+        if r["team_end"] in teams:
+            kind = "Stay" if r["team_start"] == r["team_end"] else "Join"
+            events.append((str(r["date"])[:10], 0, kind, r["player"], r["team_end"], role,
+                           status, r["source"]))
+
+    # Ordre chronologique ; à date égale : la rumeur avant l'officiel, et le
+    # départ avant l'arrivée (un départ + une arrivée le même jour = prolongation)
+    order = {"Leave": 0, "Stay": 1, "Join": 1}
+    events.sort(key=lambda e: (e[0], e[1], order.get(e[2], 1)))
+    for date, _, direction, player, team, role, status, source in events:
+        slot = (board["team"] == team) & (board["role"] == role)
+        if not slot.any():
+            continue
+        current = board.loc[slot, "after"].iloc[0]
+        if direction == "Leave":
+            if current == player:
+                board.loc[slot, ["after", "status", "source"]] = [None, f"départ ({status})", source]
+            # le joueur quitte peut-être un autre poste de l'équipe
+            other = (board["team"] == team) & (board["after"] == player)
+            board.loc[other, ["after", "status", "source"]] = [None, f"départ ({status})", source]
+        else:
+            # un joueur ne peut être qu'à un seul endroit
+            board.loc[board["after"] == player, ["after", "status", "source"]] = [None, "parti", source]
+            label = status if direction == "Join" else f"reste ({status})"
+            board.loc[slot, ["after", "status", "source"]] = [player, label, source]
+
+    # Corrections manuelles (prioritaires)
+    manual = load_mercato(season)
+    if manual is not None:
+        col = f"player_{season}"
+        for _, m in manual.iterrows():
+            slot = (board["team"] == m["team"]) & (board["role"] == m["role"])
+            if not slot.any():
+                board = pd.concat([board, pd.DataFrame([{
+                    "league": m["league"], "tier": "LEC" if m["league"] == "LEC" else "ERL1",
+                    "team": m["team"], "role": m["role"], "before": m.get(f"player_{season - 1}") or None,
+                    "after": None, "status": "", "source": ""}])], ignore_index=True)
+                slot = (board["team"] == m["team"]) & (board["role"] == m["role"])
+            board.loc[slot, ["after", "status", "source"]] = [m[col] or None, "manuel", "saisie manuelle"]
+    return board
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--season", type=int, default=pd.Timestamp.today().year + 1)
+    parser.add_argument("--league", default="LEC")
+    parser.add_argument("--refresh", action="store_true", help="retélécharger rumeurs / changements")
+    args = parser.parse_args()
+    from league_strength import load_games
+    if args.refresh:
+        fetch_events(args.season, refresh=True)
+    board = build_mercato(load_games([args.season - 1]), args.season)
+    view = board[board["league"] == args.league]
+    pd.set_option("display.width", 200)
+    for team, grp in view.groupby("team"):
+        print(f"\n== {team}")
+        print(grp[["role", "before", "after", "status", "source"]].fillna("—").to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()
