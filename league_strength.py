@@ -26,6 +26,7 @@ import pandas as pd
 
 from leaguepedia import cargo_query
 from leagues import leagues_for
+import scoring
 from scoring import ERL2_DISCOUNT, ERL2_PARENT, EXCLUDED_EM_TEAMS, SHRINK_APPEARANCES
 
 
@@ -105,6 +106,11 @@ def league_coefficients(games, seasons, verbose=False):
         if parent in coefs.index and erl2 not in coefs.index:
             coefs.loc[erl2] = [0, float("nan"), coefs.loc[parent, "coef"] - ERL2_DISCOUNT]
 
+    # Ajustements manuels (scoring.LEAGUE_COEF_ADJUST), ERL2 du pays comprises
+    for code, delta in scoring.LEAGUE_COEF_ADJUST.items():
+        for c in [code] + [e for e, parent in ERL2_PARENT.items() if parent == code]:
+            if c in coefs.index:
+                coefs.loc[c, "coef"] += delta
     return coefs.sort_values("coef", ascending=False)
 
 

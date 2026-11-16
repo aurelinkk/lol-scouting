@@ -88,6 +88,11 @@ MIN_PLAYERS_FOR_COMPARISON = 4
 # 0 = on ignore le niveau de la ligue.
 LEAGUE_WEIGHT = 0.5
 
+# Ajustement manuel du coefficient de certaines ligues (ajouté au coefficient
+# calculé). Utile quand les résultats à l'EMEA Masters sous-estiment le niveau
+# des meilleurs joueurs d'une ligue. Ex : {"LIT": 0.10, "AL": 0.05}
+LEAGUE_COEF_ADJUST = {}
+
 # Participations nécessaires avant de faire confiance au coefficient brut :
 # avec peu d'équipes envoyées à l'EM, le coef est tiré vers la moyenne (0.5).
 SHRINK_APPEARANCES = 3

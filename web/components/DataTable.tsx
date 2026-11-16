@@ -38,6 +38,8 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
   const [search, setSearch] = useState("");
   const [includeLec, setIncludeLec] = useState(false);
   const [unknownAge, setUnknownAge] = useState(true);
+  // Score sans le niveau de la ligue : qui domine le plus sa propre ligue
+  const [noLeague, setNoLeague] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "final", desc: true });
   const [limit, setLimit] = useState(PAGE);
 
@@ -81,16 +83,20 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
           (r.current_team ?? "").toLowerCase().includes(q)),
     );
     const dir = sort.desc ? -1 : 1;
+    const value = (r: RankingRow) =>
+      sort.key === "final" && noLeague
+        ? r.final - r.league_bonus
+        : (r[sort.key as keyof RankingRow] as number | undefined);
     out.sort((a, b) => {
-      const va = a[sort.key as keyof RankingRow] as number | undefined;
-      const vb = b[sort.key as keyof RankingRow] as number | undefined;
+      const va = value(a);
+      const vb = value(b);
       if (va === undefined && vb === undefined) return 0;
       if (va === undefined) return 1;
       if (vb === undefined) return -1;
       return (va - vb) * dir;
     });
     return out;
-  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, sort]);
+  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort]);
 
   useEffect(
     () => setLimit(PAGE),
@@ -190,6 +196,13 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
             <input type="checkbox" checked={unknownAge} onChange={(e) => setUnknownAge(e.target.checked)} />
             Garder les âges inconnus (filtre âge)
           </label>
+          <label
+            className="flex items-center gap-2"
+            title="Score sans le bonus/malus de niveau de ligue : qui domine le plus sa propre ligue"
+          >
+            <input type="checkbox" checked={noLeague} onChange={(e) => setNoLeague(e.target.checked)} />
+            Score sans le niveau de ligue
+          </label>
         </div>
       </div>
 
@@ -259,7 +272,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                     <td className="px-2 py-1.5 text-right">{r.age ?? "–"}</td>
                     <td className="px-2 py-1.5 text-right">{r.games}</td>
                     <td className="px-2 py-1.5 text-right font-semibold" title={topPercent(r.role_percentile)}>
-                      {fmtScore(r.final)}
+                      {fmtScore(noLeague ? r.final - r.league_bonus : r.final)}
                     </td>
                     <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_score)}</td>
                     <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_bonus)}</td>
