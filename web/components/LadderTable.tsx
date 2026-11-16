@@ -22,12 +22,22 @@ interface LadderRow {
   recent_games?: number;
   recent_winrate?: number;
   recent_kda?: number;
+  recent_cs_min?: number;
+  recent_dpm?: number;
+  recent_kp?: number;
+  peak_lp?: number;
+  peak_date?: string;
+  soloq_score?: number;
+  soloq_role_pct?: number;
+  standout?: boolean;
   pro?: string;
   pro_id?: string;
   pro_team?: string;
 }
 
-type SortKey = "rank" | "lp" | "games" | "winrate" | "lp_7d" | "games_7d" | "lp_30d" | "games_30d";
+type SortKey =
+  | "rank" | "lp" | "games" | "winrate" | "lp_7d" | "games_7d" | "lp_30d" | "games_30d"
+  | "soloq_score" | "peak_lp" | "recent_kda" | "recent_dpm" | "recent_kp" | "recent_cs_min";
 
 const TIER_LABEL: Record<string, string> = { CHALLENGER: "Chall", GRANDMASTER: "GM", MASTER: "Master" };
 
@@ -43,6 +53,7 @@ export default function LadderTable() {
   const [role, setRole] = useState("");
   const [minGames, setMinGames] = useState("0");
   const [search, setSearch] = useState("");
+  const [onlyStandout, setOnlyStandout] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "rank", desc: false });
 
   useEffect(() => {
@@ -61,6 +72,7 @@ export default function LadderTable() {
         (who === "all" || (who === "pro" ? !!r.pro : !r.pro)) &&
         (!role || r.main_role === role) &&
         r.games >= min &&
+        (!onlyStandout || r.standout) &&
         (!q || r.riot_id.toLowerCase().includes(q) || (r.pro ?? "").toLowerCase().includes(q)),
     );
     const dir = sort.desc ? -1 : 1;
@@ -72,7 +84,7 @@ export default function LadderTable() {
       if (vb === undefined) return -1;
       return ((va as number) - (vb as number)) * dir;
     });
-  }, [data, who, role, minGames, search, sort]);
+  }, [data, who, role, minGames, search, onlyStandout, sort]);
 
   if (error)
     return (
@@ -127,6 +139,12 @@ export default function LadderTable() {
             onChange={(e) => setMinGames(e.target.value)}
           />
         </label>
+        {hasProfiles && (
+          <label className="flex items-center gap-2 pb-2 text-sm text-ink-2" title="Top 5 % de son poste au score soloQ">
+            <input type="checkbox" checked={onlyStandout} onChange={(e) => setOnlyStandout(e.target.checked)} />
+            ⭐ Seulement ceux qui se démarquent
+          </label>
+        )}
         <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-ink-3">
           Recherche
           <input className={control} placeholder="Riot ID ou pro" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -134,12 +152,12 @@ export default function LadderTable() {
       </div>
 
       <p className="text-xs text-ink-3">
-        Relevé du {data.date} · {rows.length} joueurs · « 7 j » / « 30 j » = évolution depuis le relevé précédent
-        (vide s&apos;il n&apos;y en a pas encore) : LP gagnés et parties jouées.
+        Relevé du {data.date} · {rows.length} joueurs · « 7 j » / « 30 j » = LP gagnés et parties jouées depuis les
+        relevés précédents · Score = stats soloQ de l&apos;année comparées aux joueurs du même poste (⭐ = top 5 %).
       </p>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="tabular w-full text-sm">
+        <table className="tabular w-full whitespace-nowrap text-sm">
           <thead className="border-b border-border text-xs text-ink-3">
             <tr>
               {header("rank", "#", "Rang EUW")}
@@ -154,7 +172,13 @@ export default function LadderTable() {
               {header("lp_30d", "LP 30 j")}
               {header("games_30d", "Parties 30 j")}
               {hasProfiles && <th className="px-2 py-2 text-left font-medium">Poste</th>}
-              {hasProfiles && <th className="px-2 py-2 text-left font-medium">Champions récents</th>}
+              {hasProfiles && header("soloq_score", "Score", "Score soloQ : comparé aux joueurs du même poste (stats de l'année)")}
+              {hasProfiles && header("peak_lp", "Pic LP", "Pic de LP depuis notre premier relevé")}
+              {hasProfiles && header("recent_kda", "KDA")}
+              {hasProfiles && header("recent_cs_min", "CS/m")}
+              {hasProfiles && header("recent_dpm", "DMG/m")}
+              {hasProfiles && header("recent_kp", "KP")}
+              {hasProfiles && <th className="px-2 py-2 text-left font-medium">Champions</th>}
             </tr>
           </thead>
           <tbody>
@@ -191,6 +215,32 @@ export default function LadderTable() {
                     {r.main_role_share ? (
                       <span className="text-xs text-ink-3"> {Math.round(r.main_role_share * 100)} %</span>
                     ) : null}
+                  </td>
+                )}
+                {hasProfiles && (
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right font-semibold">
+                    {r.soloq_score !== undefined ? (
+                      <span title={r.soloq_role_pct ? `top ${Math.max(1, Math.round((1 - r.soloq_role_pct) * 100))} % des ${r.main_role}` : ""}>
+                        {r.standout && "⭐ "}
+                        {r.soloq_score > 0 ? "+" : ""}
+                        {r.soloq_score.toFixed(2)}
+                      </span>
+                    ) : (
+                      "–"
+                    )}
+                  </td>
+                )}
+                {hasProfiles && (
+                  <td className="px-2 py-1.5 text-right" title={r.peak_date ? `le ${r.peak_date}` : ""}>
+                    {r.peak_lp ?? "–"}
+                  </td>
+                )}
+                {hasProfiles && <td className="px-2 py-1.5 text-right">{r.recent_kda?.toFixed(2) ?? "–"}</td>}
+                {hasProfiles && <td className="px-2 py-1.5 text-right">{r.recent_cs_min?.toFixed(1) ?? "–"}</td>}
+                {hasProfiles && <td className="px-2 py-1.5 text-right">{r.recent_dpm ? Math.round(r.recent_dpm) : "–"}</td>}
+                {hasProfiles && (
+                  <td className="px-2 py-1.5 text-right">
+                    {r.recent_kp !== undefined ? `${Math.round(r.recent_kp * 100)} %` : "–"}
                   </td>
                 )}
                 {hasProfiles && <td className="whitespace-nowrap px-2 py-1.5 text-ink-2">{r.top_champions ?? ""}</td>}

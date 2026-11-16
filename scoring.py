@@ -136,3 +136,25 @@ EM_SHRINK_GAMES = 10
 # pas (et les Master+ perdent des LP par inactivité), le rang du moment ne
 # reflète donc pas leur niveau. À remettre à ~0.1 en pleine saison.
 SOLOQ_WEIGHT = 0.0
+
+# ---------------------------------------------------------------------------
+# 6. Score soloQ des non-pros (onglet Ladder, séparé du score pro)
+# ---------------------------------------------------------------------------
+# Chaque joueur profilé (soloq.py profiles) est comparé aux autres joueurs du
+# relevé ayant le même poste principal (z-scores pondérés), sur ses parties
+# classées de l'année. "lp" = LP actuels, "games" = parties de la saison.
+_SOLOQ_COMMON = {
+    "lp": 1.0, "games": 0.25, "recent_winrate": 0.5, "recent_kda": 0.5,
+    "recent_deaths": -0.5, "recent_kp": 0.75, "recent_dmg_share": 0.75,
+    "recent_dpm": 0.75, "recent_gold_min": 0.5,
+}
+SOLOQ_ROLE_WEIGHTS = {
+    "Top": {**_SOLOQ_COMMON, "recent_cs_min": 0.75},
+    "Jungle": {**_SOLOQ_COMMON, "recent_cs_min": 0.5, "recent_vision_min": 0.5},
+    "Mid": {**_SOLOQ_COMMON, "recent_cs_min": 0.75},
+    "Bot": {**_SOLOQ_COMMON, "recent_cs_min": 0.75},
+    "Support": {**_SOLOQ_COMMON, "recent_dpm": 0.25, "recent_dmg_share": 0.25,
+                "recent_gold_min": 0.25, "recent_vision_min": 1.0},
+}
+SOLOQ_MIN_GAMES = 15          # parties analysées minimum pour avoir un score
+SOLOQ_STANDOUT = 0.95         # « se démarque » = top 5 % de son poste

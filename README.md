@@ -28,13 +28,18 @@ Pour accélérer Leaguepedia, mettre un bot password dans `.env` :
 
 ```bash
 python soloq.py snapshot            # relevé du top 1000 EUW (~20 min la 1re fois : Riot ID)
-python soloq.py profiles --top 300  # poste / champions des non-pros (long, optionnel)
+python soloq.py profiles            # stats soloQ de l'année des 200 meilleurs non-pros
+                                    # (50 parties chacun ; long la 1re fois, reprend où il s'arrête)
+python soloq.py show --non-pro --by-score   # ceux qui se démarquent
 python soloq.py show --non-pro      # aperçu dans le terminal
 python export_web.py                # onglet Ladder + soloQ sur les fiches
 ```
 
 Lancer `snapshot` une fois par semaine : les évolutions (LP et parties sur 7 / 30
-jours) montrent qui grind. Les comptes des pros viennent de Leaguepedia ; pour
+jours) montrent qui grind, et le pic de LP se construit au fil des relevés (l'API
+Riot ne donne pas l'historique : pas de pic avant notre premier relevé).
+Le score soloQ compare chaque non-pro aux joueurs du même poste (poids dans
+`scoring.py`, section 6) ; il est séparé du score pro. Les comptes des pros viennent de Leaguepedia ; pour
 en ajouter ou corriger, `soloq_accounts.csv` (`player,riot_id`).
 
 ## Rosters et mercato

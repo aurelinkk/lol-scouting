@@ -297,7 +297,10 @@ def main():
     if ladder is not None:
         fields = ["rank", "riot_id", "tier", "lp", "games", "winrate", "hot_streak",
                   "lp_7d", "games_7d", "lp_30d", "games_30d", "main_role", "main_role_share",
-                  "top_champions", "recent_games", "recent_winrate", "recent_kda", "recent_cs_min"]
+                  "top_champions", "champion_pool", "recent_games", "recent_winrate", "recent_kda",
+                  "recent_cs_min", "recent_dpm", "recent_kp", "recent_dmg_share", "recent_gold_min",
+                  "recent_vision_min", "recent_deaths", "peak_lp", "peak_tier", "peak_date",
+                  "soloq_score", "soloq_role_pct", "standout"]
         rows = []
         for _, r in ladder.iterrows():
             rec = record(r, fields)
