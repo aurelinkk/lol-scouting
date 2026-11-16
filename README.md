@@ -43,7 +43,9 @@ L'onglet Rosters montre les effectifs LEC + ERL1 depuis 2023 (d'après les
 parties jouées) et le mercato de la saison suivante, **construit
 automatiquement** depuis Leaguepedia : effectif de fin de saison, puis
 transferts officiels (RosterChanges) et rumeurs (RosterRumors, qui reprend
-Sheep Esports, X...). Il sert aussi aux montées vers la saison suivante.
+Sheep Esports, X...). Les joueurs sans nouvelle dont le contrat (base GCD de
+Riot, table Contracts) se termine au plus tard le 16/11 sont retirés.
+Il sert aussi aux montées vers la saison suivante.
 
 ```bash
 python mercato.py --refresh          # mettre à jour rumeurs / transferts

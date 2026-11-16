@@ -22,6 +22,11 @@ from leaguepedia import cargo_query
 from rosters import ROLES, build_rosters, load_mercato
 
 CACHE = "data/raw/mercato_{season}_{kind}.csv"
+
+# Fin de contrat (base de contrats de Riot, le GCD, reprise par Leaguepedia) :
+# un joueur sans nouvelle dont le contrat avec son club se termine au plus tard
+# à cette date (mois-jour, saison précédente) est retiré de l'effectif projeté
+CONTRACT_CUTOFF = "11-16"
 SLOTS = ROLES + ["Coach"]
 COACH_ROLES = {"Coach", "Head Coach"}
 
@@ -81,6 +86,50 @@ def base_rosters(games, season):
     return pd.DataFrame(rows)
 
 
+def fetch_contracts(players, season, refresh=False):
+    """Contrats (GCD) des joueurs, depuis la table Contracts de Leaguepedia."""
+    path = CACHE.format(season=season, kind="contracts")
+    cached = pd.read_csv(path) if os.path.exists(path) and not refresh else pd.DataFrame(
+        columns=["player", "team", "end", "checked"])
+    done = set(cached["checked"].dropna()) if "checked" in cached else set()
+    todo = sorted({p for p in players if isinstance(p, str)} - done)
+    if todo:
+        rows = []
+        for i in range(0, len(todo), 40):
+            quoted = ",".join("'" + p.replace("'", "\\'") + "'" for p in todo[i:i + 40])
+            rows += cargo_query(tables="Contracts", fields="Player=player,Team=team,ContractEnd=end",
+                                where=f"Player IN ({quoted}) AND IsRemoval=0")
+        cached = pd.concat([cached, pd.DataFrame(rows, columns=["player", "team", "end"]),
+                            pd.DataFrame({"checked": todo})], ignore_index=True)
+        os.makedirs("data/raw", exist_ok=True)
+        cached.to_csv(path, index=False)
+    return cached.dropna(subset=["player"])
+
+
+def apply_contract_ends(board, season):
+    """Retire les joueurs « inchangé » dont le contrat avec leur club est terminé."""
+    cutoff = pd.Timestamp(f"{season - 1}-{CONTRACT_CUTOFF}")
+    unchanged = board[(board["status"] == "inchangé") & board["after"].notna() & (board["role"] != "Coach")]
+    if unchanged.empty:
+        return board
+    try:
+        contracts = fetch_contracts(unchanged["after"].tolist(), season)
+    except Exception as e:  # pas de réseau ni de cache
+        print(f"  (contrats indisponibles : {e})")
+        return board
+    contracts["key"] = contracts["player"].str.lower() + "|" + contracts["team"].str.lower()
+    last_end = pd.to_datetime(contracts["end"], errors="coerce").groupby(contracts["key"]).max()
+    for idx, r in unchanged.iterrows():
+        # nom de page Leaguepedia : "Zest (Kim Dong-min)" -> contrat sous "Zest" ou la page entière
+        names = {r["after"].lower(), r["after"].split(" (")[0].lower()}
+        ends = [last_end.get(f"{n}|{r['team'].lower()}") for n in names]
+        ends = [e for e in ends if e is not None and not pd.isna(e)]
+        if ends and max(ends) <= cutoff:
+            board.loc[idx, ["after", "status", "source"]] = [
+                None, f"fin de contrat ({max(ends).date():%d/%m/%Y})", "GCD (Leaguepedia)"]
+    return board
+
+
 def build_mercato(games, season):
     """Effectif projeté de `season` pour chaque équipe LEC / ERL1 de `season - 1`."""
     board = base_rosters(games, season - 1)
@@ -138,6 +187,9 @@ def build_mercato(games, season):
             board.loc[board["after"] == player, ["after", "status", "source"]] = [None, "parti", source]
             label = status if direction == "Join" else f"reste ({status})"
             board.loc[slot, ["after", "status", "source"]] = [player, label, source]
+
+    # Fins de contrat (GCD) : joueurs restés "inchangé" dont le contrat est fini
+    board = apply_contract_ends(board, season)
 
     # Corrections manuelles (prioritaires)
     manual = load_mercato(season)

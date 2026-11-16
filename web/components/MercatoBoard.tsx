@@ -39,7 +39,7 @@ function PlayerLink({ p, className }: { p: MercatoSlot["after"]; className?: str
 
 function Badge({ status }: { status: string }) {
   if (!status || status === "inchangé") return null;
-  const confirmed = status.includes("confirmé") || status === "manuel";
+  const confirmed = status.includes("confirmé") || status === "manuel" || status.startsWith("fin de contrat");
   // Pastille pleine = officiel, anneau = rumeur (forme + couleur, pas la couleur seule)
   return (
     <span
@@ -122,7 +122,7 @@ export default function MercatoBoard({ season, teams }: { season: number; teams:
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full" style={{ background: "var(--good)" }} /> officiel
-          (Leaguepedia)
+          (Leaguepedia, fins de contrat GCD)
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full" style={{ border: "1.5px solid var(--text-3)" }} /> rumeur
