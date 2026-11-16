@@ -346,7 +346,11 @@ def update_profiles(top, n_matches, since=None, max_age_days=14):
     cache = pd.read_csv(PROFILES) if os.path.exists(PROFILES) else pd.DataFrame(columns=["puuid", "profiled_at"])
     if "recent_dpm" not in cache:  # ancien format (sans dégâts / gold) : on recalcule
         cache = pd.DataFrame(columns=["puuid", "profiled_at"])
-    fresh = cache[pd.to_datetime(cache["profiled_at"]) >= pd.Timestamp.today() - pd.Timedelta(days=max_age_days)]
+    if "matches_requested" not in cache:
+        cache["matches_requested"] = cache.get("recent_games", 0)
+    # À jour = profilé récemment ET avec au moins autant de parties demandées
+    fresh = cache[(pd.to_datetime(cache["profiled_at"]) >= pd.Timestamp.today() - pd.Timedelta(days=max_age_days))
+                  & (cache["matches_requested"].fillna(0) >= n_matches)]
     todo = [p for p in targets["puuid"] if p not in set(fresh["puuid"])]
     print(f"Profils à calculer : {len(todo)} non-pros, jusqu'à {n_matches} parties classées depuis "
           f"le {since} chacun (~{n_matches + 1} requêtes max par joueur, moins grâce au cache ; "
@@ -357,6 +361,7 @@ def update_profiles(top, n_matches, since=None, max_age_days=14):
     for i, puuid in enumerate(todo, 1):
         before = riot_api.CALL_COUNT["n"]
         profile = build_profile(puuid, n_matches, since)
+        profile["matches_requested"] = n_matches
         new.append(profile)
         # sauvegarde après chaque joueur : Ctrl+C ne fait rien perdre
         out = pd.concat([cache, pd.DataFrame(new)]).drop_duplicates("puuid", keep="last")
