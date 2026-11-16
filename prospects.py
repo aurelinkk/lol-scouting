@@ -20,6 +20,7 @@ import pandas as pd
 
 from league_strength import coef_window, league_coefficients, load_games
 from oracles import OE_STATS, attach_oe
+import scoring
 from scoring import (EM_MIN_GAMES, EM_SHRINK_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
                      MIN_PLAYERS_FOR_COMPARISON, ROLE_WEIGHTS, SAMPLE_SHRINK_GAMES,
                      SOLOQ_WEIGHT)
@@ -185,9 +186,20 @@ def build_ranking(games, season, coef_seasons, min_games=10):
         on="player", how="left")
     ranking["em_games"] = ranking["em_games"].fillna(0).astype(int)
 
-    # Joueurs qui ont joué en LEC cette saison : exclus des prospects
-    lec_players = set(stats.loc[stats["tier"] == "LEC", "player"])
-    ranking["played_lec"] = ranking["player"].isin(lec_players)
+    # Passage en LEC (historique complet Leaguepedia, équipes invitées exclues) :
+    #  - played_lec : a joué en LEC cette saison -> exclu des prospects
+    #  - ex_lec     : a joué en LEC une saison précédente -> malus (remonte plus rarement)
+    try:
+        from careers import fetch_lec_history, lec_before
+        hist = fetch_lec_history()
+        lec_now = set(hist.loc[hist["year"] == season, "player"])
+        before = lec_before(season)
+    except Exception as e:  # pas de réseau ni de cache : on se rabat sur nos données
+        print(f"  (historique LEC indisponible : {e})")
+        lec_now, before = set(stats.loc[stats["tier"] == "LEC", "player"]), {}
+    ranking["played_lec"] = ranking["player"].isin(lec_now)
+    ranking["ex_lec"] = ranking["player"].map(before)  # "Rogue (European Team) (2024)"
+    ranking["ex_lec_malus"] = ranking["ex_lec"].notna() * scoring.EX_LEC_MALUS
 
     # SoloQ : seulement pour la saison en cours (le relevé est d'aujourd'hui)
     ranking["soloq_bonus"] = 0.0
@@ -200,7 +212,8 @@ def build_ranking(games, season, coef_seasons, min_games=10):
                                                       / ranking["soloq_ladder_size"])).fillna(0)
 
     ranking["final"] = (ranking["league_score"] + ranking["league_bonus"]
-                        + EM_WEIGHT * ranking["em_score"].fillna(0) + ranking["soloq_bonus"])
+                        + EM_WEIGHT * ranking["em_score"].fillna(0) + ranking["soloq_bonus"]
+                        + ranking["ex_lec_malus"])
 
     # Rang (percentile) dans son rôle parmi tous les joueurs d'ERL
     ranking["role_percentile"] = ranking.groupby("role")["final"].rank(pct=True).round(3)

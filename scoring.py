@@ -138,6 +138,14 @@ EM_SHRINK_GAMES = 10
 SOLOQ_WEIGHT = 0.0
 
 # ---------------------------------------------------------------------------
+# 5 bis. Anciens joueurs de LEC redescendus en ERL
+# ---------------------------------------------------------------------------
+# Un joueur déjà passé par la LEC (une saison avant, hors équipes invitées)
+# remonte plus rarement : les équipes préfèrent les nouveaux talents.
+# Ce malus s'ajoute à son score final.
+EX_LEC_MALUS = -0.25   # calibré sur 2023-2026 (au-delà de -0.25, la détection des montées baisse)
+
+# ---------------------------------------------------------------------------
 # 6. Score soloQ des non-pros (onglet Ladder, séparé du score pro)
 # ---------------------------------------------------------------------------
 # Chaque joueur profilé (soloq.py profiles) est comparé aux autres joueurs du

@@ -37,6 +37,9 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   em_games: number;
   role_percentile: number;
   played_lec: boolean;
+  /** Ancien joueur de LEC (dernière saison en LEC), ex : "Rogue (European Team) (2024)" */
+  ex_lec?: string;
+  ex_lec_malus?: number;
   photo?: string;
   logo?: string;
   country?: string;
@@ -169,6 +172,8 @@ export interface PromotionPlayer {
   from_logo?: string;
   /** Saison du profil évalué (N, ou N-1 s'il n'a pas joué en ERL en N) */
   from_season?: number;
+  /** Déjà passé par la LEC avant : c'est un retour */
+  ex_lec?: string;
   photo?: string;
   logo?: string;
   new_logo?: string;

@@ -166,3 +166,48 @@ def outside_stints(outside):
            .reset_index())
     out["tier"] = "OTHER"
     return out
+
+
+# --------------------------------------------------------------------------
+# Historique LEC complet (LEC depuis 2019 + EU LCS avant), toutes années
+# --------------------------------------------------------------------------
+LEC_HISTORY = "data/raw/lec_history.csv"
+LEC_LEAGUES = ("LoL EMEA Championship", "Europe League Championship Series")
+# Une équipe invitée (ex : KC Blue / Los Ratones en LEC Versus 2026) ne compte
+# pas : est invitée une équipe qui n'a joué que des tournois spéciaux cette année
+# (ex : NAVI, arrivé au Summer 2025 avec ~10 parties, compte bien)
+LEC_GUEST_EVENTS = r"Versus|Showmatch|All-Star"
+
+
+def fetch_lec_history(refresh=False):
+    """Parties de LEC / EU LCS par joueur, équipe et année (équipes invitées exclues)."""
+    if os.path.exists(LEC_HISTORY) and not refresh:
+        return pd.read_csv(LEC_HISTORY)
+    leagues = ",".join(f"'{l}'" for l in LEC_LEAGUES)
+    rows = cargo_query(
+        tables="ScoreboardPlayers=SP,ScoreboardGames=SG,Tournaments=T,PlayerRedirects=PR",
+        join_on="SP.GameId=SG.GameId,SG.OverviewPage=T.OverviewPage,SP.Link=PR.AllName",
+        fields="PR.OverviewPage=player,SP.Link=link,SP.Team=team,T.Year=year,T.Name=tournament,"
+               "COUNT(*)=games",
+        where=f"T.League IN ({leagues})",
+        group_by="PR.OverviewPage,SP.Link,SP.Team,T.Year,T.Name")
+    df = pd.DataFrame(rows, columns=["player", "link", "team", "year", "tournament", "games"])
+    df["player"] = df["player"].replace("", pd.NA).fillna(df["link"])
+    df["year"] = pd.to_numeric(df["year"], errors="coerce")
+    df["games"] = pd.to_numeric(df["games"], errors="coerce")
+    special = df["tournament"].str.contains(LEC_GUEST_EVENTS, case=False, na=False)
+    regular_teams = df[~special].groupby(["year", "team"]).size().reset_index()[["year", "team"]]
+    df = df.merge(regular_teams, on=["year", "team"])
+    df = df.groupby(["player", "team", "year"], as_index=False)["games"].sum()
+    os.makedirs("data/raw", exist_ok=True)
+    df.to_csv(LEC_HISTORY, index=False)
+    return df
+
+
+def lec_before(season):
+    """Joueurs ayant joué en LEC (hors équipes invitées) une saison < `season`.
+    Renvoie {joueur: "équipe (année)" de leur dernière saison en LEC}."""
+    hist = fetch_lec_history()
+    past = hist[hist["year"] < season].sort_values(["year", "games"])
+    last = past.groupby("player").last()
+    return {p: f"{r['team']} ({int(r['year'])})" for p, r in last.iterrows()}
