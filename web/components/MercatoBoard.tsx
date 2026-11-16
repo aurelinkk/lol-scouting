@@ -10,6 +10,8 @@ export interface MercatoSlot {
   after: { name: string; id?: string } | null;
   status: string;
   source?: string;
+  /** Piste non tranchée (plusieurs destinations le même jour) */
+  options?: string;
 }
 export interface MercatoTeam {
   league: string;
@@ -55,7 +57,15 @@ function Badge({ status }: { status: string }) {
   );
 }
 
-export default function MercatoBoard({ season, teams }: { season: number; teams: MercatoTeam[] }) {
+export default function MercatoBoard({
+  season,
+  teams,
+  undecided = [],
+}: {
+  season: number;
+  teams: MercatoTeam[];
+  undecided?: { player: string; id?: string; options: string[] }[];
+}) {
   const leagues = useMemo(() => {
     const codes = [...new Set(teams.map((t) => t.league))];
     return codes.sort((a, b) => (a === "LEC" ? -1 : b === "LEC" ? 1 : a.localeCompare(b)));
@@ -111,6 +121,11 @@ export default function MercatoBoard({ season, teams }: { season: number; teams:
                       </span>
                       <Badge status={s.status} />
                     </span>
+                    {s.options && (
+                      <span className="col-span-4 -mt-1 truncate text-right text-[11px] italic text-ink-3" title={s.options}>
+                        {s.options.split(" · ")[0]}
+                      </span>
+                    )}
                   </li>
                 );
               })}
@@ -119,6 +134,25 @@ export default function MercatoBoard({ season, teams }: { season: number; teams:
         ))}
       </div>
       {!shown.length && <p className="text-sm text-ink-3">Aucune équipe.</p>}
+      {undecided.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-3 text-sm">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">Pistes non tranchées</div>
+          <ul className="space-y-0.5">
+            {undecided.map((u) => (
+              <li key={u.player}>
+                {u.id ? (
+                  <Link href={`/joueurs/${u.id}`} className="font-medium hover:underline">
+                    {short(u.player)}
+                  </Link>
+                ) : (
+                  <span className="font-medium">{short(u.player)}</span>
+                )}{" "}
+                <span className="text-ink-2">→ {u.options.join(" ou ")}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full" style={{ background: "var(--good)" }} /> officiel

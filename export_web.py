@@ -343,14 +343,20 @@ def main():
 
         teams = []
         for (league, tier, team), grp in board.groupby(["league", "tier", "team"], sort=False):
-            changed = any(st not in ("inchangé", "") for st in grp["status"])
+            changed = (any(st not in ("inchangé", "") for st in grp["status"])
+                       or any(isinstance(o, str) and o for o in grp.get("options", [])))
             teams.append({"league": league, "tier": tier, "team": team, "logo": logos.get(team),
                           "changed": changed, "slots": [
                 {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
-                 "status": r["status"], "source": r["source"] or None}
+                 "status": r["status"], "source": r["source"] or None,
+                 "options": r.get("options") or None}
                 for _, r in grp.iterrows()
                 if r["role"] != "Coach" or isinstance(r["before"], str) or isinstance(r["after"], str)]})
-        write("mercato.json", {"season": next_season, "teams": teams})
+        board_teams = set(board["team"])
+        undecided = [{"player": p, "id": ids.get(resolve_name(p, games) or ""), "options": o}
+                     for p, o in board.attrs.get("undecided", {}).items()
+                     if any(t in board_teams for t in o)]
+        write("mercato.json", {"season": next_season, "teams": teams, "undecided": undecided})
     elif os.path.exists(os.path.join(OUT_DIR, "mercato.json")):
         os.remove(os.path.join(OUT_DIR, "mercato.json"))
 

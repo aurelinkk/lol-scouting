@@ -152,13 +152,35 @@ def build_mercato(games, season):
         if role and c["team"] in teams:
             events.append((str(c["date"])[:10], 1, c["direction"], c["player"], c["team"], role,
                            "confirmé", "Leaguepedia"))
+    # Plusieurs destinations le même jour pour un joueur (ex : SkewMond, article
+    # Sheep du 10/11 citant Karmine Corp ET Team Vitality) : rien n'est tranché,
+    # on ne le place nulle part et on garde les pistes pour l'affichage
+    rumors = rumors[~rumors["not_happening"].astype(str).isin(["1", "True", "true"])].copy()
+    rumors["day"] = rumors["date"].astype(str).str[:10]
+    moves = rumors[rumors["team_end"] != rumors["team_start"]]
+    latest = moves.groupby("player")["day"].transform("max")
+    last_moves = moves[moves["day"] == latest]
+    n_dest = last_moves.groupby("player")["team_end"].nunique()
+    undecided = set(n_dest[n_dest > 1].index)
+    options = {p: sorted(last_moves.loc[last_moves["player"] == p, "team_end"].unique())
+               for p in undecided}
+    board["options"] = ""
+
     for _, r in rumors.iterrows():
-        if str(r["not_happening"]) in ("1", "True", "true"):
-            continue
         role = _role(r["role"])
         if not role:
             continue
         status = "confirmé" if r["status"] == "Confirmed" else "rumeur"
+        if r["player"] in undecided and r["team_end"] in options[r["player"]]:
+            # piste non tranchée : on la note sur le poste visé, sans y placer le joueur
+            slot = (board["team"] == r["team_end"]) & (board["role"] == role)
+            others = " / ".join(t for t in options[r["player"]] if t != r["team_end"])
+            board.loc[slot, "options"] = (f"piste : {r['player']} (aussi {others})"
+                                          f" · {r['source']}")
+            if r["team_start"] in teams:
+                events.append((str(r["date"])[:10], 0, "Leave", r["player"], r["team_start"], role,
+                               status, r["source"]))
+            continue
         if r["team_start"] in teams and r["team_start"] != r["team_end"]:
             events.append((str(r["date"])[:10], 0, "Leave", r["player"], r["team_start"], role,
                            status, r["source"]))
@@ -204,6 +226,7 @@ def build_mercato(games, season):
                     "after": None, "status": "", "source": ""}])], ignore_index=True)
                 slot = (board["team"] == m["team"]) & (board["role"] == m["role"])
             board.loc[slot, ["after", "status", "source"]] = [m[col] or None, "manuel", "saisie manuelle"]
+    board.attrs["undecided"] = options
     return board
 
 

@@ -29,6 +29,7 @@ import type { MercatoTeam } from "@/components/MercatoBoard";
 export interface Mercato {
   season: number;
   teams: MercatoTeam[];
+  undecided?: { player: string; id?: string; options: string[] }[];
 }
 
 export const getMercato = (): Mercato | null => {

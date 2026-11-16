@@ -25,7 +25,7 @@ export default function RostersPage() {
               transferts officiels et rumeurs. Sert aussi aux montées {mercato.season - 1} → {mercato.season}.
             </p>
           </div>
-          <MercatoBoard season={mercato.season} teams={mercato.teams} />
+          <MercatoBoard season={mercato.season} teams={mercato.teams} undecided={mercato.undecided} />
         </section>
       )}
 
