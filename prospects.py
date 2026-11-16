@@ -95,6 +95,7 @@ def aggregate(df):
         **{stat: grouped[stat].mean() for stat in OE_STATS},
         "oe_games": grouped["oe_match"].sum(),
         "birthdate": grouped["birthdate"].first(),
+        "age_approx": grouped["birthdate_approx"].any() if "birthdate_approx" in df else False,
         "last_game": grouped["date"].max(),
         "country": grouped["country"].first(),
     }).reset_index()

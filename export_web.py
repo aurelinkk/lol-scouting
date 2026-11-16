@@ -144,7 +144,7 @@ def main():
     current_league = club_games.groupby("player")["league_code"].last().to_dict()
 
     # --- Classements par saison --------------------------------------------
-    rank_fields = ["season", "role", "team", "league_code", "tier", "age", "games",
+    rank_fields = ["season", "role", "team", "league_code", "tier", "age", "age_approx", "games",
                    "final", "league_score", "league_score_raw", "sample_factor",
                    "league_bonus", "em_score", "em_score_raw", "em_games",
                    "ex_lec", "ex_lec_malus", "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
@@ -264,6 +264,7 @@ def main():
             "photo": photos.get(player), "country": clean(latest.get("country")),
             "birthdate": clean(birth.iloc[0]) if len(birth) else None,
             "age": clean(round((today - birth.iloc[0]).days / 365.25, 1)) if len(birth) else None,
+            "age_approx": bool(rows["age_approx"].any()) if "age_approx" in rows else False,
             "team": latest["team"], "logo": logos.get(latest["team"]),
             "role": latest["role"], "league_code": latest["league_code"],
             "tier": latest["tier"],

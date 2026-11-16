@@ -90,8 +90,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               <div>
                 <dt className="inline text-ink-3">Âge </dt>
                 <dd className="inline font-medium">
-                  {player.age ? `${Math.floor(player.age)} ans` : "inconnu"}
-                  {player.birthdate && <span className="text-ink-3"> (né le {player.birthdate})</span>}
+                  {player.age ? `${player.age_approx ? "~" : ""}${Math.floor(player.age)} ans` : "inconnu"}
+                  {player.birthdate && !player.age_approx && (
+                    <span className="text-ink-3"> (né le {player.birthdate})</span>
+                  )}
+                  {player.age_approx && <span className="text-ink-3"> (année approximative)</span>}
                 </dd>
               </div>
               {player.country && (

@@ -277,7 +277,9 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                     >
                       {r.league_code} <span className="text-xs text-ink-3">{r.tier}</span>
                     </td>
-                    <td className="px-2 py-1.5 text-right">{r.age ?? "–"}</td>
+                    <td className="px-2 py-1.5 text-right" title={r.age_approx ? "Âge approximatif (année de naissance seule)" : undefined}>
+                      {r.age !== undefined ? `${r.age_approx ? "~" : ""}${r.age}` : "–"}
+                    </td>
                     <td className="px-2 py-1.5 text-right">{r.games}</td>
                     <td className="px-2 py-1.5 text-right font-semibold" title={topPercent(r.role_percentile)}>
                       {fmtScore(noLeague ? r.final - r.league_bonus : r.final)}

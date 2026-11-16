@@ -134,7 +134,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-1 text-xs text-ink-3">
                             <TeamLogo team={p.team} src={p.logo} size={14} />
                             <span className="truncate">
-                              {p.league_code} · {p.age !== undefined ? `${p.age} ans` : "âge ?"}
+                              {p.league_code} · {p.age !== undefined ? `${p.age_approx ? "~" : ""}${p.age} ans` : "âge ?"}
                             </span>
                           </div>
                         </div>

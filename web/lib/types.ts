@@ -17,6 +17,8 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   league_code: string;
   tier: string;
   age?: number;
+  /** Âge déduit d'une année seule (birthdates.csv) : afficher « ~ » */
+  age_approx?: boolean;
   games: number;
   final: number;
   league_score: number;
@@ -127,6 +129,7 @@ export interface Player {
   country?: string;
   birthdate?: string;
   age?: number;
+  age_approx?: boolean;
   team: string;
   logo?: string;
   role: Role;

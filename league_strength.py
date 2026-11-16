@@ -160,20 +160,37 @@ def apply_player_overrides(df):
 BIRTHDATES_FILE = "birthdates.csv"
 
 
+def parse_birthdate(value):
+    """Date complète (2004-06-28), mois (2004-06) ou année seule (2004).
+    Renvoie (date, approximative ?) : l'année seule -> 1er juillet, le mois -> le 15."""
+    text = str(value).strip()
+    if re.fullmatch(r"\d{4}", text):
+        return pd.Timestamp(f"{text}-07-01"), True
+    if re.fullmatch(r"\d{4}-\d{1,2}", text):
+        return pd.Timestamp(f"{text}-15"), True
+    date = pd.to_datetime(text, errors="coerce")
+    return date, False
+
+
 def apply_birthdates(df):
     """Complète / corrige les dates de naissance avec birthdates.csv (saisie manuelle).
 
     Leaguepedia n'a pas la date de naissance de beaucoup de joueurs d'ERL.
     La date saisie à la main est prioritaire sur celle de Leaguepedia.
+    Une année seule (ex : 2004, déduite d'un « 22 ans » vu sur Twitter) est
+    acceptée : l'âge est alors marqué approximatif (« ~22 ans »).
     """
+    df["birthdate_approx"] = False
     if not os.path.exists(BIRTHDATES_FILE):
         return df
-    manual = pd.read_csv(BIRTHDATES_FILE, parse_dates=["birthdate"])
-    dates = dict(zip(manual["player"], manual["birthdate"]))
-    override = df["player"].map(dates)
-    if "player_link" in df:
-        override = override.fillna(df["player_link"].map(dates))
-    df["birthdate"] = override.fillna(df["birthdate"])
+    manual = pd.read_csv(BIRTHDATES_FILE, dtype=str).fillna("")
+    parsed = {p: parse_birthdate(b) for p, b in zip(manual["player"], manual["birthdate"]) if b}
+    dates = {p: d for p, (d, _) in parsed.items() if not pd.isna(d)}
+    approx = {p for p, (d, a) in parsed.items() if a and not pd.isna(d)}
+    key = df["player"].where(df["player"].isin(dates), df.get("player_link", df["player"]))
+    override = key.map(dates)
+    df["birthdate"] = pd.to_datetime(override).fillna(df["birthdate"])
+    df["birthdate_approx"] = key.isin(approx) & override.notna()
     return df
 
 

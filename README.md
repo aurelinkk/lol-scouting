@@ -19,7 +19,8 @@ sur oracleselixir.com/tools/downloads et les placer dans `data/oracles/`
 Âges : Leaguepedia n'a pas la date de naissance de beaucoup de joueurs d'ERL.
 `python missing_ages.py` liste les joueurs classés sans âge (du mieux classé au
 moins bien) ; compléter `birthdates.csv` (`player,birthdate,source`), puis
-relancer `python export_web.py`.
+relancer `python export_web.py`. Si on ne connaît que l'âge (ex : « 22 ans » en
+2026), une année seule est acceptée (`2004`) : l'âge s'affiche « ~22 ans ».
 
 Pour accélérer Leaguepedia, mettre un bot password dans `.env` :
 `LEAGUEPEDIA_USER` et `LEAGUEPEDIA_PASSWORD`.
