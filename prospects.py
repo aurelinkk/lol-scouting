@@ -18,7 +18,8 @@ import argparse
 
 import pandas as pd
 
-from league_strength import coef_window, league_coefficients, load_games
+from league_strength import coef_window, load_games
+from league_talent import season_coefficients, self_up_adjustment
 from oracles import OE_STATS, attach_oe
 import scoring
 from scoring import (EM_MIN_GAMES, EM_SHRINK_GAMES, EM_WEIGHT, LEAGUE_WEIGHT,
@@ -143,8 +144,12 @@ def weighted_zscores(stats, group_keys):
     return stats
 
 
-def build_ranking(games, season, coef_seasons, min_games=10):
-    """Classement de tous les joueurs d'ERL de la saison (LEC exclue)."""
+def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=None):
+    """Classement de tous les joueurs d'ERL de la saison (LEC exclue).
+
+    use_next_season : utiliser les montées de la saison suivante dans le niveau
+    de la ligue (défaut : scoring.TALENT_USE_NEXT_SEASON ; False pour les backtests).
+    """
     games = add_game_metrics(games[games["season"] == season])
     stats = aggregate(games)
 
@@ -168,11 +173,18 @@ def build_ranking(games, season, coef_seasons, min_games=10):
                .drop(columns="_tier"))
 
     # Bonus de niveau de ligue
-    coefs = league_coefficients(load_games(coef_seasons), coef_seasons)
+    # Coefficient de la saison = coef EM (2 ans) + niveau des joueurs de la ligue
+    # cette saison (league_talent.py). Un joueur monté ne profite pas de sa
+    # propre montée dans l'indicateur « montées de la ligue » (leave-one-out).
+    coefs = season_coefficients(season, use_next_season, window=coef_seasons)
     erl1 = [c for c in ranking.loc[ranking["tier"] == "ERL1", "league_code"].unique()
             if c in coefs.index]
     ref = coefs.loc[erl1, "coef"]
-    ranking["league_coef"] = ranking["league_code"].map(coefs["coef"])
+    ranking["league_coef_base"] = ranking["league_code"].map(coefs["base"])
+    ranking["league_talent"] = ranking["league_code"].map(coefs["talent"])
+    loo = self_up_adjustment(season, use_next_season)
+    ranking["league_coef"] = ranking["league_code"].map(coefs["coef"]) + [
+        loo.get((p, l), 0.0) for p, l in zip(ranking["player"], ranking["league_code"])]
     ranking["league_bonus"] = (LEAGUE_WEIGHT * (ranking["league_coef"] - ref.mean())
                                / ref.std()).fillna(0)
 

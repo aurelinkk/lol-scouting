@@ -60,7 +60,13 @@ export default function Dashboard() {
       tooltip: (
         <div className="space-y-0.5">
           <div className="font-semibold">{Object.values(l.names).at(-1)}</div>
-          <div>Coefficient : {l.coef.toFixed(3)}</div>
+          <div>Coefficient {meta.seasons.at(-1)} : {l.coef.toFixed(3)}</div>
+          {l.em_coef !== undefined && Math.abs(l.coef - l.em_coef) >= 0.005 && (
+            <div>
+              dont EM {l.em_coef.toFixed(2)} et niveau des joueurs {l.coef - l.em_coef >= 0 ? "+" : "−"}
+              {Math.abs(l.coef - l.em_coef).toFixed(2)}
+            </div>
+          )}
           {l.em_teams > 0 ? (
             <div>
               {l.em_teams} participations à l&apos;EM · percentile moyen {(l.raw_mean ?? 0).toFixed(2)}
@@ -159,7 +165,7 @@ export default function Dashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card
           title="Niveau des ligues"
-          subtitle={`Coefficient = placement moyen des équipes de la ligue à l'EMEA Masters (${meta.seasons.join("–")}), 1 = vainqueur.`}
+          subtitle={`Coefficient ${meta.seasons.at(-1)} = placement à l'EMEA Masters sur 2 ans (1 = vainqueur) + niveau des joueurs de la ligue. Détail saison par saison dans l'onglet Ligues.`}
         >
           <div className="mb-3 flex gap-4 text-xs text-ink-2">
             <span className="flex items-center gap-1.5">

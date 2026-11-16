@@ -11,6 +11,7 @@ les matchs pros de 2023 à aujourd'hui, la soloQ EUW et le mercato.
 | **Indicateurs** | Meilleurs prospects par poste (21 ans ou moins), niveau des ligues, taux de montée selon le rang |
 | **Données** | Classement complet filtrable (saison, poste, ligue, âge, club actuel…), avec ou sans le niveau de ligue |
 | **Fiche joueur** | Photo, club, âge, carrière en frise (LEC / ERL1 / ERL2 / autres régions), titres, récompenses, chaque stat vs son poste, détail du score, évolution par tournoi |
+| **Ligues** | Niveau de chaque ligue saison par saison : résultats à l'EMEA Masters, ex-LEC, joueurs passés par la division du dessus, montés l'année suivante, ERL2 contre l'ERL1 du pays |
 | **Montées** | Par saison : qui est monté (ERL2 → ERL1, ERL1 → LEC) et son profil l'année d'avant. Valide le score : 9 montés en LEC sur 11 étaient dans notre top 10 % |
 | **Rosters** | Effectifs LEC + ERL1 depuis 2023 et **mercato automatique** de la saison suivante (transferts officiels, rumeurs Sheep Esports / X, fins de contrat GCD, pistes non tranchées) |
 | **Ladder** | Top 1000 soloQ EUW : non-pros à scouter, progression de LP, volume de jeu, score soloQ par poste (⭐ = top 5 %) |
@@ -21,7 +22,7 @@ les matchs pros de 2023 à aujourd'hui, la soloQ EUW et le mercato.
 **Score = performance dans sa ligue + niveau de la ligue + EMEA Masters − malus ex-LEC**
 
 - **Performance dans sa ligue** : chaque stat comparée aux joueurs **du même poste dans la même ligue**. On privilégie la phase de lane (écarts de CS, gold et XP à 15 min), puis les dégâts comparés au champion joué, le KDA, la participation aux kills… Le score est réduit quand le joueur a peu de parties.
-- **Niveau de la ligue** : d'après le placement de ses équipes à l'EMEA Masters sur 2 ans (la LFL vaut plus que la Liga Portuguesa).
+- **Niveau de la ligue** : d'après le placement de ses équipes à l'EMEA Masters sur 2 ans (la LFL vaut plus que la Liga Portuguesa), ajusté chaque saison selon ses joueurs (`league_talent.py`) : part d'anciens joueurs de LEC et de joueurs montés en LEC l'année suivante pour une ERL1 ; joueurs passés par l'ERL1, montés l'année suivante et résultats contre l'ERL1 du pays pour une ERL2 (ex : LFL2 2025 bien plus forte que la Nexus League 2026). Un joueur monté ne profite pas de sa propre montée.
 - **EMEA Masters** : performance face aux joueurs de toutes les ligues.
 - **Ex-LEC** : petit malus pour les joueurs déjà passés par la LEC, qui remontent un peu plus rarement.
 
@@ -55,7 +56,7 @@ Corrections à la main (prioritaires sur les données automatiques) :
 
 Outils en ligne de commande : `prospects.py` (classement), `player.py <pseudo>`
 (fiche détaillée), `promotions.py` (montées), `league_strength.py` (coefficients),
-`oracles.py <saison>` (couverture Oracle's Elixir).
+`oracles.py <saison>` (couverture Oracle's Elixir), `league_talent.py` (niveau des ligues par saison).
 
 ## Site (Vercel)
 

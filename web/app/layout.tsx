@@ -13,6 +13,7 @@ const NAV = [
   { href: "/", label: "Indicateurs" },
   { href: "/donnees", label: "Données" },
   { href: "/montees", label: "Montées" },
+  { href: "/ligues", label: "Ligues" },
   { href: "/rosters", label: "Rosters" },
   { href: "/ladder", label: "Ladder" },
   { href: "/analyses", label: "Analyses" },

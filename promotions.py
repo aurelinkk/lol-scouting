@@ -49,12 +49,13 @@ def destination(games_next):
     team_games["ok"] = team_games["n"] >= team_games["tier"].map(MIN_TEAM_GAMES)
     g = g.merge(team_games[team_games["ok"]][["tier", "team"]], on=["tier", "team"])
 
-    best = (g.groupby(["player", "tier", "team"])["date"].min().reset_index(name="first_game")
+    best = (g.groupby(["player", "tier", "team"])
+            .agg(first_game=("date", "min"), new_league=("league_code", "first")).reset_index()
             .assign(level=lambda d: d["tier"].map(order))
             .sort_values(["level", "first_game"])
             .drop_duplicates("player"))
     return best.rename(columns={"tier": "new_level", "team": "new_team"})[
-        ["player", "new_level", "new_team", "first_game"]]
+        ["player", "new_level", "new_team", "new_league", "first_game"]]
 
 
 def previous_club(games, promoted):
@@ -92,8 +93,10 @@ def compute_promotions(games, season_from, season_to, coef_seasons=None, min_gam
     Colonnes ajoutées : new_level / new_team (NaN si plus en ERL/LEC en N+1),
     tier_percentile (rang dans son rôle parmi les joueurs du même niveau en N).
     """
-    # Coefficient de ligue sur les 2 ans qui précèdent la montée (pas d'info du futur)
-    before = build_ranking(games, season_from, coef_seasons or coef_window(season_from), min_games)
+    # Coefficient de ligue sur les 2 ans qui précèdent la montée, sans les montées
+    # de la saison suivante (pas d'info du futur : on juge le score tel qu'il était)
+    before = build_ranking(games, season_from, coef_seasons or coef_window(season_from), min_games,
+                           use_next_season=False)
     before = before[~before["played_lec"]].copy()
     before["tier_percentile"] = (before.groupby(["tier", "role"])["final"]
                                  .rank(pct=True).round(3))
@@ -115,7 +118,8 @@ def compute_promotions(games, season_from, season_to, coef_seasons=None, min_gam
     lec_n = set(games.loc[(games["season"] == season_from) & (games["tier"] == "LEC"), "player"])
     missing = missing[~missing["player"].isin(lec_n)]
     if not missing.empty and (games["season"] == season_from - 1).any():
-        prev = build_ranking(games, season_from - 1, coef_window(season_from - 1), min_games)
+        prev = build_ranking(games, season_from - 1, coef_window(season_from - 1), min_games,
+                             use_next_season=False)
         prev = prev[~prev["played_lec"]].copy()
         prev["tier_percentile"] = prev.groupby(["tier", "role"])["final"].rank(pct=True).round(3)
         prev = prev[prev["player"].isin(missing["player"])].merge(missing, on="player")

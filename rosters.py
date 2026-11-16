@@ -81,8 +81,8 @@ def mercato_destination(season, games):
         player = resolve_name(r["after"], games)
         if player:
             rows.append({"player": player, "new_level": r["tier"], "new_team": r["team"],
-                         "first_game": pd.Timestamp.max})
-    df = pd.DataFrame(rows, columns=["player", "new_level", "new_team", "first_game"])
+                         "new_league": r["league"], "first_game": pd.Timestamp.max})
+    df = pd.DataFrame(rows, columns=["player", "new_level", "new_team", "new_league", "first_game"])
     order = {"LEC": 0, "ERL1": 1, "ERL2": 2}
     return (df.assign(level=df["new_level"].map(order)).sort_values("level")
             .drop_duplicates("player").drop(columns="level"))

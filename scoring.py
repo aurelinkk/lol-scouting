@@ -105,6 +105,23 @@ ERL2_PARENT = {
     "NLC2": "NLC", "RL2": "RL", "TCL2": "TCL", "LPLOL2": "LPLOL", "LIT2": "LIT",
 }
 
+# Niveau de la ligue saison par saison, d'après ses joueurs (league_talent.py).
+# Coefficient de la saison = coef EM (ou ERL1 du pays - décote pour une ERL2)
+#                            + TALENT_WEIGHT x talent (moyenne de z-scores).
+# 0 = on garde le coefficient EM seul, identique toutes les saisons.
+TALENT_WEIGHT = {"ERL1": 0.10, "ERL2": 0.05}
+TALENT_SIGNAL_WEIGHTS = {
+    # part des titulaires déjà passés par la LEC / montés en LEC l'année suivante
+    "ERL1": {"ex_lec": 1.0, "up": 1.0},
+    # passés par l'ERL1 / montés l'année suivante / victoires contre l'ERL1 du pays
+    "ERL2": {"above": 1.0, "up": 1.0, "cross": 1.0},
+}
+# Utiliser les montées de la saison suivante (connues après coup ou via le
+# mercato). False = comme en cours de saison (backtests sans info du futur).
+TALENT_USE_NEXT_SEASON = True
+CROSS_MIN_GAMES = 5      # parties ERL2 vs ERL1 nécessaires pour compter
+CROSS_SHRINK_GAMES = 10  # tirées vers la moyenne générale avec ce poids
+
 # ---------------------------------------------------------------------------
 # 3. Performance à l'EMEA Masters
 # ---------------------------------------------------------------------------

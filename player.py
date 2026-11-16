@@ -9,7 +9,7 @@ import argparse
 
 import pandas as pd
 
-from league_strength import coef_window, league_coefficients, load_games
+from league_strength import coef_window, load_games
 from prospects import add_game_metrics, aggregate, build_ranking, weighted_score, zscores
 from scoring import EM_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
@@ -87,7 +87,6 @@ def main():
         raise SystemExit("Précise le nom exact.")
 
     coef_seasons = args.coef_seasons or coef_window(args.season)
-    coefs = league_coefficients(load_games(coef_seasons), coef_seasons)
     ranking = build_ranking(games, args.season, coef_seasons, args.min_games)
     pd.set_option("display.width", 200)
 
@@ -116,13 +115,13 @@ def main():
     r = ranking[ranking["player"] == rows["player"].iloc[0]]
     if not r.empty:
         r = r.iloc[0]
-        coef = coefs["coef"].get(r["league_code"], float("nan"))
         em = r["em_score"]
         print(f"\n--- Score final (ligue principale : {r['league_code']}) ---")
         print(f"  Score dans la ligue          {r['league_score']:+.2f}   "
               f"({r['league_score_raw']:+.2f} x {r['sample_factor']:.2f} pour {r['games']} parties)")
         print(f"  Bonus niveau de ligue        {r['league_bonus']:+.2f}   "
-              f"(coef EM de la ligue : {coef:.2f})")
+              f"(coef de la ligue cette saison : {r['league_coef']:.2f} = EM {r['league_coef_base']:.2f}"
+              f" + niveau des joueurs {r['league_coef'] - r['league_coef_base']:+.2f})")
         print(f"  {EM_WEIGHT} x score EMEA Masters    "
               f"{EM_WEIGHT * (0 if pd.isna(em) else em):+.2f}   "
               f"({'pas d EM' if pd.isna(em) else f'{r.em_score_raw:+.2f} réduit à {em:+.2f} pour {r.em_games} parties'})")

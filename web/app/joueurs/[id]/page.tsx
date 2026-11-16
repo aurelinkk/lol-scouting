@@ -176,7 +176,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       <td className="text-right">{fmtScore(s.league_score)}</td>
                     </tr>
                     <tr>
-                      <td className="py-0.5 text-ink-2">Bonus niveau de ligue</td>
+                      <td className="py-0.5 text-ink-2">
+                        Bonus niveau de ligue{" "}
+                        {s.league_coef !== undefined && s.league_coef_base !== undefined && (
+                          <Link href="/ligues" className="text-ink-3 hover:underline">
+                            (coef {s.league_coef.toFixed(2)} = EM {s.league_coef_base.toFixed(2)}{" "}
+                            {s.league_coef - s.league_coef_base >= 0 ? "+" : "−"} niveau des joueurs{" "}
+                            {Math.abs(s.league_coef - s.league_coef_base).toFixed(2)})
+                          </Link>
+                        )}
+                      </td>
                       <td className="text-right">{fmtScore(s.league_bonus)}</td>
                     </tr>
                     <tr>

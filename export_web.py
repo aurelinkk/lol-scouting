@@ -27,6 +27,7 @@ from league_strength import available_seasons, coef_window, league_coefficients,
 from leagues import LEAGUES
 from promotions import compute_promotions, hit_rates
 from prospects import add_game_metrics, aggregate, build_ranking
+from league_talent import league_talent, season_coefficients
 from scoring import EM_WEIGHT, LEAGUE_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
 OUT_DIR = "web/data"                # lu par le serveur au build (jamais envoyé tel quel)
@@ -85,6 +86,36 @@ def league_names():
     return names
 
 
+def league_seasons(seasons, ids):
+    """Niveau de chaque ligue saison par saison (league_talent.py), avec les
+    joueurs derrière les indicateurs (montés l'année suivante, ex-LEC...)."""
+    talent = league_talent()
+    players = talent.attrs["players"]
+    out = {}
+    for season in seasons:
+        coefs = season_coefficients(season)
+        t = talent[talent["season"] == season].set_index("league_code")
+        for code in t.index:
+            r = t.loc[code]
+            ps = players[(players["season"] == season) & (players["league_code"] == code)]
+            ref = lambda d: [{"id": ids.get(p), "name": p, "team": tm}
+                             for p, tm in zip(d["player"], d["team"])]
+            up = ps[ps["up"] > 0].sort_values("up", ascending=False)
+            out.setdefault(code, {})[str(season)] = {
+                "coef": clean(coefs["coef"].get(code)), "base": clean(coefs["base"].get(code)),
+                "talent": clean(r["talent"]), "starters": int(r["starters"]),
+                "ex_lec": int(r["ex_lec_n"]),
+                "above": int(r["above_n"]) if r["above_known"] else None,
+                "up": int(r["up_n"]) if r["up_count"] > 0 else None,
+                "up_value": clean(r["up"]),
+                "cross_wins": int(r["cross_wins"]), "cross_games": int(r["cross_games"]),
+                "z": {k[2:]: clean(r[k]) for k in r.index if k.startswith("z_") and pd.notna(r[k])},
+                "up_players": [{**x, "value": clean(v)} for x, v in zip(ref(up), up["up"])],
+                "ex_lec_players": ref(ps[ps["ex_lec"]]),
+            }
+    return out
+
+
 def peer_percentiles(stats):
     """Pour chaque ligne : moyenne du poste dans la ligue et percentile, par stat."""
     out = {}
@@ -131,10 +162,13 @@ def main():
     # Coefficient affiché : les 2 dernières saisons
     coefs = league_coefficients(games, coef_window(max(seasons)))
     names = league_names()
+    by_season = league_seasons(seasons, ids)
+    latest = season_coefficients(max(seasons))
     write("leagues.json", [
         {**names.get(code, {"code": code, "tier": "?", "names": {}}),
-         "coef": clean(r["coef"]), "em_teams": clean(r["em_teams"]),
-         "raw_mean": clean(r["raw_mean"])}
+         "coef": clean(latest["coef"].get(code, r["coef"])), "em_coef": clean(r["coef"]),
+         "em_teams": clean(r["em_teams"]), "raw_mean": clean(r["raw_mean"]),
+         "seasons": by_season.get(code, {})}
         for code, r in coefs.iterrows()
     ])
 
@@ -146,7 +180,7 @@ def main():
     # --- Classements par saison --------------------------------------------
     rank_fields = ["season", "role", "team", "league_code", "tier", "age", "age_approx", "games",
                    "final", "league_score", "league_score_raw", "sample_factor",
-                   "league_bonus", "em_score", "em_score_raw", "em_games",
+                   "league_bonus", "league_coef", "league_coef_base", "em_score", "em_score_raw", "em_games",
                    "ex_lec", "ex_lec_malus", "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
                    "soloq_games", "soloq_winrate", "soloq_lp_7d", "soloq_games_7d",
                    "role_percentile", "played_lec"] + STATS

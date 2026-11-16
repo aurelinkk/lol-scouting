@@ -25,6 +25,9 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   league_score_raw?: number;
   sample_factor?: number;
   league_bonus: number;
+  /** Coefficient de la ligue cette saison (EM + niveau des joueurs) et sa part EM */
+  league_coef?: number;
+  league_coef_base?: number;
   em_score?: number;
   em_score_raw?: number;
   soloq_bonus?: number;
@@ -141,13 +144,41 @@ export interface Player {
   career?: Career;
 }
 
+export interface LeaguePlayerRef {
+  id?: string;
+  name: string;
+  team: string;
+  value?: number;
+}
+
+/** Niveau d'une ligue une saison donnée (league_talent.py) */
+export interface LeagueSeason {
+  coef?: number;
+  /** Coef EMEA Masters sur 2 ans (ERL2 : ERL1 du pays − décote) */
+  base?: number;
+  talent: number;
+  starters: number;
+  ex_lec: number;
+  above: number | null;
+  up: number | null;
+  up_value?: number;
+  cross_wins: number;
+  cross_games: number;
+  z: Record<string, number>;
+  up_players: LeaguePlayerRef[];
+  ex_lec_players: LeaguePlayerRef[];
+}
+
 export interface League {
   code: string;
   tier: string;
   names: Record<string, string>;
+  /** Coefficient de la dernière saison (EM + niveau des joueurs) */
   coef: number;
+  em_coef?: number;
   em_teams: number;
   raw_mean?: number;
+  seasons?: Record<string, LeagueSeason>;
 }
 
 export interface PromotionPlayer {
