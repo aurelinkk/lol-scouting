@@ -226,6 +226,25 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
 
 
 
+def other_region_games(players):
+    """Parties de `players` dans l'autre région suivie (data/na/ vu d'Europe, data/
+    vu de NA), pour la frise de carrière."""
+    other, data_dir = ("na", "data/na") if REGION == "eu" else ("eu", "data")
+    frames = []
+    for path in glob.glob(f"{data_dir}/pro_games_*.csv"):
+        season = int(re.search(r"(\d{4})\.csv$", path).group(1))
+        config = leagues_by_region(other).get(season)
+        if not config:
+            continue
+        g = pd.read_csv(path, parse_dates=["date"])
+        g = g[g["player"].isin(players)]
+        g["season"] = season
+        g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
+        g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
+        frames.append(g)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
 def player_ids(players):
     """Identifiants stables pour les URLs (/joueurs/<id>)."""
     ids, used = {}, set()
@@ -352,6 +371,11 @@ def main():
 
     # Carrière : périodes en club, titres, récompenses individuelles
     st = stints(games)
+    # Périodes dans l'autre région suivie (ex : Yukino, NACL 2023-2024 puis KC Blue)
+    abroad = other_region_games(set(games["player"]))
+    abroad_st = stints(abroad).assign(tier="OTHER") if not abroad.empty else pd.DataFrame()
+    if not abroad_st.empty:
+        st = pd.concat([st, abroad_st], ignore_index=True)
     # Périodes hors EMEA déjà relevées (ex : LØS en CBLOL pour Zest et Feisty)
     outside_files = glob.glob(f"{RAW_DIR}/outside_*.csv")
     if outside_files:
@@ -359,6 +383,9 @@ def main():
         out_games = pd.concat([fetch_outside_games(
             pd.read_csv(f)["player"].dropna().unique().tolist(), int(f[-8:-4])) for f in outside_files])
         other = outside_stints(out_games)
+        if not abroad_st.empty and not other.empty:  # déjà pris dans l'autre région
+            seen = set(zip(abroad_st["player"], abroad_st["team"]))
+            other = other[[(p, t) not in seen for p, t in zip(other["player"], other["team"])]]
         if not other.empty:
             st = pd.concat([st, other], ignore_index=True)
     st = st.sort_values(["player", "start"])

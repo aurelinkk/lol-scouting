@@ -37,6 +37,10 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
   if (!player) notFound();
   const meta = getMeta(region);
   const R = REGION_INFO[region];
+  // Même joueur dans l'autre région (même page Leaguepedia) : ex. Yukino, NACL puis KC Blue
+  const otherRegion: Region = region === "eu" ? "na" : "eu";
+  const twin = hasRegion(otherRegion) ? getPlayer(id, otherRegion) : undefined;
+  const hasTwin = twin?.name === player.name;
 
   const [pseudo, realName] = (() => {
     const m = player.name.match(/^(.*?)\s*\((.*)\)$/);
@@ -118,6 +122,11 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
               >
                 Page Leaguepedia ↗
               </a>
+              {hasTwin && (
+                <Link href={link(otherRegion, `/joueurs/${id}`)} className="text-accent hover:underline">
+                  Fiche {REGION_INFO[otherRegion].name} →
+                </Link>
+              )}
             </dl>
           </div>
           {career && (
