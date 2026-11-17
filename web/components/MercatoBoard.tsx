@@ -15,6 +15,8 @@ export interface MercatoSlot {
   source?: string;
   /** Piste non tranchée (plusieurs destinations le même jour) */
   options?: string;
+  /** Où part le joueur de départ (ex : Yukino -> FlyQuest, LCS) */
+  to?: { team: string; logo?: string; league?: string; tier?: string; region?: string } | null;
 }
 export interface MercatoTeam {
   league: string;
@@ -127,6 +129,12 @@ export default function MercatoBoard({
                       </span>
                       <Badge status={s.status} />
                     </span>
+                    {s.to && (
+                      <span className="col-span-4 -mt-1 truncate text-right text-[11px] text-ink-3">
+                        {s.before ? short(s.before.name) : ""} part chez {s.to.team}
+                        {s.to.league && s.to.region && s.to.region !== region ? ` (${s.to.league})` : ""}
+                      </span>
+                    )}
                     {s.options && (
                       <span className="col-span-4 -mt-1 truncate text-right text-[11px] italic text-ink-3" title={s.options}>
                         {s.options.split(" · ")[0]}

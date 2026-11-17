@@ -24,7 +24,7 @@ from careers import (fetch_awards, fetch_titles, level_totals, outside_stints, s
 from images import get_image_urls
 from rosters import build_rosters, resolve_name
 from league_strength import available_seasons, coef_window, league_coefficients, load_games
-from leagues import LEAGUES
+from leagues import LEAGUES, leagues_by_region
 from region import RAW_DIR, REGION, WEB_DATA_DIR, WEB_PUBLIC_DIR
 from promotions import compute_promotions, hit_rates
 from prospects import add_game_metrics, aggregate, build_ranking
@@ -137,25 +137,107 @@ def peer_percentiles(stats):
     return out
 
 
+def team_levels(season):
+    """Équipe -> (ligue, niveau, région) en `season`, pour l'Europe ET la NA
+    (fichiers data/pro_games_* et data/na/pro_games_*) : sert à situer la
+    destination d'un joueur qui change de région (ex : Yukino -> FlyQuest, LCS)."""
+    out = {}
+    for region, data_dir in (("eu", "data"), ("na", "data/na")):
+        path = f"{data_dir}/pro_games_{season}.csv"
+        if not os.path.exists(path):
+            continue
+        g = pd.read_csv(path, usecols=["game_id", "team", "league", "tournament"])
+        config = leagues_by_region(region).get(season, {})
+        g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
+        g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
+        g = g[g["tier"].isin(["LEC", "ERL1", "ERL2"])
+              & ~g["tournament"].str.contains("Promotion|Qualifier|Invitational|Versus", case=False, na=False)]
+        n = g.groupby(["team", "league_code", "tier"])["game_id"].nunique().reset_index(name="n")
+        n = n[n["n"] >= 10].sort_values("n", ascending=False).drop_duplicates("team")
+        for _, r in n.iterrows():
+            out.setdefault(r["team"], (r["league_code"], r["tier"], region))
+    return out
+
+
+def export_mercato(games, ids, logos, next_season):
+    """mercato.json : mercato automatique de la saison suivante (voir mercato.py)."""
+    from mercato import build_mercato
+    try:
+        board = build_mercato(games, next_season)
+    except Exception as e:
+        print(f"  (mercato indisponible : {e})")
+        board = None
+    if board is not None and not board.empty:
+        levels = team_levels(next_season - 1)
+
+        def destination(team):
+            """Club où part un joueur, avec sa ligue (ex : FlyQuest, LCS, NA)."""
+            if not isinstance(team, str) or not team:
+                return None
+            league, tier, region = levels.get(team, (None, None, None))
+            return {"team": team, "logo": logos.get(team), "league": league, "tier": tier,
+                    "region": region}
+
+        def slot(name):
+            if not isinstance(name, str) or not name:
+                return None
+            pid = resolve_name(name, games)
+            return {"name": name, "id": ids.get(pid) if pid else None}
+
+        teams = []
+        for (league, tier, team), grp in board.groupby(["league", "tier", "team"], sort=False):
+            changed = (any(st not in ("inchangé", "") for st in grp["status"])
+                       or any(isinstance(o, str) and o for o in grp.get("options", [])))
+            teams.append({"league": league, "tier": tier, "team": team, "logo": logos.get(team),
+                          "changed": changed, "slots": [
+                {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
+                 "status": r["status"], "source": r["source"] or None,
+                 "options": r.get("options") or None, "to": destination(r.get("to"))}
+                for _, r in grp.iterrows()
+                if r["role"] != "Coach" or isinstance(r["before"], str) or isinstance(r["after"], str)]})
+        board_teams = set(board["team"])
+        undecided = [{"player": p, "id": ids.get(resolve_name(p, games) or ""), "options": o}
+                     for p, o in board.attrs.get("undecided", {}).items()
+                     if any(t in board_teams for t in o)]
+        write("mercato.json", {"season": next_season, "teams": teams, "undecided": undecided})
+    elif os.path.exists(os.path.join(OUT_DIR, "mercato.json")):
+        os.remove(os.path.join(OUT_DIR, "mercato.json"))
+
+
+
+def player_ids(players):
+    """Identifiants stables pour les URLs (/joueurs/<id>)."""
+    ids, used = {}, set()
+    for player in sorted(players):
+        slug, i = slugify(player), 2
+        while slug in used:
+            slug, i = f"{slugify(player)}-{i}", i + 1
+        ids[player] = slug
+        used.add(slug)
+    return ids
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seasons", type=int, nargs="+", help="par défaut : toutes celles téléchargées")
+    parser.add_argument("--only", choices=["mercato"],
+                        help="ne régénérer que le mercato (rapide, sans Oracle's Elixir)")
     args = parser.parse_args()
     seasons = sorted(args.seasons or available_seasons())
+
+    if args.only == "mercato":
+        games = load_games(seasons)
+        _, logos = get_image_urls()
+        print("Export web :")
+        export_mercato(games, player_ids(games["player"].unique()), logos, max(seasons) + 1)
+        return
 
     games = load_games(seasons)
     games = add_game_metrics(games)
     stats = aggregate(games)
     photos, logos = get_image_urls()
 
-    # Identifiants stables pour les URLs (/joueurs/<id>)
-    ids, used = {}, set()
-    for player in sorted(stats["player"].unique()):
-        slug, i = slugify(player), 2
-        while slug in used:
-            slug, i = f"{slugify(player)}-{i}", i + 1
-        ids[player] = slug
-        used.add(slug)
+    ids = player_ids(stats["player"].unique())
 
     print("Export web :")
 
@@ -367,39 +449,7 @@ def main():
                             "teams": sorted(teams, key=lambda t: t["team"].lower())})
     write("rosters.json", sorted(roster_list, key=lambda r: (r["season"], r["start"])), PUBLIC_DIR)
 
-    # --- Mercato de la saison suivante (automatique, voir mercato.py) ------------
-    next_season = max(seasons) + 1
-    from mercato import build_mercato
-    try:
-        board = build_mercato(games, next_season)
-    except Exception as e:
-        print(f"  (mercato indisponible : {e})")
-        board = None
-    if board is not None and not board.empty:
-        def slot(name):
-            if not isinstance(name, str) or not name:
-                return None
-            pid = resolve_name(name, games)
-            return {"name": name, "id": ids.get(pid) if pid else None}
-
-        teams = []
-        for (league, tier, team), grp in board.groupby(["league", "tier", "team"], sort=False):
-            changed = (any(st not in ("inchangé", "") for st in grp["status"])
-                       or any(isinstance(o, str) and o for o in grp.get("options", [])))
-            teams.append({"league": league, "tier": tier, "team": team, "logo": logos.get(team),
-                          "changed": changed, "slots": [
-                {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
-                 "status": r["status"], "source": r["source"] or None,
-                 "options": r.get("options") or None}
-                for _, r in grp.iterrows()
-                if r["role"] != "Coach" or isinstance(r["before"], str) or isinstance(r["after"], str)]})
-        board_teams = set(board["team"])
-        undecided = [{"player": p, "id": ids.get(resolve_name(p, games) or ""), "options": o}
-                     for p, o in board.attrs.get("undecided", {}).items()
-                     if any(t in board_teams for t in o)]
-        write("mercato.json", {"season": next_season, "teams": teams, "undecided": undecided})
-    elif os.path.exists(os.path.join(OUT_DIR, "mercato.json")):
-        os.remove(os.path.join(OUT_DIR, "mercato.json"))
+    export_mercato(games, ids, logos, max(seasons) + 1)
 
     # --- Méta ------------------------------------------------------------
     write("meta.json", {

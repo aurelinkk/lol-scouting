@@ -32,6 +32,27 @@ export default function DonneesPage({ region }: { region: Region }) {
     }
   }
 
+  // Départs vers un club d'une autre ligue d'après le mercato, y compris dans
+  // l'autre région (ex : Yukino, KC Blue -> FlyQuest en LCS)
+  const RANK: Record<string, number> = { LEC: 0, ERL1: 1, ERL2: 2 };
+  for (const t of getMercato(region)?.teams ?? []) {
+    for (const s of t.slots) {
+      const to = s.to;
+      if (!to?.tier || !s.before?.id || to.tier === "?") continue;
+      const key = `${(mercatoSeason ?? 0) - 1}:${s.before.id}`;
+      if (promoted[key]) continue;
+      const abroad = to.region && to.region !== region;
+      const up = (RANK[to.tier] ?? 9) < (RANK[t.tier] ?? 9);
+      if (!up && !abroad) continue;
+      promoted[key] = {
+        level: up ? (to.tier === "LEC" ? "top" : "second") : "move",
+        team: abroad && to.league ? `${to.team} (${to.league})` : to.team,
+        season: mercatoSeason ?? 0,
+        rumor: s.status.includes("rumeur"),
+      };
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div>

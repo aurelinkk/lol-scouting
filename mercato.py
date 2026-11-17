@@ -15,6 +15,7 @@ Usage :
 """
 import argparse
 import os
+import time
 
 import pandas as pd
 
@@ -29,6 +30,8 @@ CACHE = RAW_DIR + "/mercato_{season}_{kind}.csv"
 # à cette date (mois-jour, saison précédente) est retiré de l'effectif projeté
 CONTRACT_CUTOFF = "11-16"
 SLOTS = ROLES + ["Coach"]
+EVENTS_MAX_AGE_HOURS = 6  # rumeurs / transferts retéléchargés au-delà
+NOT_A_TEAM = {"Free Agent", "Retired", "Inactive", "Unknown", "None", ""}
 COACH_ROLES = {"Coach", "Head Coach"}
 
 
@@ -43,7 +46,10 @@ def fetch_events(season, refresh=False):
     """Rumeurs et changements officiels depuis septembre de la saison précédente."""
     since = f"{season - 1}-09-01"
     paths = {k: CACHE.format(season=season, kind=k) for k in ("rumors", "changes")}
-    fresh = all(os.path.exists(p) for p in paths.values()) and not refresh
+    # Cache de quelques heures seulement : les rumeurs arrivent tous les jours
+    fresh = (all(os.path.exists(p) for p in paths.values()) and not refresh
+             and all(time.time() - os.path.getmtime(p) < EVENTS_MAX_AGE_HOURS * 3600
+                     for p in paths.values()))
     if fresh:
         return pd.read_csv(paths["rumors"]), pd.read_csv(paths["changes"])
     rumors = pd.DataFrame(cargo_query(
@@ -152,7 +158,7 @@ def build_mercato(games, season):
         role = _role(c["role"])
         if role and c["team"] in teams:
             events.append((str(c["date"])[:10], 1, c["direction"], c["player"], c["team"], role,
-                           "confirmé", "Leaguepedia"))
+                           "confirmé", "Leaguepedia", None))
     # Plusieurs destinations le même jour pour un joueur (ex : SkewMond, article
     # Sheep du 10/11 citant Karmine Corp ET Team Vitality) : rien n'est tranché,
     # on ne le place nulle part et on garde les pistes pour l'affichage
@@ -180,21 +186,37 @@ def build_mercato(games, season):
                                           f" · {r['source']}")
             if r["team_start"] in teams:
                 events.append((str(r["date"])[:10], 0, "Leave", r["player"], r["team_start"], role,
-                               status, r["source"]))
+                               status, r["source"], None))
             continue
         if r["team_start"] in teams and r["team_start"] != r["team_end"]:
             events.append((str(r["date"])[:10], 0, "Leave", r["player"], r["team_start"], role,
-                           status, r["source"]))
+                           status, r["source"], r["team_end"]))
+        if r["team_end"] not in teams and r["team_start"] != r["team_end"]:
+            # Destination hors de nos ligues (ex : Yukino, KC Blue -> FlyQuest en
+            # LCS) : il quitte le poste où une rumeur plus ancienne l'avait placé
+            events.append((str(r["date"])[:10], 0, "Out", r["player"], r["team_end"], role,
+                           status, r["source"], r["team_end"]))
         if r["team_end"] in teams:
             kind = "Stay" if r["team_start"] == r["team_end"] else "Join"
             events.append((str(r["date"])[:10], 0, kind, r["player"], r["team_end"], role,
-                           status, r["source"]))
+                           status, r["source"], None))
 
     # Ordre chronologique ; à date égale : la rumeur avant l'officiel, et le
     # départ avant l'arrivée (un départ + une arrivée le même jour = prolongation)
-    order = {"Leave": 0, "Stay": 1, "Join": 1}
+    order = {"Leave": 0, "Out": 0, "Stay": 1, "Join": 1}
     events.sort(key=lambda e: (e[0], e[1], order.get(e[2], 1)))
-    for date, _, direction, player, team, role, status, source in events:
+    dest_of = {}  # dernière destination connue de chaque joueur
+    for date, _, direction, player, team, role, status, source, dest in events:
+        if dest:
+            dest_of[player] = dest
+        elif direction == "Join":
+            dest_of[player] = team
+        if direction == "Out":
+            # parti hors de nos ligues : son poste se libère (son ancien poste s'il
+            # y était, ou celui où une rumeur plus ancienne l'avait placé)
+            for idx in board.index[board["after"] == player]:
+                board.loc[idx, ["after", "status", "source"]] = [None, f"départ ({status})", source]
+            continue
         slot = (board["team"] == team) & (board["role"] == role)
         if not slot.any():
             continue
@@ -210,6 +232,14 @@ def build_mercato(games, season):
             board.loc[board["after"] == player, ["after", "status", "source"]] = [None, "parti", source]
             label = status if direction == "Join" else f"reste ({status})"
             board.loc[slot, ["after", "status", "source"]] = [player, label, source]
+
+    # Destination des joueurs qui quittent leur équipe (si une rumeur ou un
+    # transfert la donne) : ex. Yukino -> FlyQuest, Carzzy -> Movistar KOI
+    dest_of = {p: d for p, d in dest_of.items() if d and d not in NOT_A_TEAM}
+    board["to"] = [
+        dest_of.get(b) if isinstance(b, str) and dest_of.get(b) != t
+        and not ((board["team"] == t) & (board["after"] == b)).any() else None
+        for b, t in zip(board["before"], board["team"])]
 
     # Fins de contrat (GCD) : joueurs restés "inchangé" dont le contrat est fini
     board = apply_contract_ends(board, season)

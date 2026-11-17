@@ -123,6 +123,11 @@ from region import IS_EU  # noqa: E402
 LEAGUES = LEAGUES_EU if IS_EU else LEAGUES_NA
 
 
+def leagues_by_region(region):
+    """Configuration d'une région précise (eu / na), quelle que soit SCOUT_REGION."""
+    return LEAGUES_EU if region == "eu" else LEAGUES_NA
+
+
 def leagues_for(year):
     if year not in LEAGUES:
         raise SystemExit(

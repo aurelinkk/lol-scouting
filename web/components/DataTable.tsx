@@ -29,12 +29,13 @@ const PAGE = 100;
 
 /** Montée la saison suivante : 1re division (doré) ou ERL2 -> ERL1 (vert) */
 export interface Promoted {
-  level: "top" | "second";
+  /** top / second : montée (couleur) ; move : départ vers l'autre région, même niveau ou en dessous */
+  level: "top" | "second" | "move";
   team: string;
   season: number;
   rumor: boolean;
 }
-const PROMO_COLOR = { top: "var(--tier-lec)", second: "var(--tier-em)" };
+const PROMO_COLOR = { top: "var(--tier-lec)", second: "var(--tier-em)", move: "var(--text-3)" };
 
 export default function DataTable({
   seasons,
@@ -243,11 +244,11 @@ export default function DataTable({
               ? "perf. dans sa ligue + bonus de niveau de ligue + EMEA Masters"
               : "perf. comparée aux joueurs du même poste"}
           </p>
-          {Object.keys(promoted).some((k) => k.startsWith(`${season}:`)) && (
+          {Object.entries(promoted).some(([k, p]) => k.startsWith(`${season}:`) && p.level !== "move") && (
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ background: PROMO_COLOR.top }} />
-                Monte en {R.top} en {season + 1}
+                Monte en LEC ou LCS en {season + 1}
               </span>
               {R.hasEm && (
                 <span className="flex items-center gap-1.5">
@@ -288,7 +289,7 @@ export default function DataTable({
                     key={`${r.id}-${r.season}`}
                     className="border-b border-border last:border-0 hover:bg-surface-2"
                     style={
-                      promoted[`${r.season}:${r.id}`]
+                      promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
                         ? {
                             background: `color-mix(in srgb, ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]} 13%, transparent)`,
                           }
@@ -298,7 +299,7 @@ export default function DataTable({
                     <td
                       className="px-2 py-1.5 text-ink-3"
                       style={
-                        promoted[`${r.season}:${r.id}`]
+                        promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
                           ? { boxShadow: `inset 3px 0 0 ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]}` }
                           : undefined
                       }
@@ -346,7 +347,7 @@ export default function DataTable({
                               return (
                                 <span
                                   className="flex items-center gap-1 text-xs"
-                                  title={`${p.rumor ? "Rumeur" : "Montée"} ${p.season} : ${p.team}`}
+                                  title={`${p.rumor ? "Rumeur" : p.level === "move" ? "Transfert" : "Montée"} ${p.season} : ${p.team}`}
                                 >
                                   <span style={{ color: PROMO_COLOR[p.level] }}>→</span>
                                   <span className="max-w-32 truncate">{p.team}</span>
