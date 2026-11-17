@@ -119,6 +119,21 @@ TALENT_SIGNAL_WEIGHTS = {
 # Utiliser les montées de la saison suivante (connues après coup ou via le
 # mercato). False = comme en cours de saison (backtests sans info du futur).
 TALENT_USE_NEXT_SEASON = True
+# ---------------------------------------------------------------------------
+# 1re division (LEC / LCS) dans le classement (onglet Données, filtre « inclure
+# les joueurs passés par la LEC ») : perf. dans la LEC + bonus fixe de niveau.
+# ---------------------------------------------------------------------------
+# Bonus de niveau d'un joueur de 1re division, en points de score : écart moyen
+# entre le score des montés l'année d'avant (ERL) et leur score en LEC une fois
+# montés (python prospects.py --calibrate-top).
+# Calibré (sans Oracle's Elixir) : Europe 1.36 (43 montés, 1.13 à 1.52 selon la
+# saison), NA 0.76 (17 montés). Recalculer : python prospects.py --calibrate-top
+TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.75}
+# Part de la moyenne des coéquipiers retirée au score d'un joueur, par niveau :
+# 0.5 = on juge à moitié sa performance par rapport à son équipe. 0 en ERL pour
+# garder le calibrage des montées (ajustable).
+TEAM_ADJUST = {"LEC": 0.5, "ERL1": 0.0, "ERL2": 0.0}
+
 CROSS_MIN_GAMES = 5      # parties ERL2 vs ERL1 nécessaires pour compter
 CROSS_SHRINK_GAMES = 10  # tirées vers la moyenne générale avec ce poids
 

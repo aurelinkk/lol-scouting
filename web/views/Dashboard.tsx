@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HBarChart } from "@/components/Charts";
 import { Avatar, PlayerName, TeamLogo } from "@/components/Images";
 import RegionMissing from "@/components/RegionMissing";
+import { REGIONS } from "@/lib/region";
 import { link, playerLink, REGION_INFO, type Region, tierName } from "@/lib/region";
 import { getLeagues, getMeta, getPromotions, getRankings, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
@@ -51,6 +52,24 @@ export default function Dashboard({ region }: { region: Region }) {
       (r.age === undefined || r.age <= MAX_AGE) &&
       r.games >= MIN_GAMES,
   );
+
+  // Toutes régions : les meilleurs prospects d'Europe et de NA mélangés, classés
+  // par rang dans leur région (les scores ne sont pas comparables entre régions)
+  const crossRegion = REGIONS.filter(hasRegion).flatMap((reg) => {
+    const info = REGION_INFO[reg];
+    const s = Math.max(...getMeta(reg).seasons);
+    return getRankings(reg)
+      .filter(
+        (r) =>
+          r.season === s &&
+          !r.played_lec &&
+          !r.ex_lec &&
+          (r.age === undefined || r.age <= info.prospectMaxAge) &&
+          r.games >= MIN_GAMES,
+      )
+      .map((r) => ({ ...r, region: reg }));
+  });
+  const multiRegion = new Set(crossRegion.map((r) => r.region)).size > 1;
 
   const leagueBars = leagues
     .filter((l) => l.tier === "ERL1" || l.tier === "ERL2")
@@ -124,6 +143,56 @@ export default function Dashboard({ region }: { region: Region }) {
           hint="hors équipes invitées"
         />
       </div>
+
+      {multiRegion && (
+        <Card
+          title="Meilleurs cracks — toutes régions"
+          subtitle="Europe et Amérique du Nord mélangées, classées par rang dans leur poste au sein de leur région (top 1 % d'abord) : les scores ne se comparent pas directement d'une région à l'autre. 21 ans ou moins en Europe, 23 en NA, jamais passés par la 1re division."
+        >
+          <div className="grid gap-4 md:grid-cols-5">
+            {ROLES.map((role) => (
+              <div key={role}>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">{role}</div>
+                <ol className="space-y-1.5">
+                  {crossRegion
+                    .filter((p) => p.role === role)
+                    .sort((a, b) => b.role_percentile - a.role_percentile || b.final - a.final)
+                    .slice(0, 5)
+                    .map((p) => (
+                      <li key={`${p.region}-${p.id}`}>
+                        <Link
+                          href={playerLink(p.region, p.id)}
+                          className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-2"
+                        >
+                          <Avatar name={p.name} src={p.photo} size={34} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm">
+                              <PlayerName name={p.name} />
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-ink-3">
+                              <span
+                                className="rounded px-1 text-[10px] font-semibold"
+                                style={{
+                                  background: p.region === "eu" ? "var(--accent-soft)" : "color-mix(in srgb, var(--series-2) 22%, transparent)",
+                                }}
+                              >
+                                {REGION_INFO[p.region].short}
+                              </span>
+                              <span className="truncate">
+                                {p.league_code} · {p.age !== undefined ? `${p.age_approx ? "~" : ""}${p.age} ans` : "âge ?"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right text-[11px] font-semibold">{topPercent(p.role_percentile)}</div>
+                        </Link>
+                      </li>
+                    ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card
         title={`Meilleurs prospects ${season} — ${MAX_AGE} ans ou moins`}

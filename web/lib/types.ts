@@ -28,6 +28,9 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   /** Coefficient de la ligue cette saison (EM + niveau des joueurs) et sa part EM */
   league_coef?: number;
   league_coef_base?: number;
+  /** 1re division : part du score retirée / ajoutée selon le niveau de ses coéquipiers */
+  team_adjust?: number;
+  team_mates?: number;
   em_score?: number;
   em_score_raw?: number;
   soloq_bonus?: number;

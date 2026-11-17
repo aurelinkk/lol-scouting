@@ -5,12 +5,14 @@ import { usePathname } from "next/navigation";
 import { link, REGION_INFO, type Region, REGIONS, regionFromPath } from "@/lib/region";
 
 // Onglets : les pages Ligues, Ladder et Analyses n'existent que pour l'Europe
-const NAV: { path: string; label: string; eu_only?: boolean }[] = [
+// global : même page pour les deux régions (pas de version /na)
+const NAV: { path: string; label: string; eu_only?: boolean; global?: boolean }[] = [
   { path: "/", label: "Indicateurs" },
   { path: "/donnees", label: "Données" },
   { path: "/montees", label: "Montées" },
   { path: "/ligues", label: "Ligues", eu_only: true },
   { path: "/rosters", label: "Rosters" },
+  { path: "/comparer", label: "Comparer", global: true },
   { path: "/ladder", label: "Ladder", eu_only: true },
   { path: "/analyses", label: "Analyses", eu_only: true },
 ];
@@ -21,6 +23,7 @@ function switchTo(pathname: string, target: Region): string {
   const path = pathname.replace(/^\/na(?=\/|$)/, "") || "/";
   if (SHARED.includes(path)) return link(target, path);
   if (path.startsWith("/joueurs/")) return link(target, "/donnees");
+  if (path === "/comparer") return "/comparer";
   return link(target, "/");
 }
 
@@ -44,11 +47,12 @@ export default function Nav() {
       </div>
       <nav className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 text-sm [scrollbar-width:none]">
         {NAV.filter((n) => region === "eu" || !n.eu_only).map((n) => {
+          const href = n.eu_only || n.global ? n.path : link(region, n.path);
           const active = n.path === "/" ? current === "/" : current.startsWith(n.path);
           return (
             <Link
               key={n.path}
-              href={n.eu_only ? n.path : link(region, n.path)}
+              href={href}
               className={`shrink-0 rounded-md px-2 py-1.5 hover:bg-surface-2 hover:text-ink sm:px-3 ${active ? "text-ink" : "text-ink-2"}`}
             >
               {n.label}

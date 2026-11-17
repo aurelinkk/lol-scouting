@@ -163,13 +163,14 @@ export default function DataTable({
             ))}
           </select>
         </label>
-        {R.hasEm && (
+        {(R.hasEm || includeLec) && (
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Niveau
           <select className={control} value={tier} onChange={(e) => setTier(e.target.value)}>
             <option value="">Tous</option>
-            <option>ERL1</option>
-            <option>ERL2</option>
+            {includeLec && <option value="LEC">{R.top}</option>}
+            <option value="ERL1">{tierName("ERL1", region)}</option>
+            {R.hasEm && <option value="ERL2">ERL2</option>}
           </select>
         </label>
         )}
@@ -216,7 +217,7 @@ export default function DataTable({
         <div className="flex flex-col gap-1 pb-1 text-sm text-ink-2">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={includeLec} onChange={(e) => setIncludeLec(e.target.checked)} />
-            Inclure les joueurs passés par la {R.top} (cette saison ou avant)
+            Inclure les joueurs de {R.top} (et ceux déjà passés par la {R.top})
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={unknownAge} onChange={(e) => setUnknownAge(e.target.checked)} />
@@ -244,6 +245,11 @@ export default function DataTable({
             {R.hasEm
               ? "perf. dans sa ligue + bonus de niveau de ligue + EMEA Masters"
               : "perf. comparée aux joueurs du même poste"}
+            {includeLec &&
+              rows.some((r) => r.tier === "LEC") &&
+              ` · Joueurs de ${R.top} : perf. dans la ${R.top} jugée en partie par rapport à leur équipe, + bonus fixe de 1re division (${fmtScore(
+                rows.find((r) => r.tier === "LEC")?.league_bonus,
+              )}) ; leur « top % » les situe parmi les prospects de leur poste`}
           </p>
           {Object.entries(promoted).some(([k, p]) => k.startsWith(`${season}:`) && p.level !== "move") && (
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
@@ -279,7 +285,7 @@ export default function DataTable({
                   {header("games", "Parties")}
                   {header("final", "Score", "Score final")}
                   {header("league_score", "Ligue", "Performance dans sa ligue (z-score pondéré)")}
-                  {R.hasLeagues && header("league_bonus", "Bonus", "Bonus de niveau de ligue")}
+                  {(R.hasLeagues || includeLec) && header("league_bonus", "Bonus", "Bonus de niveau de ligue")}
                   {R.hasEm && header("em_score", "EM", "Performance à l'EMEA Masters")}
                   {columns.map((c) => header(c.key, c.label))}
                 </tr>
@@ -290,7 +296,7 @@ export default function DataTable({
                     key={`${r.id}-${r.season}`}
                     className="border-b border-border last:border-0 hover:bg-surface-2"
                     style={
-                      promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
+                      r.tier !== "LEC" && promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
                         ? {
                             background: `color-mix(in srgb, ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]} 13%, transparent)`,
                           }
@@ -300,7 +306,7 @@ export default function DataTable({
                     <td
                       className="px-2 py-1.5 text-ink-3"
                       style={
-                        promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
+                        r.tier !== "LEC" && promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
                           ? { boxShadow: `inset 3px 0 0 ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]}` }
                           : undefined
                       }
@@ -317,9 +323,13 @@ export default function DataTable({
                         {(r.ex_lec || (r.played_lec && !promoted[`${r.season}:${r.id}`])) && (
                           <span
                             className="rounded border border-border px-1 text-[10px] text-ink-3"
-                            title={r.ex_lec ? `Ancien joueur de ${R.top} : ${r.ex_lec}` : `A joué en ${R.top} cette saison`}
+                            title={
+                              r.tier === "LEC" || !r.ex_lec
+                                ? `Joueur de ${R.top} cette saison`
+                                : `Ancien joueur de ${R.top} : ${r.ex_lec}`
+                            }
                           >
-                            {r.ex_lec ? `ex-${R.top}` : R.top}
+                            {r.tier === "LEC" || !r.ex_lec ? R.top : `ex-${R.top}`}
                           </span>
                         )}
                       </Link>
@@ -343,7 +353,7 @@ export default function DataTable({
                           >
                             <TeamLogo team={team} src={logo} size={18} />
                             <span className="max-w-40 truncate">{team}</span>
-                            {promoted[`${r.season}:${r.id}`] && (() => {
+                            {r.tier !== "LEC" && promoted[`${r.season}:${r.id}`] && (() => {
                               const p = promoted[`${r.season}:${r.id}`];
                               return (
                                 <span
@@ -375,7 +385,9 @@ export default function DataTable({
                       {fmtScore(noLeague ? r.final - r.league_bonus : r.final)}
                     </td>
                     <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_score)}</td>
-                    {R.hasLeagues && <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_bonus)}</td>}
+                    {(R.hasLeagues || includeLec) && (
+                      <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_bonus)}</td>
+                    )}
                     {R.hasEm && (
                     <td className="px-2 py-1.5 text-right text-ink-2" title={r.em_games ? `${r.em_games} parties` : ""}>
                       {fmtScore(r.em_score)}

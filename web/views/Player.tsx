@@ -122,6 +122,14 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
               >
                 Page Leaguepedia ↗
               </a>
+              {scores.length > 0 && (
+                <Link
+                  href={`/comparer?a=${region}-${scores[0].season}-${id}`}
+                  className="text-accent hover:underline"
+                >
+                  Comparer →
+                </Link>
+              )}
               {hasTwin && (
                 <Link href={link(otherRegion, `/joueurs/${id}`)} className="text-accent hover:underline">
                   Fiche {REGION_INFO[otherRegion].name} →
@@ -187,7 +195,20 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                       </td>
                       <td className="text-right">{fmtScore(s.league_score)}</td>
                     </tr>
-                    {R.hasLeagues && (
+                    {s.tier === "LEC" && (
+                      <tr>
+                        <td className="py-0.5 text-ink-2">
+                          Bonus 1re division ({R.top}){" "}
+                          {s.team_adjust ? (
+                            <span className="text-ink-3">
+                              · perf. ajustée selon son équipe ({fmtScore(s.team_adjust)})
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="text-right">{fmtScore(s.league_bonus)}</td>
+                      </tr>
+                    )}
+                    {R.hasLeagues && s.tier !== "LEC" && (
                       <>
                     <tr>
                       <td className="py-0.5 text-ink-2">

@@ -18,7 +18,7 @@ import argparse
 
 import pandas as pd
 
-from league_strength import coef_window, load_games
+from league_strength import available_seasons, coef_window, load_games
 from region import DATA_DIR, IS_EU
 from league_talent import season_coefficients, self_up_adjustment
 from oracles import OE_STATS, attach_oe
@@ -154,9 +154,26 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
     games = add_game_metrics(games[games["season"] == season])
     stats = aggregate(games)
 
-    # Score dans sa ligue (on ne garde que les échantillons suffisants)
-    league_rows = stats[stats["tier"].isin(["ERL1", "ERL2"]) & (stats["games"] >= min_games)]
+    # Score dans sa ligue (on ne garde que les échantillons suffisants). La LEC
+    # (LCS en NA) est calculée aussi, pour comparer les prospects aux titulaires
+    # de 1re division (onglet Données, filtre désactivé par défaut)
+    league_rows = stats[stats["tier"].isin(["ERL1", "ERL2", "LEC"]) & (stats["games"] >= min_games)]
+    # Pas les équipes invitées en LEC (Los Ratones, KC Blue en LEC Versus 2026)
+    lec_games = games[games["tier"] == "LEC"]
+    regular_lec = set(lec_games.loc[~lec_games["tournament"].str.contains(
+        r"Versus|Showmatch|All-Star", case=False, na=False), "team"])
+    league_rows = league_rows[(league_rows["tier"] != "LEC") | league_rows["team"].isin(regular_lec)]
     league_rows = weighted_zscores(league_rows, ["league_code", "role"])
+    # Performance comparée à son équipe (scoring.TEAM_ADJUST) : le joueur le plus
+    # faible d'une équipe qui gagne tout ne doit pas passer devant celui qui
+    # surperforme dans une équipe du bas de tableau
+    grp = league_rows.groupby(["league_code", "team"])["score"]
+    n = grp.transform("count")
+    mates = ((grp.transform("sum") - league_rows["score"]) / (n - 1)).where(n > 1, 0.0)
+    league_rows["team_mates"] = mates
+    league_rows["team_adjust"] = -league_rows["tier"].map(
+        lambda t: scoring.TEAM_ADJUST.get(t, 0.0)).astype(float) * mates
+    league_rows["score"] = league_rows["score"] + league_rows["team_adjust"]
     # Réduction selon le nombre de parties (voir SAMPLE_SHRINK_GAMES)
     league_rows["league_score_raw"] = league_rows["score"]
     league_rows["sample_factor"] = league_rows["games"] / (league_rows["games"] + SAMPLE_SHRINK_GAMES)
@@ -166,7 +183,9 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
     # Ligue principale d'un joueur : la plus haute qu'il a jouée avec assez de
     # parties (ERL1 avant ERL2), puis la plus récente. Ex : Looki 2026 =
     # LFL avec KC Blue, pas la PRM2 de l'automne 2025 avec DKB.
-    tier_order = {"ERL1": 0, "ERL2": 1}
+    # La LEC n'est la ligue principale que d'un joueur sans saison d'ERL (un
+    # monté en cours de saison garde son profil ERL : ex. SamD 2025)
+    tier_order = {"ERL1": 0, "ERL2": 1, "LEC": 2}
     ranking = (league_rows.dropna(subset=["league_score"])
                .assign(_tier=lambda d: d["tier"].map(tier_order))
                .sort_values(["_tier", "last_game"], ascending=[True, False])
@@ -213,7 +232,11 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
         lec_now, before = set(stats.loc[stats["tier"] == "LEC", "player"]), {}
     ranking["played_lec"] = ranking["player"].isin(lec_now)
     ranking["ex_lec"] = ranking["player"].map(before)  # "Rogue (European Team) (2024)"
-    ranking["ex_lec_malus"] = ranking["ex_lec"].notna() * scoring.EX_LEC_MALUS
+    top = ranking["tier"] == "LEC"
+    ranking["ex_lec_malus"] = (ranking["ex_lec"].notna() & ~top) * scoring.EX_LEC_MALUS
+    # 1re division : bonus fixe de niveau (calibré sur les montés, voir scoring.py)
+    from region import REGION
+    ranking.loc[top, "league_bonus"] = scoring.TOP_LEAGUE_BONUS.get(REGION, 0.0)
 
     # SoloQ : seulement pour la saison en cours (le relevé est d'aujourd'hui)
     ranking["soloq_bonus"] = 0.0
@@ -230,12 +253,45 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
                         + ranking["ex_lec_malus"])
 
     # Rang (percentile) dans son rôle parmi tous les joueurs d'ERL
-    ranking["role_percentile"] = ranking.groupby("role")["final"].rank(pct=True).round(3)
+    # Percentile parmi les joueurs d'ERL ; un joueur de LEC est situé par rapport
+    # à eux (où il se classerait parmi les prospects de son poste)
+    erl = ranking[~top]
+    ranking.loc[~top, "role_percentile"] = erl.groupby("role")["final"].rank(pct=True).round(3)
+    for idx in ranking.index[top]:
+        same = erl.loc[erl["role"] == ranking.at[idx, "role"], "final"]
+        ranking.at[idx, "role_percentile"] = round(float((same < ranking.at[idx, "final"]).mean()), 3) if len(same) else None
     return ranking.sort_values("final", ascending=False)
+
+
+def calibrate_top_bonus():
+    """Bonus de 1re division : écart moyen entre le score d'un joueur en ERL la
+    saison N et son score en LEC (LCS) la saison N+1, sur tous les montés."""
+    import io, contextlib
+    seasons = available_seasons()
+    games = load_games(seasons)
+    saved = dict(scoring.TOP_LEAGUE_BONUS)
+    scoring.TOP_LEAGUE_BONUS = {k: 0.0 for k in saved}
+    rk = {}
+    for s in seasons:
+        with contextlib.redirect_stdout(io.StringIO()):
+            rk[s] = build_ranking(games, s, coef_window(s))
+    scoring.TOP_LEAGUE_BONUS = saved
+    rows = []
+    for s in seasons[:-1]:
+        a = rk[s][rk[s]["tier"] != "LEC"][["player", "final"]]
+        b = rk[s + 1][rk[s + 1]["tier"] == "LEC"][["player", "league_score"]]
+        rows.append(a.merge(b, on="player").assign(season=s))
+    m = pd.concat(rows)
+    m["gap"] = m["final"] - m["league_score"]
+    print(f"{len(m)} montés ; bonus conseillé = {m['gap'].mean():.2f} (médiane {m['gap'].median():.2f})")
+    print(m.groupby("season")["gap"].agg(["count", "mean"]).round(2).to_string())
+    print("-> à reporter dans scoring.TOP_LEAGUE_BONUS")
 
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--calibrate-top", action="store_true",
+                        help="calcule le bonus de 1re division (LEC / LCS) à mettre dans scoring.py")
     parser.add_argument("--season", type=int, default=2026)
     parser.add_argument("--coef-seasons", type=int, nargs="+",
                         help="saisons du coefficient de ligue (défaut : la saison et la précédente)")
@@ -247,6 +303,9 @@ def main():
     parser.add_argument("--tier", nargs="+", help="ex : ERL1 ERL2")
     parser.add_argument("--top", type=int, default=10, help="joueurs affichés par rôle")
     args = parser.parse_args()
+    if args.calibrate_top:
+        calibrate_top_bonus()
+        return
 
     games = load_games([args.season])
     ranking = build_ranking(games, args.season, args.coef_seasons or coef_window(args.season),
