@@ -126,7 +126,7 @@ TALENT_USE_NEXT_SEASON = True
 # Bonus de niveau d'un joueur de 1re division, en points de score : écart moyen
 # entre le score des montés l'année d'avant (ERL) et leur score en LEC une fois
 # montés (python prospects.py --calibrate-top).
-# Calibré (sans Oracle's Elixir) : Europe 1.36 (43 montés, 1.13 à 1.52 selon la
+# Calibré avec Oracle's Elixir : Europe 1.43 (39 montés, 1.16 à 1.66 selon la
 # saison), NA 0.70 avec Oracle's Elixir (17 montés). Recalculer : python prospects.py --calibrate-top
 TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.70}
 # Part de la moyenne des coéquipiers retirée au score d'un joueur, par niveau :
