@@ -249,6 +249,31 @@ def team_changes(season):
     return out
 
 
+def add_contract_ends(board, season):
+    """Fin de contrat (GCD) de chaque joueur avec l'équipe du poste : colonnes
+    before_end / after_end (date ISO ou None)."""
+    names = sorted(set(board["before"].dropna()) | set(board["after"].dropna()))
+    board["before_end"], board["after_end"] = None, None
+    try:
+        contracts = fetch_contracts(names, season)
+    except Exception as e:  # pas de réseau ni de cache
+        print(f"  (contrats indisponibles : {e})")
+        return board
+    key = contracts["player"].str.lower() + "|" + contracts["team"].str.lower()
+    last_end = pd.to_datetime(contracts["end"], errors="coerce").groupby(key).max()
+
+    def end(name, team):
+        if not isinstance(name, str):
+            return None
+        ends = [last_end.get(f"{n}|{str(team).lower()}") for n in {name.lower(), name.split(" (")[0].lower()}]
+        ends = [e for e in ends if e is not None and not pd.isna(e)]
+        return max(ends).strftime("%Y-%m-%d") if ends else None
+
+    board["before_end"] = [end(b, t) for b, t in zip(board["before"], board["team"])]
+    board["after_end"] = [end(a, t) for a, t in zip(board["after"], board["team"])]
+    return board
+
+
 def build_mercato(games, season, refresh=False):
     """Effectif projeté de `season` pour chaque équipe LEC / ERL1 de `season - 1`."""
     board = base_rosters(games, season - 1)
@@ -382,9 +407,9 @@ def build_mercato(games, season, refresh=False):
         if not slot.any():
             continue
         # un joueur ne peut être qu'à un seul endroit
-        leave_info[player] = ("parti", source, url)
+        leave_info[player] = (f"parti ({status})", source, url)
         for idx in board.index[(board["after"] == player) & ~slot]:
-            vacate(idx, player, ("parti", source, url))
+            vacate(idx, player, (f"parti ({status})", source, url))
         label = status if direction == "Join" else f"reste ({status})"
         board.loc[slot, cols] = [player, label, source, url]
 
@@ -396,6 +421,8 @@ def build_mercato(games, season, refresh=False):
 
     # Destination des joueurs qui quittent leur équipe (si une rumeur ou un
     # transfert la donne) : ex. Yukino -> FlyQuest, Carzzy -> Movistar KOI
+    retired = {p for p, d in dest_of.items() if str(d).lower().startswith("retire")}
+    board["retired"] = board["before"].isin(retired)
     dest_of = {p: d for p, d in dest_of.items() if d and d not in NOT_A_TEAM}
     board["to"] = [
         dest_of.get(b) if isinstance(b, str) and dest_of.get(b) != t
@@ -405,6 +432,7 @@ def build_mercato(games, season, refresh=False):
     # Fins de contrat (GCD) : joueurs restés "inchangé" dont le contrat est fini
     board = apply_contract_ends(board, season)
     coaches = build_coaches(board, changes, rumors, season, refresh)
+    board = add_contract_ends(board, season)
 
     # Corrections manuelles (prioritaires)
     manual = load_mercato(season)

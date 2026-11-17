@@ -25,6 +25,7 @@ from images import get_image_urls
 from rosters import build_rosters, resolve_name
 from league_strength import available_seasons, coef_window, league_coefficients, load_games
 from leagues import LEAGUES, leagues_by_region
+from mercato import CONTRACT_CUTOFF
 from region import RAW_DIR, REGION, WEB_DATA_DIR, WEB_PUBLIC_DIR
 from promotions import compute_promotions, hit_rates
 from prospects import add_game_metrics, aggregate, build_ranking
@@ -205,6 +206,36 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
             return {"name": name}
 
         all_coaches = board.attrs.get("coaches", {})
+        cutoff = f"{next_season - 1}-{CONTRACT_CUTOFF}"
+
+        def contract_state(end):
+            """c2027 = sous contrat jusqu'à la fin de la saison, c2028 = au-delà."""
+            if not isinstance(end, str) or end <= cutoff:
+                return None
+            return "c2027" if end[:4] <= str(next_season) else "c2028"
+
+        def states(r):
+            """Couleur des cases gauche (saison passée) et droite (saison à venir)."""
+            before, after = r["before"], r["after"]
+            st = str(r["status"])
+            official = "confirmé" in st or st == "manuel"
+            if not isinstance(before, str):
+                left = None
+            elif before == after:
+                left = contract_state(r.get("before_end")) or "team"
+            elif r.get("retired"):
+                left = "retired"
+            elif st.startswith("fin de contrat"):
+                left = "fa"
+            else:
+                left = "out" if official else "rumor_out"
+            if not isinstance(after, str):
+                right = None
+            elif before == after and not ("rumeur" in st or official):
+                right = contract_state(r.get("after_end")) or "team"
+            else:
+                right = "in" if official else "rumor_in"
+            return left, right
 
         def coach_list(team):
             """Coachs : restent (stay), partent (leave), arrivent (new)."""
@@ -213,8 +244,13 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                 if not c["before"] and not c["after"]:
                     continue
                 change = "stay" if c["before"] and c["after"] else ("leave" if c["before"] else "new")
+                st = str(c.get("status"))
+                official = "confirmé" in st
+                state = {"stay": "rumor_in" if "rumeur" in st else ("in" if official else "team"),
+                         "new": "in" if official else "rumor_in",
+                         "leave": "out" if official else "rumor_out"}[change]
                 p = slot(c["name"]) or {"name": c["name"]}
-                out.append({**p, "role": c.get("role") or "Coach", "change": change,
+                out.append({**p, "role": c.get("role") or "Coach", "change": change, "state": state,
                             "rumor": "rumeur" in str(c.get("status")),
                             "status": c.get("status"), "source": c.get("source") or None,
                             "url": c.get("url") if isinstance(c.get("url"), str) else None})
@@ -233,6 +269,7 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                           "coaches": coach_list(team),
                           "changed": changed or bool(former), "slots": [
                 {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
+                 "left": states(r)[0], "right": states(r)[1],
                  "status": r["status"], "source": r["source"] or None,
                  "options": r.get("options") or None, "to": destination(r.get("to")),
                  "url": r.get("url") if isinstance(r.get("url"), str) else None}

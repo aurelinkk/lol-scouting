@@ -25,6 +25,16 @@
   --tier-erl2: #eb6834;
   --tier-em: #1baf7a;
   --gold: #c98500;
+  /* Mercato : couleur des cases (légende de l'onglet Rosters) */
+  --m-team: #e2e1dd;
+  --m-rumor_in: #bdecf3;
+  --m-rumor_out: #fbd2a5;
+  --m-out: #f0a7a0;
+  --m-in: #b4e3aa;
+  --m-fa: #cdb8ab;
+  --m-c2027: #f2b6c4;
+  --m-c2028: #f8dbe2;
+  --m-retired: #efe9e6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -51,6 +61,16 @@
     --tier-erl2: #d95926;
     --tier-em: #199e70;
     --gold: #eda100;
+    /* Mercato */
+    --m-team: #3a3a37;
+    --m-rumor_in: #164a52;
+    --m-rumor_out: #5c3c14;
+    --m-out: #622220;
+    --m-in: #1f4d1d;
+    --m-fa: #4b3c33;
+    --m-c2027: #5c2a3a;
+    --m-c2028: #45303a;
+    --m-retired: #34302f;
   }
 }
 
@@ -77,6 +97,16 @@
   --tier-erl2: #d95926;
   --tier-em: #199e70;
   --gold: #eda100;
+  /* Mercato */
+  --m-team: #3a3a37;
+  --m-rumor_in: #164a52;
+  --m-rumor_out: #5c3c14;
+  --m-out: #622220;
+  --m-in: #1f4d1d;
+  --m-fa: #4b3c33;
+  --m-c2027: #5c2a3a;
+  --m-c2028: #45303a;
+  --m-retired: #34302f;
 }
 
 @theme inline {
