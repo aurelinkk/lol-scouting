@@ -30,7 +30,7 @@ CACHE = RAW_DIR + "/mercato_{season}_{kind}.csv"
 # à cette date (mois-jour, saison précédente) est retiré de l'effectif projeté
 CONTRACT_CUTOFF = "11-16"
 SLOTS = ROLES + ["Coach"]
-EVENTS_MAX_AGE_HOURS = 6  # rumeurs / transferts retéléchargés au-delà
+EVENTS_MAX_AGE_HOURS = 1  # rumeurs / transferts retéléchargés au-delà
 NOT_A_TEAM = {"Free Agent", "Retired", "Inactive", "Unknown", "None", ""}
 COACH_ROLES = {"Coach", "Head Coach"}
 
@@ -137,13 +137,13 @@ def apply_contract_ends(board, season):
     return board
 
 
-def build_mercato(games, season):
+def build_mercato(games, season, refresh=False):
     """Effectif projeté de `season` pour chaque équipe LEC / ERL1 de `season - 1`."""
     board = base_rosters(games, season - 1)
     board["after"] = board["before"]
     board["status"] = board["before"].map(lambda p: "inchangé" if p else "")
     board["source"] = ""
-    rumors, changes = fetch_events(season)
+    rumors, changes = fetch_events(season, refresh=refresh)
     teams = set(board["team"])
 
     # Noms parfois en minuscules dans Leaguepedia ("kyeahoo") : on reprend

@@ -159,11 +159,12 @@ def team_levels(season):
     return out
 
 
-def export_mercato(games, ids, logos, next_season):
-    """mercato.json : mercato automatique de la saison suivante (voir mercato.py)."""
+def export_mercato(games, ids, logos, next_season, refresh=False):
+    """mercato.json : mercato automatique de la saison suivante (voir mercato.py).
+    refresh : retélécharger les rumeurs / transferts même s'ils sont récents."""
     from mercato import build_mercato
     try:
-        board = build_mercato(games, next_season)
+        board = build_mercato(games, next_season, refresh=refresh)
     except Exception as e:
         print(f"  (mercato indisponible : {e})")
         board = None
@@ -229,7 +230,8 @@ def main():
         games = load_games(seasons)
         _, logos = get_image_urls()
         print("Export web :")
-        export_mercato(games, player_ids(games["player"].unique()), logos, max(seasons) + 1)
+        export_mercato(games, player_ids(games["player"].unique()), logos, max(seasons) + 1,
+                       refresh=True)
         return
 
     games = load_games(seasons)
