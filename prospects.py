@@ -145,6 +145,44 @@ def weighted_zscores(stats, group_keys):
     return stats
 
 
+def blend_international(league_rows, season):
+    """1re division (LEC / LCS) : ajoute les tournois internationaux (Worlds,
+    MSI, EWC, First Stand, voir intl.py) et écarte davantage les joueurs de LEC
+    entre eux (scoring.TOP_LEAGUE_SPREAD).
+
+    Aux internationaux, chaque joueur est comparé à tous ceux de son poste (LCK,
+    LPL...). Ce z-score est ramené à l'échelle de la LEC (écart moyen entre le
+    score LEC et le score international des joueurs de LEC présents), puis
+    mélangé au score LEC selon le nombre de parties (une partie internationale
+    compte INTL_GAME_WEIGHT fois)."""
+    league_rows = league_rows.copy()
+    top = league_rows["tier"] == "LEC"
+    league_rows["intl_games"] = 0
+    league_rows["intl_score"] = float("nan")
+    try:
+        from intl import load_intl
+        intl = load_intl(season)
+    except Exception:
+        intl = None
+    if intl is not None and top.any():
+        istats = aggregate(add_game_metrics(intl))
+        istats = istats[istats["games"] >= scoring.INTL_MIN_GAMES]
+        istats = weighted_zscores(istats, ["role"]).dropna(subset=["score"])
+        z = istats.set_index("player")["score"]
+        n = istats.set_index("player")["games"]
+        rows = league_rows[top & league_rows["player"].isin(z.index)]
+        if len(rows):
+            gap = (rows["score"] - rows["player"].map(z)).mean() if len(rows) >= 5 else 0.0
+            for idx, r in rows.iterrows():
+                n_lec, n_int = r["games"], n[r["player"]] * scoring.INTL_GAME_WEIGHT
+                on_scale = z[r["player"]] + gap
+                league_rows.at[idx, "score"] = (n_lec * r["score"] + n_int * on_scale) / (n_lec + n_int)
+                league_rows.at[idx, "intl_games"] = int(n[r["player"]])
+                league_rows.at[idx, "intl_score"] = round(float(z[r["player"]]), 3)
+    league_rows.loc[top, "score"] = league_rows.loc[top, "score"] * scoring.TOP_LEAGUE_SPREAD
+    return league_rows
+
+
 def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=None):
     """Classement de tous les joueurs d'ERL de la saison (LEC exclue).
 
@@ -174,6 +212,7 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
     league_rows["team_adjust"] = -league_rows["tier"].map(
         lambda t: scoring.TEAM_ADJUST.get(t, 0.0)).astype(float) * mates
     league_rows["score"] = league_rows["score"] + league_rows["team_adjust"]
+    league_rows = blend_international(league_rows, season)
     # Réduction selon le nombre de parties (voir SAMPLE_SHRINK_GAMES)
     league_rows["league_score_raw"] = league_rows["score"]
     league_rows["sample_factor"] = league_rows["games"] / (league_rows["games"] + SAMPLE_SHRINK_GAMES)

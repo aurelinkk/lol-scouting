@@ -208,6 +208,16 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                         <td className="text-right">{fmtScore(s.league_bonus)}</td>
                       </tr>
                     )}
+                    {s.tier === "LEC" && s.intl_games ? (
+                      <tr>
+                        <td className="py-0.5 text-ink-2" colSpan={2}>
+                          <span className="text-ink-3">
+                            Inclut {s.intl_games} parties internationales (Worlds, MSI, EWC, First Stand) : {fmtScore(s.intl_score)}{" "}
+                            vs les joueurs du monde à son poste
+                          </span>
+                        </td>
+                      </tr>
+                    ) : null}
                     {R.hasLeagues && s.tier !== "LEC" && (
                       <>
                     <tr>

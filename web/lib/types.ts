@@ -31,6 +31,9 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   /** 1re division : part du score retirée / ajoutée selon le niveau de ses coéquipiers */
   team_adjust?: number;
   team_mates?: number;
+  /** Tournois internationaux (Worlds, MSI, EWC, First Stand) : parties et z-score vs le monde */
+  intl_games?: number;
+  intl_score?: number;
   em_score?: number;
   em_score_raw?: number;
   soloq_bonus?: number;

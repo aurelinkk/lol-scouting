@@ -221,6 +221,14 @@ function Header({ pick, row, leagues }: { pick: Pick; row: RankingRow; leagues: 
         )}
         <dt className="text-ink-3">Parties</dt>
         <dd className="text-right">{row.games}</dd>
+        {row.intl_games ? (
+          <>
+            <dt className="text-ink-3">Internationaux</dt>
+            <dd className="text-right">
+              {fmtScore(row.intl_score)} <span className="text-xs text-ink-3">({row.intl_games} p. vs le monde)</span>
+            </dd>
+          </>
+        ) : null}
         {seasonInfo?.coef != null && (
           <>
             <dt className="text-ink-3">Coef. {row.league_code} {pick.season}</dt>
@@ -297,53 +305,98 @@ export default function Comparator({
         )}
       </div>
 
-      {A.row && B.row && (
-        <section className="rounded-lg border border-border bg-surface p-4">
-          <h2 className="text-sm font-semibold">Stats</h2>
-          <p className="mt-0.5 text-xs text-ink-3">
-            Valeur et barre = percentile parmi les joueurs du même poste <b>dans sa propre ligue</b> (au moins 10
-            parties). En gras : le meilleur des deux. Une même valeur ne se vaut pas d&apos;une ligue à l&apos;autre :
-            le score final, lui, tient compte du niveau de la ligue.
-          </p>
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_9rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-sm">
-            <div className="truncate text-right text-xs font-semibold" style={{ color: "var(--series-1)" }}>
-              {A.row.name.replace(/\s*\(.*\)$/, "")} · {A.row.league_code} {a!.season}
+      {A.row && B.row && (() => {
+        const ra = A.row!;
+        const rb = B.row!;
+        const lines = STATS.filter((s) => ra[s] != null || rb[s] != null).map((stat) => {
+          const va = ra[stat];
+          const vb = rb[stat];
+          const pa = pctInLeague(A.rows, ra, stat);
+          const pb = pctInLeague(B.rows, rb, stat);
+          const lower = LOWER_IS_BETTER.includes(stat);
+          const best: "a" | "b" | null =
+            va == null || vb == null || va === vb ? null : (lower ? va < vb : va > vb) ? "a" : "b";
+          // Gros écart : 35 points de percentile, ou 30 % d'écart relatif sans percentile
+          const big =
+            best !== null &&
+            (pa !== null && pb !== null
+              ? Math.abs(pa - pb) >= 0.35
+              : Math.abs((va as number) - (vb as number)) / Math.max(Math.abs(va as number), Math.abs(vb as number), 1e-9) >= 0.3);
+          return { stat, va, vb, pa, pb, best, big };
+        });
+        const wins = { a: lines.filter((l) => l.best === "a").length, b: lines.filter((l) => l.best === "b").length };
+        const crush = { a: lines.filter((l) => l.best === "a" && l.big).length, b: lines.filter((l) => l.best === "b" && l.big).length };
+        const nameA = ra.name.replace(/\s*\(.*\)$/, "");
+        const nameB = rb.name.replace(/\s*\(.*\)$/, "");
+        const COLOR = { a: "var(--series-1)", b: "var(--series-2)" };
+        const Value = ({ side, v, p, stat, best, big }: { side: "a" | "b"; v: number | undefined; p: number | null; stat: StatKey; best: "a" | "b" | null; big: boolean }) => {
+          const win = best === side;
+          return (
+            <span
+              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 tabular ${win ? "font-semibold text-ink" : "text-ink-3"}`}
+              style={win ? { background: `color-mix(in srgb, ${COLOR[side]} ${big ? 30 : 15}%, transparent)` } : undefined}
+            >
+              {side === "b" && win && big && <span style={{ color: COLOR[side] }}>▲▲</span>}
+              {fmtStat(stat, v)}
+              {p !== null && <span className="text-[10px] font-normal text-ink-3">{Math.max(1, Math.round(p * 100))}e %</span>}
+              {side === "a" && win && big && <span style={{ color: COLOR[side] }}>▲▲</span>}
+            </span>
+          );
+        };
+        return (
+          <section className="rounded-lg border border-border bg-surface p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-sm font-semibold">Stats</h2>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="font-semibold" style={{ color: COLOR.a }}>
+                  {nameA} {wins.a}
+                </span>
+                <span className="text-ink-3">–</span>
+                <span className="font-semibold" style={{ color: COLOR.b }}>
+                  {wins.b} {nameB}
+                </span>
+                <span className="text-xs text-ink-3">
+                  stats gagnées · dont nettement : {crush.a} – {crush.b}
+                </span>
+              </div>
             </div>
-            <div />
-            <div className="truncate text-xs font-semibold" style={{ color: "var(--series-2)" }}>
-              {B.row.name.replace(/\s*\(.*\)$/, "")} · {B.row.league_code} {b!.season}
-            </div>
-            {STATS.filter((s) => A.row![s] != null || B.row![s] != null).map((stat) => {
-              const va = A.row![stat];
-              const vb = B.row![stat];
-              const pa = pctInLeague(A.rows, A.row!, stat);
-              const pb = pctInLeague(B.rows, B.row!, stat);
-              const lower = LOWER_IS_BETTER.includes(stat);
-              const best =
-                va == null || vb == null || va === vb ? null : (lower ? va < vb : va > vb) ? "a" : "b";
-              return (
+            <p className="mt-1 text-xs text-ink-3">
+              Fond coloré = le meilleur des deux ; <b>▲▲</b> et fond plus foncé = écart net (au moins 35 points de
+              percentile). Percentile parmi les joueurs du même poste <b>dans sa propre ligue</b> (10 parties ou plus) :
+              une même valeur ne se vaut pas d&apos;une ligue à l&apos;autre, le score final tient compte du niveau.
+            </p>
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-sm">
+              <div className="truncate text-right text-xs font-semibold" style={{ color: COLOR.a }}>
+                {nameA} · {ra.league_code} {a!.season}
+              </div>
+              <div />
+              <div className="truncate text-xs font-semibold" style={{ color: COLOR.b }}>
+                {nameB} · {rb.league_code} {b!.season}
+              </div>
+              {lines.map(({ stat, va, vb, pa, pb, best, big }) => (
                 <div key={stat} className="contents">
-                  <div className="space-y-0.5">
-                    <div className={`text-right tabular ${best === "a" ? "font-semibold" : "text-ink-2"}`}>
-                      {fmtStat(stat, va)}
-                      {pa !== null && <span className="ml-1.5 text-[10px] text-ink-3">{Math.max(1, Math.round(pa * 100))}e %</span>}
-                    </div>
+                  <div className="space-y-0.5 text-right">
+                    <Value side="a" v={va} p={pa} stat={stat} best={best} big={big} />
                     <Bar pct={pa} side="left" />
                   </div>
-                  <div className="text-center text-xs text-ink-3">{STAT_LABELS[stat]}</div>
+                  <div
+                    className={`text-center text-xs ${big ? "font-semibold text-ink" : "text-ink-3"}`}
+                    title={big ? "Écart net" : undefined}
+                  >
+                    {best === "a" && <span style={{ color: COLOR.a }}>◀ </span>}
+                    {STAT_LABELS[stat]}
+                    {best === "b" && <span style={{ color: COLOR.b }}> ▶</span>}
+                  </div>
                   <div className="space-y-0.5">
-                    <div className={`tabular ${best === "b" ? "font-semibold" : "text-ink-2"}`}>
-                      {fmtStat(stat, vb)}
-                      {pb !== null && <span className="ml-1.5 text-[10px] text-ink-3">{Math.max(1, Math.round(pb * 100))}e %</span>}
-                    </div>
+                    <Value side="b" v={vb} p={pb} stat={stat} best={best} big={big} />
                     <Bar pct={pb} side="right" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+              ))}
+            </div>
+          </section>
+        );
+      })()}
     </div>
   );
 }

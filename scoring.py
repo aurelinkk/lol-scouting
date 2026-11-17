@@ -132,7 +132,15 @@ TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.70}
 # Part de la moyenne des coéquipiers retirée au score d'un joueur, par niveau :
 # 0.5 = on juge à moitié sa performance par rapport à son équipe. 0 en ERL pour
 # garder le calibrage des montées (ajustable).
-TEAM_ADJUST = {"LEC": 0.5, "ERL1": 0.0, "ERL2": 0.0}
+TEAM_ADJUST = {"LEC": 0.2, "ERL1": 0.0, "ERL2": 0.0}
+# Écart entre joueurs de LEC : leur score dans la ligue est multiplié par ce
+# facteur (les meilleurs de LEC se détachent nettement des meilleurs prospects).
+TOP_LEAGUE_SPREAD = 1.5
+# Tournois internationaux (Worlds, MSI, EWC, First Stand ; python intl.py) :
+# parties nécessaires pour compter, et poids d'une partie internationale par
+# rapport à une partie de LEC dans le score.
+INTL_MIN_GAMES = 3
+INTL_GAME_WEIGHT = 2.0
 
 CROSS_MIN_GAMES = 5      # parties ERL2 vs ERL1 nécessaires pour compter
 CROSS_SHRINK_GAMES = 10  # tirées vers la moyenne générale avec ce poids
