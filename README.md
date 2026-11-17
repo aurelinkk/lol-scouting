@@ -56,7 +56,7 @@ python soloq.py snapshot               # relevé du ladder EUW (1 fois / semaine
 python soloq.py profiles               # stats soloQ de l'année des non-pros (long, reprend où il s'arrête)
 python mercato.py --refresh            # rumeurs, transferts, contrats
 python export_web.py                   # génère les données du site
-git add web/data web/public/data && git commit -m "Données" && git push   # Vercel redéploie
+git add web/data web/public/data; git commit -m "Données"; git push   # Vercel redéploie
 # (puis la même chose avec SCOUT_REGION=na pour la NA)
 ```
 
