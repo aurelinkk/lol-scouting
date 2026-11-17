@@ -229,10 +229,10 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                 left = "fa"
             else:
                 left = "out" if official else "rumor_out"
+            # 2027 : deux couleurs seulement. Vert = annonce officielle ; bleu =
+            # rumeur, ou joueur toujours sous contrat sans rumeur de départ
             if not isinstance(after, str):
                 right = None
-            elif before == after and not ("rumeur" in st or official):
-                right = contract_state(r.get("after_end")) or "team"
             else:
                 right = "in" if official else "rumor_in"
             return left, right
@@ -246,7 +246,7 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                 change = "stay" if c["before"] and c["after"] else ("leave" if c["before"] else "new")
                 st = str(c.get("status"))
                 official = "confirmé" in st
-                state = {"stay": "rumor_in" if "rumeur" in st else ("in" if official else "team"),
+                state = {"stay": "in" if official else "rumor_in",
                          "new": "in" if official else "rumor_in",
                          "leave": "out" if official else "rumor_out"}[change]
                 p = slot(c["name"]) or {"name": c["name"]}

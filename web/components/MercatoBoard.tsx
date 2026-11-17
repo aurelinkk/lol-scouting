@@ -55,16 +55,20 @@ export interface MercatoTeam {
   team_source?: string | null;
 }
 
-const LEGEND: { state: CellState; label: string }[] = [
-  { state: "team", label: "Dans l'équipe en 2026" },
-  { state: "rumor_in", label: "Rumeur : rejoint / reste" },
-  { state: "rumor_out", label: "Rumeur : part" },
-  { state: "out", label: "Officiellement parti" },
-  { state: "in", label: "Officiellement arrivé / prolongé" },
-  { state: "fa", label: "Fin de contrat (agent libre)" },
+// Colonne de gauche (saison passée) : situation du joueur ; colonne de droite
+// (saison à venir) : vert = officiel, bleu = rumeur ou toujours sous contrat
+const LEGEND_LEFT: { state: CellState; label: string }[] = [
+  { state: "team", label: "Dans l'équipe" },
   { state: "c2027", label: "Sous contrat jusqu'à fin {next}" },
   { state: "c2028", label: "Sous contrat au-delà" },
+  { state: "rumor_out", label: "Rumeur : part" },
+  { state: "out", label: "Officiellement parti" },
+  { state: "fa", label: "Fin de contrat (agent libre)" },
   { state: "retired", label: "Prend sa retraite" },
+];
+const LEGEND_RIGHT: { state: CellState; label: string }[] = [
+  { state: "in", label: "Officiel (annonce du club)" },
+  { state: "rumor_in", label: "Rumeur, ou sous contrat sans rumeur de départ" },
 ];
 
 const bg = (state?: CellState | null) => (state ? `var(--m-${state})` : "transparent");
@@ -280,13 +284,21 @@ export default function MercatoBoard({
         <aside className="shrink-0 space-y-3 lg:sticky lg:top-20 lg:w-60">
           <div className="rounded-lg border border-border bg-surface p-3">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Légende</div>
-            <ul className="space-y-1 text-xs">
-              {LEGEND.map((l) => (
-                <li key={l.state} className="rounded-[5px] px-2 py-1" style={{ background: bg(l.state) }}>
-                  {l.label.replace("{next}", String(season))}
-                </li>
-              ))}
-            </ul>
+            {[
+              { title: String(season - 1), items: LEGEND_LEFT },
+              { title: String(season), items: LEGEND_RIGHT },
+            ].map((g) => (
+              <div key={g.title} className="mb-2">
+                <div className="mb-1 text-[11px] font-medium text-ink-2">{g.title}</div>
+                <ul className="space-y-1 text-xs">
+                  {g.items.map((l) => (
+                    <li key={l.state} className="rounded-[5px] px-2 py-1" style={{ background: bg(l.state) }}>
+                      {l.label.replace("{next}", String(season))}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
             <p className="mt-2 text-[11px] leading-snug text-ink-3">
               ↗ ouvre l&apos;article ou le post (Sheep Esports, X, annonce officielle). Contrats : base GCD de Riot via
               Leaguepedia. Corrections : <code>rosters_{season}.csv</code>.
