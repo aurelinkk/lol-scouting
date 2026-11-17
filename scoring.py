@@ -127,8 +127,8 @@ TALENT_USE_NEXT_SEASON = True
 # entre le score des montés l'année d'avant (ERL) et leur score en LEC une fois
 # montés (python prospects.py --calibrate-top).
 # Calibré (sans Oracle's Elixir) : Europe 1.36 (43 montés, 1.13 à 1.52 selon la
-# saison), NA 0.76 (17 montés). Recalculer : python prospects.py --calibrate-top
-TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.75}
+# saison), NA 0.70 avec Oracle's Elixir (17 montés). Recalculer : python prospects.py --calibrate-top
+TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.70}
 # Part de la moyenne des coéquipiers retirée au score d'un joueur, par niveau :
 # 0.5 = on juge à moitié sa performance par rapport à son équipe. 0 en ERL pour
 # garder le calibrage des montées (ajustable).
