@@ -9,7 +9,7 @@ import type { Promotion, PromotionPlayer } from "@/lib/types";
 
 export const metadata = { title: "Montées · LoL Scouting" };
 
-function Move({ p }: { p: PromotionPlayer }) {
+function Move({ p, top }: { p: PromotionPlayer; top: string }) {
   const from = p.from_team ?? p.team;
   return (
     <span className="flex items-center gap-1.5 whitespace-nowrap text-sm">
@@ -20,6 +20,9 @@ function Move({ p }: { p: PromotionPlayer }) {
       <span className="text-ink-3">→</span>
       <TeamLogo team={p.new_team} src={p.new_logo} size={18} />
       <span className="max-w-36 truncate font-medium">{p.new_team}</span>
+      {p.new_league && p.new_league !== p.league_code && p.new_level === "LEC" && p.new_league !== top && (
+        <span className="text-xs text-ink-3">({p.new_league})</span>
+      )}
     </span>
   );
 }
@@ -56,7 +59,7 @@ function PromotionTable({ players, rankLabel, region }: { players: PromotionPlay
                 </Link>
               </td>
               <td className="px-2 py-1.5">
-                <Move p={p} />
+                <Move p={p} top={REGION_INFO[region].top} />
               </td>
               <td className="whitespace-nowrap px-2 py-1.5 text-ink-2">
                 {p.league_code} <span className="text-xs text-ink-3">{p.tier}</span>
@@ -138,8 +141,9 @@ function PromotionSeason({ promo, region }: { promo: Promotion; region: Region }
                           {p.role}
                         </span>
                       </div>
-                      <Move p={p} />
+                      <Move p={p} top={REGION_INFO[region].top} />
                       <div className="text-xs text-ink-3">
+                        {p.mid_season && <span>monté en cours de saison {promo.from} · </span>}
                         {p.from_season !== undefined && p.from_season < promo.from && (
                           <span>dernière saison en {R.lower} : {p.from_season} · </span>
                         )}

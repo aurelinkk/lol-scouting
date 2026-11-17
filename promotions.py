@@ -13,6 +13,7 @@ Usage :
     python promotions.py --from 2025 --to 2026
 """
 import argparse
+import os
 
 import pandas as pd
 
@@ -59,6 +60,48 @@ def destination(games_next):
         ["player", "new_level", "new_team", "new_league", "first_game"]]
 
 
+GUEST_EVENTS = r"Versus|Showmatch|All-Star"
+
+
+def mid_season_promotions(games, season):
+    """Joueurs montés en LEC en cours de saison : des parties d'ERL, puis des
+    parties de LEC avec une équipe régulière (pas une équipe invitée en LEC
+    Versus). Ex : SamD, LFL avec IJC au printemps 2025 puis NAVI en LEC à l'été.
+    Comptés comme montées de `season` vers `season + 1`, avec leur profil ERL
+    de `season`."""
+    g = games[(games["season"] == season)
+              & ~games["tournament"].str.contains(PROMOTION_PATTERN, case=False, na=False)]
+    lec = g[g["tier"] == "LEC"]
+    special = lec["tournament"].str.contains(GUEST_EVENTS, case=False, na=False)
+    regular_teams = set(lec.loc[~special, "team"])
+    lec = lec[~special & lec["team"].isin(regular_teams)]
+    erl = g[g["tier"].isin(["ERL1", "ERL2"])]
+    first_lec = lec.sort_values("date").groupby("player").first()
+    first_erl = erl.groupby("player")["date"].min()
+    rows = [{"player": p, "new_level": "LEC", "new_team": r["team"], "new_league": r["league_code"],
+             "first_game": r["date"]}
+            for p, r in first_lec.iterrows()
+            if p in first_erl.index and first_erl[p] < r["date"]]
+    return pd.DataFrame(rows, columns=["player", "new_level", "new_team", "new_league", "first_game"])
+
+
+def other_region_destination(season):
+    """Plus haut niveau atteint en `season` dans l'AUTRE région (Europe <-> NA),
+    d'après ses matchs téléchargés (data/na/ ou data/). Ex : Gakgos, LFL2 2025
+    (Project Conquerors) -> FlyQuest en LCS 2026 : une montée en 1re division."""
+    from leagues import leagues_by_region
+    from region import IS_EU
+    other, data_dir = ("na", "data/na") if IS_EU else ("eu", "data")
+    path = f"{data_dir}/pro_games_{season}.csv"
+    config = leagues_by_region(other).get(season)
+    if not os.path.exists(path) or not config:
+        return pd.DataFrame(columns=["player", "new_level", "new_team", "new_league", "first_game"])
+    g = pd.read_csv(path, parse_dates=["date"])
+    g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
+    g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
+    return destination(g)
+
+
 def previous_club(games, promoted):
     """Dernier club (hors EMEA Masters et tournois de promotion) avant la première
     partie au nouveau niveau, en saison N ou en début de saison N+1.
@@ -98,7 +141,9 @@ def compute_promotions(games, season_from, season_to, coef_seasons=None, min_gam
     # de la saison suivante (pas d'info du futur : on juge le score tel qu'il était)
     before = build_ranking(games, season_from, coef_seasons or coef_window(season_from), min_games,
                            use_next_season=False)
-    before = before[~before["played_lec"]].copy()
+    # Joueurs de LEC exclus, sauf ceux montés en cours de saison (ex : SamD 2025)
+    mid = mid_season_promotions(games, season_from)
+    before = before[~before["played_lec"] | before["player"].isin(mid["player"])].copy()
     before["tier_percentile"] = (before.groupby(["tier", "role"])["final"]
                                  .rank(pct=True).round(3))
     next_games = games[games["season"] == season_to]
@@ -110,8 +155,17 @@ def compute_promotions(games, season_from, season_to, coef_seasons=None, min_gam
             raise SystemExit(f"Pas de parties ni de rosters_{season_to}.csv pour {season_to}")
     else:
         after = destination(next_games)
+        # Montés en cours de saison N+1 : comptés l'année suivante, pas ici
+        after = after[~after["player"].isin(mid_season_promotions(games, season_to)["player"])]
+        # Partis dans l'autre région (Europe <-> NA) : leur niveau là-bas
+        abroad = other_region_destination(season_to)
+        abroad = abroad[abroad["player"].isin(before["player"]) & ~abroad["player"].isin(after["player"])]
+        after = pd.concat([after, abroad], ignore_index=True)
+    # Montés en cours de saison N : leur montée, c'est leur arrivée en LEC en N
+    after = pd.concat([after[~after["player"].isin(mid["player"])], mid], ignore_index=True)
     merged = before.merge(after, on="player", how="left")
     merged["from_season"] = season_from
+    merged["mid_season"] = merged["player"].isin(mid["player"])
 
     # Montés sans avoir joué en ERL la saison N (ex : Feisty, Zest pour 2027) :
     # on prend leur profil de la saison N-1 s'ils ne sont pas passés par la LEC en N

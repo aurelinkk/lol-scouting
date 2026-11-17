@@ -200,6 +200,10 @@ export interface PromotionPlayer {
   dpm: number;
   new_level: string;
   new_team: string;
+  /** Ligue d'arrivée (ex : "LCS" pour un joueur d'ERL parti en NA) */
+  new_league?: string;
+  /** Monté en cours de saison (ex : SamD, LFL au printemps 2025 puis NAVI en LEC à l'été) */
+  mid_season?: boolean;
   /** Dernier club avant la montée (peut être en saison N+1) */
   from_team?: string;
   from_league?: string;

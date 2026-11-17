@@ -23,10 +23,11 @@ export default function DonneesPage({ region }: { region: Region }) {
     for (const p of promo.players) {
       const level = p.new_level === "LEC" ? "top" : p.new_level === "ERL1" && p.tier === "ERL2" ? "second" : null;
       if (!level) continue;
+      const abroad = p.new_league && p.new_level === "LEC" && p.new_league !== REGION_INFO[region].top;
       promoted[`${p.from_season ?? promo.from}:${p.id}`] = {
         level,
-        team: p.new_team,
-        season: promo.to,
+        team: abroad ? `${p.new_team} (${p.new_league})` : p.new_team,
+        season: p.mid_season ? promo.from : promo.to,
         rumor: promo.to === mercatoSeason && rumors.has(p.id),
       };
     }

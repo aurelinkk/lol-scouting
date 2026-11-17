@@ -98,7 +98,8 @@ export default function DataTable({
         (!league || r.league_code === league) &&
         (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
-        (includeLec || (!r.played_lec && !r.ex_lec)) &&
+        // Les joueurs montés en cours de saison (ex : SamD 2025) restent visibles
+        (includeLec || (!r.played_lec && !r.ex_lec) || (!r.ex_lec && !!promoted[`${r.season}:${r.id}`])) &&
         (!q ||
           r.name.toLowerCase().includes(q) ||
           r.team.toLowerCase().includes(q) ||
@@ -118,7 +119,7 @@ export default function DataTable({
       return (va - vb) * dir;
     });
     return out;
-  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort]);
+  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted]);
 
   useEffect(
     () => setLimit(PAGE),
@@ -313,12 +314,12 @@ export default function DataTable({
                           <PlayerName name={r.name} />
                         </span>
                         <span className="text-xs text-ink-3">{r.role}</span>
-                        {(r.ex_lec || r.played_lec) && (
+                        {(r.ex_lec || (r.played_lec && !promoted[`${r.season}:${r.id}`])) && (
                           <span
                             className="rounded border border-border px-1 text-[10px] text-ink-3"
-                            title={r.played_lec ? `A joué en ${R.top} cette saison` : `Ancien joueur de ${R.top} : ${r.ex_lec}`}
+                            title={r.ex_lec ? `Ancien joueur de ${R.top} : ${r.ex_lec}` : `A joué en ${R.top} cette saison`}
                           >
-                            {r.played_lec ? R.top : `ex-${R.top}`}
+                            {r.ex_lec ? `ex-${R.top}` : R.top}
                           </span>
                         )}
                       </Link>
@@ -347,7 +348,7 @@ export default function DataTable({
                               return (
                                 <span
                                   className="flex items-center gap-1 text-xs"
-                                  title={`${p.rumor ? "Rumeur" : p.level === "move" ? "Transfert" : "Montée"} ${p.season} : ${p.team}`}
+                                  title={`${p.rumor ? "Rumeur" : p.level === "move" ? "Transfert" : "Montée"} ${p.season === r.season ? `en cours de saison ${p.season}` : p.season} : ${p.team}`}
                                 >
                                   <span style={{ color: PROMO_COLOR[p.level] }}>→</span>
                                   <span className="max-w-32 truncate">{p.team}</span>
