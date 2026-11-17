@@ -29,7 +29,7 @@ CACHE = RAW_DIR + "/mercato_{season}_{kind}.csv"
 # un joueur sans nouvelle dont le contrat avec son club se termine au plus tard
 # à cette date (mois-jour, saison précédente) est retiré de l'effectif projeté
 CONTRACT_CUTOFF = "11-16"
-SLOTS = ROLES + ["Coach"]
+SLOTS = ROLES  # les coachs sont gérés à part (liste en bas de chaque équipe)
 EVENTS_MAX_AGE_HOURS = 1  # rumeurs / transferts retéléchargés au-delà
 NOT_A_TEAM = {"Free Agent", "Retired", "Inactive", "Unknown", "None", ""}
 COACH_ROLES = {"Coach", "Head Coach"}
@@ -99,8 +99,87 @@ def base_rosters(games, season):
         by_role = dict(zip(grp["role"], grp["player"]))
         for role in SLOTS:
             rows.append({"league": league, "tier": tier, "team": team, "role": role,
-                         "before": by_role.get(role)})
+                         "before": by_role.get(role), "base_tournament": grp["tournament"].iloc[0]})
     return pd.DataFrame(rows)
+
+
+def is_coach_role(role):
+    """Head Coach, Assistant Coach, Strategic Coach... (pas les managers / analystes)."""
+    return "coach" in str(role).lower()
+
+
+def fetch_staff(tournaments, season, refresh=False):
+    """Coachs de chaque équipe lors de son dernier tournoi (Leaguepedia, TournamentPlayers)."""
+    path = CACHE.format(season=season, kind="staff")
+    if os.path.exists(path) and not refresh:
+        df = pd.read_csv(path)
+        if set(tournaments) <= set(df["tournament"].dropna()) | set(df.get("checked", pd.Series()).dropna()):
+            return df.dropna(subset=["coach"])
+    rows = []
+    todo = sorted(set(tournaments))
+    for i in range(0, len(todo), 20):
+        quoted = ",".join("'" + t.replace("'", "\\'") + "'" for t in todo[i:i + 20])
+        rows += cargo_query(
+            tables="TournamentPlayers=TP,Tournaments=T", join_on="TP.OverviewPage=T.OverviewPage",
+            fields="T.Name=tournament,TP.Team=team,TP.Link=coach,TP.Role=role",
+            where=f"T.Name IN ({quoted}) AND TP.Role LIKE '%Coach%'")
+    df = pd.DataFrame(rows, columns=["tournament", "team", "coach", "role"])
+    out = pd.concat([df, pd.DataFrame({"checked": todo})], ignore_index=True)
+    os.makedirs(RAW_DIR, exist_ok=True)
+    out.to_csv(path, index=False)
+    return df
+
+
+def build_coaches(board, changes, rumors, season, refresh=False):
+    """Coachs de chaque équipe : staff de fin de saison, puis arrivées / départs
+    (officiels ou rumeurs) dans l'ordre chronologique.
+    Renvoie {équipe: [{name, role, before, after, status, source, url}]}."""
+    teams = board.drop_duplicates("team")
+    try:
+        staff = fetch_staff(teams["base_tournament"].dropna().tolist(), season - 1, refresh)
+    except Exception as e:  # pas de réseau ni de cache
+        print(f"  (coachs indisponibles : {e})")
+        staff = pd.DataFrame(columns=["tournament", "team", "coach", "role"])
+    known = set(board["team"])
+    coaches = {t: {} for t in known}
+    for _, r in staff.iterrows():
+        # l'équipe peut avoir été renommée depuis (ex : Dignitas -> OpTic Gaming)
+        team = teams.loc[(teams["base_tournament"] == r["tournament"])
+                         & ((teams["team"] == r["team"]) | (teams["former_team"] == r["team"])), "team"]
+        if len(team):
+            coaches[team.iloc[0]][r["coach"]] = {"name": r["coach"], "role": "Coach", "before": True,
+                                                 "after": True, "status": "inchangé", "source": "", "url": None}
+    events = []
+    for _, c in changes[changes["role"].map(is_coach_role)].iterrows():
+        events.append((str(c["date"])[:10], 1, c["direction"], c["player"], c["team"], c["role"],
+                       "confirmé", "Leaguepedia", _url(c.get("link"))))
+    for _, r in rumors[rumors["role"].map(is_coach_role)].iterrows():
+        status = "confirmé" if r["status"] == "Confirmed" else "rumeur"
+        if r["team_start"] != r["team_end"]:
+            events.append((str(r["day"]), 0, "Leave", r["player"], r["team_start"], r["role"],
+                           status, r["source"], _url(r.get("link"))))
+        events.append((str(r["day"]), 0, "Join" if r["team_start"] != r["team_end"] else "Stay",
+                       r["player"], r["team_end"], r["role"], status, r["source"], _url(r.get("link"))))
+    events.sort(key=lambda e: (e[0], e[1], 0 if e[2] == "Leave" else 1))
+    for date, _, direction, name, team, role, status, source, url in events:
+        if direction == "Leave":
+            entry = coaches.get(team, {}).get(name)
+            if entry and entry["after"]:
+                entry.update(after=False, status=f"départ ({status})", source=source, url=url)
+            continue
+        if team not in coaches:
+            # parti dans une équipe que l'on ne suit pas : il quitte la sienne
+            for other in coaches.values():
+                if name in other and other[name]["after"] and other[name]["before"]:
+                    other[name].update(after=False, status=f"départ ({status})", source=source, url=url)
+            continue
+        for t, other in coaches.items():  # un coach n'est que dans une équipe
+            if t != team and name in other and other[name]["after"]:
+                other[name].update(after=False, status=f"départ ({status})", source=source, url=url)
+        entry = coaches[team].setdefault(name, {"name": name, "role": role, "before": False})
+        label = status if direction == "Join" and not entry["before"] else f"reste ({status})"
+        entry.update(after=True, role=role or entry.get("role"), status=label, source=source, url=url)
+    return {t: list(c.values()) for t, c in coaches.items()}
 
 
 def fetch_contracts(players, season, refresh=False):
@@ -325,6 +404,7 @@ def build_mercato(games, season, refresh=False):
 
     # Fins de contrat (GCD) : joueurs restés "inchangé" dont le contrat est fini
     board = apply_contract_ends(board, season)
+    coaches = build_coaches(board, changes, rumors, season, refresh)
 
     # Corrections manuelles (prioritaires)
     manual = load_mercato(season)
@@ -340,6 +420,7 @@ def build_mercato(games, season, refresh=False):
                 slot = (board["team"] == m["team"]) & (board["role"] == m["role"])
             board.loc[slot, ["after", "status", "source"]] = [m[col] or None, "manuel", "saisie manuelle"]
     board.attrs["undecided"] = options
+    board.attrs["coaches"] = coaches
     return board
 
 

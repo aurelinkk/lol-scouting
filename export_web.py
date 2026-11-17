@@ -204,6 +204,23 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                 return {"name": name, "id": ids[pid]}
             return {"name": name}
 
+        all_coaches = board.attrs.get("coaches", {})
+
+        def coach_list(team):
+            """Coachs : restent (stay), partent (leave), arrivent (new)."""
+            out = []
+            for c in all_coaches.get(team, []):
+                if not c["before"] and not c["after"]:
+                    continue
+                change = "stay" if c["before"] and c["after"] else ("leave" if c["before"] else "new")
+                p = slot(c["name"]) or {"name": c["name"]}
+                out.append({**p, "role": c.get("role") or "Coach", "change": change,
+                            "rumor": "rumeur" in str(c.get("status")),
+                            "status": c.get("status"), "source": c.get("source") or None,
+                            "url": c.get("url") if isinstance(c.get("url"), str) else None})
+            order = {"stay": 0, "new": 1, "leave": 2}
+            return sorted(out, key=lambda c: (order[c["change"]], "Head" not in c["role"]))
+
         teams = []
         for (league, tier, team), grp in board.groupby(["league", "tier", "team"], sort=False):
             changed = (any(st not in ("inchangé", "") for st in grp["status"])
@@ -213,6 +230,7 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                           "logo": logos.get(team) or logos.get(former),
                           "former_team": former or None,
                           "team_source": (grp["team_source"].iloc[0] or None) if former else None,
+                          "coaches": coach_list(team),
                           "changed": changed or bool(former), "slots": [
                 {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
                  "status": r["status"], "source": r["source"] or None,

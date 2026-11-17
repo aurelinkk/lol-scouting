@@ -14,6 +14,17 @@ export interface MercatoPlayer {
   region?: Region;
 }
 
+export type Change = "stay" | "leave" | "new";
+
+export interface MercatoCoach extends MercatoPlayer {
+  role: string;
+  change: Change;
+  rumor: boolean;
+  status?: string;
+  source?: string | null;
+  url?: string | null;
+}
+
 export interface MercatoSlot {
   role: string;
   before: MercatoPlayer | null;
@@ -34,6 +45,8 @@ export interface MercatoTeam {
   logo?: string;
   changed: boolean;
   slots: MercatoSlot[];
+  /** Staff : restent (stay), partent (leave), arrivent (new) */
+  coaches?: MercatoCoach[];
   /** Équipe remplacée / renommée (ex : OpTic Gaming à la place de Dignitas) */
   former_team?: string | null;
   team_source?: string | null;
@@ -41,6 +54,30 @@ export interface MercatoTeam {
 
 function short(name: string) {
   return name.replace(/\s*\(.*\)$/, "");
+}
+
+// Pastilles de couleur : vert = reste, rouge = part, bleu = arrive
+const CHANGE_COLOR: Record<Change, string> = {
+  stay: "var(--good)",
+  leave: "var(--critical)",
+  new: "var(--accent)",
+};
+
+function Chip({ change, children, dashed }: { change: Change; children: React.ReactNode; dashed?: boolean }) {
+  const c = CHANGE_COLOR[change];
+  return (
+    <span
+      className="inline-flex max-w-full min-w-0 items-center rounded-md px-1.5 py-px"
+      style={{
+        background: `color-mix(in srgb, ${c} 14%, transparent)`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${c} ${dashed ? 0 : 28}%, transparent)`,
+        outline: dashed ? `1px dashed color-mix(in srgb, ${c} 45%, transparent)` : undefined,
+        outlineOffset: dashed ? "-1px" : undefined,
+      }}
+    >
+      <span className="truncate">{children}</span>
+    </span>
+  );
 }
 
 function PlayerLink({ p, className }: { p: MercatoSlot["after"]; className?: string }) {
@@ -156,7 +193,7 @@ export default function MercatoBoard({
             </div>
             <ul className="divide-y divide-border">
               {t.slots.map((s) => {
-                const unchanged = s.before?.name === s.after?.name;
+                const unchanged = !!s.before && s.before.name === s.after?.name;
                 return (
                   <li
                     key={s.role}
@@ -164,14 +201,24 @@ export default function MercatoBoard({
                     title={s.source ? `${s.status} · source : ${s.source}` : s.status}
                   >
                     <span className="text-[11px] uppercase tracking-wide text-ink-3">{s.role}</span>
-                    <span className="truncate text-ink-2">
-                      <PlayerLink p={s.before} />
+                    <span className="flex min-w-0">
+                      {s.before ? (
+                        <Chip change={unchanged ? "stay" : "leave"}>
+                          <PlayerLink p={s.before} />
+                        </Chip>
+                      ) : (
+                        <span className="text-ink-3">—</span>
+                      )}
                     </span>
                     <span className="text-center text-ink-3">→</span>
                     <span className="flex min-w-0 items-center justify-end gap-1 text-right">
-                      <span className="truncate">
-                        <PlayerLink p={s.after} className={unchanged ? "text-ink-3" : "font-semibold"} />
-                      </span>
+                      {s.after ? (
+                        <Chip change={unchanged ? "stay" : "new"}>
+                          <PlayerLink p={s.after} className={unchanged ? "" : "font-semibold"} />
+                        </Chip>
+                      ) : (
+                        <span className="text-ink-3">—</span>
+                      )}
                       <Badge status={s.status} url={s.url} source={s.source} />
                     </span>
                     {s.to && (
@@ -189,6 +236,34 @@ export default function MercatoBoard({
                 );
               })}
             </ul>
+            {t.coaches && t.coaches.length > 0 && (
+              <div className="border-t border-border bg-surface-2/40 px-3 py-2">
+                <div className="mb-1 text-[11px] uppercase tracking-wide text-ink-3">Coachs</div>
+                <div className="flex flex-wrap gap-1 text-xs">
+                  {t.coaches.map((c) => (
+                    <span
+                      key={c.name}
+                      className="inline-flex items-center gap-1"
+                      title={`${c.role} · ${c.status ?? ""}${c.source ? ` · ${c.source}` : ""}`}
+                    >
+                      <Chip change={c.change} dashed={c.rumor}>
+                        <PlayerLink p={c} className={c.change === "new" ? "font-semibold" : ""} />
+                        {c.role !== "Coach" && (
+                          <span className="ml-1 text-[10px] text-ink-3">
+                            {c.role.replace("Head Coach", "HC").replace(" Coach", "")}
+                          </span>
+                        )}
+                      </Chip>
+                      {c.url && (
+                        <a href={c.url} target="_blank" rel="noreferrer" className="text-[10px] text-ink-3 hover:text-accent">
+                          ↗
+                        </a>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -213,6 +288,14 @@ export default function MercatoBoard({
         </div>
       )}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
+        <span className="flex items-center gap-1.5">
+          <Chip change="stay">reste</Chip>
+          <Chip change="leave">part</Chip>
+          <Chip change="new">arrive</Chip>
+          <Chip change="new" dashed>
+            coach (rumeur)
+          </Chip>
+        </span>
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full" style={{ background: "var(--good)" }} /> officiel
           (Leaguepedia, fins de contrat GCD)
