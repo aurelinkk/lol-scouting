@@ -48,7 +48,7 @@ def destination(games_next):
     g = g[~g["tournament"].str.contains(PROMOTION_PATTERN, case=False, na=False)]
 
     team_games = g.groupby(["tier", "team"])["game_id"].nunique().reset_index(name="n")
-    team_games["ok"] = team_games["n"] >= team_games["tier"].map(MIN_TEAM_GAMES)
+    team_games["ok"] = team_games["n"] >= [MIN_TEAM_GAMES.get(t, 10) for t in team_games["tier"]]
     g = g.merge(team_games[team_games["ok"]][["tier", "team"]], on=["tier", "team"])
 
     best = (g.groupby(["player", "tier", "team"])

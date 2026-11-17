@@ -244,7 +244,12 @@ def season_coefficients(season, use_next_season=None, window=None):
     out = pd.DataFrame({"base": base})
     out["talent"] = t["talent"].reindex(out.index).fillna(0)
     out["tier"] = t["tier"].reindex(out.index)
-    w = out["tier"].map(scoring.TALENT_WEIGHT).fillna(0)
+    # Poids du niveau de chaque ligue (calcul explicite en float : avec les
+    # chaînes Arrow de pandas 3, un .map() peut garder un type texte)
+    w = pd.Series([float(scoring.TALENT_WEIGHT.get(t, 0.0)) if isinstance(t, str) else 0.0
+                   for t in out["tier"]], index=out.index, dtype=float)
+    out["base"] = pd.to_numeric(out["base"], errors="coerce")
+    out["talent"] = pd.to_numeric(out["talent"], errors="coerce").fillna(0.0)
     out["coef"] = out["base"] + w * out["talent"]
     # ERL2 : coef EM de l'ERL1 du pays - décote (déjà dans `base`) + son propre
     # niveau ; l'ajustement de l'ERL1 n'est pas répercuté (LFL2 2025 forte,
