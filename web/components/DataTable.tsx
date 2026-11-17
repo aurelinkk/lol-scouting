@@ -27,7 +27,24 @@ const STAT_COLUMNS: { key: StatKey; label: string; oe?: boolean }[] = [
 
 const PAGE = 100;
 
-export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe: boolean }) {
+/** Montée la saison suivante : 1re division (doré) ou ERL2 -> ERL1 (vert) */
+export interface Promoted {
+  level: "top" | "second";
+  team: string;
+  season: number;
+  rumor: boolean;
+}
+const PROMO_COLOR = { top: "var(--tier-lec)", second: "var(--tier-em)" };
+
+export default function DataTable({
+  seasons,
+  hasOe,
+  promoted = {},
+}: {
+  seasons: number[];
+  hasOe: boolean;
+  promoted?: Record<string, Promoted>;
+}) {
   const region = useRegion();
   const R = REGION_INFO[region];
   const [rows, setRows] = useState<RankingRow[] | null>(null);
@@ -226,6 +243,21 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
               ? "perf. dans sa ligue + bonus de niveau de ligue + EMEA Masters"
               : "perf. comparée aux joueurs du même poste"}
           </p>
+          {Object.keys(promoted).some((k) => k.startsWith(`${season}:`)) && (
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: PROMO_COLOR.top }} />
+                Monte en {R.top} en {season + 1}
+              </span>
+              {R.hasEm && (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-sm" style={{ background: PROMO_COLOR.second }} />
+                  Monte d&apos;ERL2 en ERL1 en {season + 1}
+                </span>
+              )}
+              {isCurrent && <span className="text-ink-3">d&apos;après le mercato (officiel ou rumeur)</span>}
+            </p>
+          )}
           <div className="overflow-x-auto rounded-lg border border-border bg-surface">
             <table className="tabular w-full text-sm">
               <thead className="border-b border-border text-xs text-ink-3">
@@ -252,8 +284,27 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
               </thead>
               <tbody>
                 {filtered.slice(0, limit).map((r, i) => (
-                  <tr key={`${r.id}-${r.season}`} className="border-b border-border last:border-0 hover:bg-surface-2">
-                    <td className="px-2 py-1.5 text-ink-3">{i + 1}</td>
+                  <tr
+                    key={`${r.id}-${r.season}`}
+                    className="border-b border-border last:border-0 hover:bg-surface-2"
+                    style={
+                      promoted[`${r.season}:${r.id}`]
+                        ? {
+                            background: `color-mix(in srgb, ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]} 13%, transparent)`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <td
+                      className="px-2 py-1.5 text-ink-3"
+                      style={
+                        promoted[`${r.season}:${r.id}`]
+                          ? { boxShadow: `inset 3px 0 0 ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]}` }
+                          : undefined
+                      }
+                    >
+                      {i + 1}
+                    </td>
                     <td className="px-2 py-1.5">
                       <Link href={playerLink(region, r.id)} className="flex items-center gap-2 hover:underline">
                         <Avatar name={r.name} src={r.photo} size={28} />
@@ -290,6 +341,19 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                           >
                             <TeamLogo team={team} src={logo} size={18} />
                             <span className="max-w-40 truncate">{team}</span>
+                            {promoted[`${r.season}:${r.id}`] && (() => {
+                              const p = promoted[`${r.season}:${r.id}`];
+                              return (
+                                <span
+                                  className="flex items-center gap-1 text-xs"
+                                  title={`${p.rumor ? "Rumeur" : "Montée"} ${p.season} : ${p.team}`}
+                                >
+                                  <span style={{ color: PROMO_COLOR[p.level] }}>→</span>
+                                  <span className="max-w-32 truncate">{p.team}</span>
+                                  {p.rumor && <span className="text-ink-3">(rumeur)</span>}
+                                </span>
+                              );
+                            })()}
                             {isCurrent && r.current_league && r.current_league !== r.league_code && (
                               <span className="text-xs text-ink-3">{r.current_league}</span>
                             )}
