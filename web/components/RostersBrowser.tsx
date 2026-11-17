@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Avatar, PlayerName, TeamLogo } from "./Images";
 import { TIER_COLOR } from "@/lib/tiers";
+import { playerLink, publicData, REGION_INFO } from "@/lib/region";
+import { useRegion } from "@/lib/useRegion";
+
 
 interface RosterPlayer {
   id?: string;
@@ -29,6 +32,7 @@ interface RosterEvent {
 const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"];
 
 function TeamCard({ team }: { team: RosterTeam }) {
+  const region = useRegion();
   // Titulaire = le joueur avec le plus de parties à chaque poste ; les autres = remplaçants
   const starters = ROLES.map((role) => team.players.filter((p) => p.role === role).sort((a, b) => b.games - a.games)[0]);
   const subs = team.players.filter((p) => !starters.includes(p));
@@ -48,7 +52,7 @@ function TeamCard({ team }: { team: RosterTeam }) {
                 <>
                   <Avatar name={p.name} src={p.photo} size={22} />
                   {p.id ? (
-                    <Link href={`/joueurs/${p.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                    <Link href={playerLink(region, p.id)} className="min-w-0 flex-1 truncate text-sm hover:underline">
                       <PlayerName name={p.name} />
                     </Link>
                   ) : (
@@ -70,7 +74,7 @@ function TeamCard({ team }: { team: RosterTeam }) {
             <span key={p.name + p.role}>
               {i > 0 && ", "}
               {p.id ? (
-                <Link href={`/joueurs/${p.id}`} className="hover:underline">
+                <Link href={playerLink(region, p.id)} className="hover:underline">
                   {p.name.replace(/\s*\(.*\)$/, "")}
                 </Link>
               ) : (
@@ -86,26 +90,28 @@ function TeamCard({ team }: { team: RosterTeam }) {
 }
 
 export default function RostersBrowser() {
+  const region = useRegion();
+  const top = REGION_INFO[region].top;
   const [events, setEvents] = useState<RosterEvent[] | null>(null);
   const [error, setError] = useState(false);
   const [season, setSeason] = useState<number | null>(null);
-  const [league, setLeague] = useState("LEC");
+  const [league, setLeague] = useState(top);
   const [tournament, setTournament] = useState("");
 
   useEffect(() => {
-    fetch("/data/rosters.json")
+    fetch(publicData(region, "rosters.json"))
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data: RosterEvent[]) => {
         setEvents(data);
         setSeason(Math.max(...data.map((e) => e.season)));
       })
       .catch(() => setError(true));
-  }, []);
+  }, [region]);
 
   const seasons = useMemo(() => [...new Set((events ?? []).map((e) => e.season))].sort((a, b) => b - a), [events]);
   const leagues = useMemo(() => {
     const codes = [...new Set((events ?? []).filter((e) => e.season === season).map((e) => e.league_code))];
-    return codes.sort((a, b) => (a === "LEC" ? -1 : b === "LEC" ? 1 : a.localeCompare(b)));
+    return codes.sort((a, b) => (a === top ? -1 : b === top ? 1 : a.localeCompare(b)));
   }, [events, season]);
   const tournaments = useMemo(
     () => (events ?? []).filter((e) => e.season === season && e.league_code === league),

@@ -17,6 +17,21 @@ les matchs pros de 2023 à aujourd'hui, la soloQ EUW et le mercato.
 | **Ladder** | Top 1000 soloQ EUW : non-pros à scouter, progression de LP, volume de jeu, score soloQ par poste (⭐ = top 5 %) |
 | **Analyses** | Analyse soloQ approfondie d'un joueur ciblé (toutes ses parties de l'année) lancée depuis le site, rapport prêt en ~20 min |
 
+## Europe et Amérique du Nord
+
+Le sélecteur **EU / NA** en haut du site change de région. Les deux classements
+restent séparés : aucune compétition ne permet de comparer le niveau de la NACL
+à celui des ERL. En NA, le score est la performance dans la NACL (même calcul
+par poste, malus ex-LCS) ; pas de coefficient de ligue ni d'EMEA Masters, pas
+encore de soloQ (onglets Ligues, Ladder et Analyses : Europe seulement).
+Les scripts Python prennent la région dans la variable `SCOUT_REGION`
+(`eu` par défaut) : données dans `data/na/`, site dans `web/data/na/`.
+
+```bash
+SCOUT_REGION=na python fetch_pro.py --year 2026   # PowerShell : $env:SCOUT_REGION="na"
+SCOUT_REGION=na python export_web.py
+```
+
 ## Comment le score est calculé
 
 **Score = performance dans sa ligue + niveau de la ligue + EMEA Masters − malus ex-LEC**
@@ -42,6 +57,7 @@ python soloq.py profiles               # stats soloQ de l'année des non-pros (l
 python mercato.py --refresh            # rumeurs, transferts, contrats
 python export_web.py                   # génère les données du site
 git add web/data web/public/data && git commit -m "Données" && git push   # Vercel redéploie
+# (puis la même chose avec SCOUT_REGION=na pour la NA)
 ```
 
 Corrections à la main (prioritaires sur les données automatiques) :

@@ -25,13 +25,14 @@ from images import get_image_urls
 from rosters import build_rosters, resolve_name
 from league_strength import available_seasons, coef_window, league_coefficients, load_games
 from leagues import LEAGUES
+from region import RAW_DIR, REGION, WEB_DATA_DIR, WEB_PUBLIC_DIR
 from promotions import compute_promotions, hit_rates
 from prospects import add_game_metrics, aggregate, build_ranking
 from league_talent import league_talent, season_coefficients
 from scoring import EM_WEIGHT, LEAGUE_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
-OUT_DIR = "web/data"                # lu par le serveur au build (jamais envoyé tel quel)
-PUBLIC_DIR = "web/public/data"      # servi au navigateur (tableau filtrable)
+OUT_DIR = WEB_DATA_DIR             # lu par le serveur au build (jamais envoyé tel quel)
+PUBLIC_DIR = WEB_PUBLIC_DIR         # servi au navigateur (tableau filtrable)
 STATS = list(STAT_LABELS)
 LOWER_IS_BETTER = {"deaths_pg", "fb_victim"}
 MIN_PEER_GAMES = 10
@@ -247,12 +248,14 @@ def main():
     # Carrière : périodes en club, titres, récompenses individuelles
     st = stints(games)
     # Périodes hors EMEA déjà relevées (ex : LØS en CBLOL pour Zest et Feisty)
-    outside_files = glob.glob("data/raw/outside_*.csv")
+    outside_files = glob.glob(f"{RAW_DIR}/outside_*.csv")
     if outside_files:
         from careers import fetch_outside_games
         out_games = pd.concat([fetch_outside_games(
             pd.read_csv(f)["player"].dropna().unique().tolist(), int(f[-8:-4])) for f in outside_files])
-        st = pd.concat([st, outside_stints(out_games)], ignore_index=True)
+        other = outside_stints(out_games)
+        if not other.empty:
+            st = pd.concat([st, other], ignore_index=True)
     st = st.sort_values(["player", "start"])
     st_by = {p: g for p, g in st.groupby("player")}
     lv_by = {p: g for p, g in level_totals(st[st["tier"] != "OTHER"]).groupby("player")}
@@ -401,6 +404,7 @@ def main():
     # --- Méta ------------------------------------------------------------
     write("meta.json", {
         "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "region": REGION,
         "seasons": seasons,
         "games": int(games["game_id"].nunique()),
         "players": len(players),

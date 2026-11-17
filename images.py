@@ -2,15 +2,16 @@
 
 On ne télécharge pas les images : on récupère seulement leur adresse sur le
 CDN de Leaguepedia, que la web app affiche directement.
-Résultats en cache dans data/raw/images.json.
+Résultats en cache dans data/raw/images.json (data/na/raw/ pour la NA).
 """
 import json
 import os
 import re
 
 from leaguepedia import API_URL, cargo_query, session
+from region import RAW_DIR, region_sql
 
-CACHE = "data/raw/images.json"
+CACHE = f"{RAW_DIR}/images.json"  # un cache par région (data/raw, data/na/raw)
 THUMB_WIDTH = 240
 
 
@@ -33,12 +34,12 @@ def _year(text):
 
 
 def player_files(min_year):
-    """Photo la plus récente de chaque joueur (tournois EMEA depuis min_year)."""
+    """Photo la plus récente de chaque joueur (tournois de la région depuis min_year)."""
     rows = cargo_query(
         tables="PlayerImages=PI,Tournaments=T",
         join_on="PI.Tournament=T.OverviewPage",
         fields="PI.Link=player,PI.FileName=file,PI.Team=team,PI.Tournament=tournament",
-        where=f"T.Year>={min_year} AND T.Region='EMEA'",
+        where=f"T.Year>={min_year} AND {region_sql('T')}",
     )
     best = {}
     for r in rows:
@@ -49,8 +50,8 @@ def player_files(min_year):
 
 
 def team_files():
-    rows = cargo_query(tables="Teams", fields="Name=team,Image=file",
-                       where="Region='EMEA' AND Image IS NOT NULL")
+    rows = cargo_query(tables="Teams=Te", fields="Te.Name=team,Te.Image=file",
+                       where=f"{region_sql('Te')} AND Te.Image IS NOT NULL")
     return {r["team"]: r["file"] for r in rows if r["file"]}
 
 

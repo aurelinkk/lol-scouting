@@ -1,4 +1,4 @@
-"""Télécharge les stats des matchs pros européens depuis Leaguepedia.
+"""Télécharge les stats des matchs pros (Europe, ou NA avec SCOUT_REGION=na) depuis Leaguepedia.
 
 Usage :
     python fetch_pro.py                 # saison en cours, toutes les ligues de leagues.py
@@ -15,6 +15,7 @@ import pandas as pd
 
 from leaguepedia import cargo_query
 from leagues import leagues_for
+from region import DATA_DIR, RAW_DIR
 
 FIELDS = {
     # Partie
@@ -87,7 +88,7 @@ def clean(df):
 
 def fetch_league_cached(league, year, refresh=False):
     """Télécharge une ligue, ou la relit depuis data/raw/ si déjà téléchargée."""
-    cache_dir = f"data/raw/{year}"
+    cache_dir = f"{RAW_DIR}/{year}"
     os.makedirs(cache_dir, exist_ok=True)
     path = os.path.join(cache_dir, league.replace("/", "_") + ".csv")
 
@@ -133,8 +134,8 @@ def main():
     data = pd.concat(frames, ignore_index=True)
     data = clean(data)
 
-    os.makedirs("data", exist_ok=True)
-    path = f"data/pro_games_{args.year}.csv"
+    os.makedirs(DATA_DIR, exist_ok=True)
+    path = f"{DATA_DIR}/pro_games_{args.year}.csv"
     data.to_csv(path, index=False)
     print()
     print(f"{len(data)} lignes ({data['player'].nunique()} joueurs) -> {path}")

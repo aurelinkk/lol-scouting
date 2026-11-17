@@ -210,6 +210,8 @@ def league_talent(games=None, use_next_season=None, verbose=False):
     agg["talent"], agg["talent_den"], agg["up_sd"] = 0.0, 0.0, np.nan
     for tier, weights in scoring.TALENT_SIGNAL_WEIGHTS.items():
         t = agg["tier"] == tier
+        if not t.any():  # ex : pas d'ERL2 en NA
+            continue
         num, den = 0.0, 0.0
         for signal, w in weights.items():
             v = agg.loc[t, signal]
@@ -222,6 +224,8 @@ def league_talent(games=None, use_next_season=None, verbose=False):
                 agg.loc[t, "up_sd"] = sd
             num = num + (w * z).fillna(0)
             den = den + w * z.notna()
+        if isinstance(den, float):  # aucun indicateur utilisable pour ce niveau
+            continue
         agg.loc[t, "talent"] = (num / den.replace(0, np.nan)).fillna(0)
         agg.loc[t, "talent_den"] = den
     agg.attrs["players"] = ps

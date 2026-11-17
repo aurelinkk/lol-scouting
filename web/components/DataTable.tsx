@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Avatar, PlayerName, TeamLogo } from "./Images";
 import { fmtScore, fmtStat, topPercent } from "@/lib/format";
 import { ROLES, type RankingRow, type StatKey } from "@/lib/types";
+import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
+import { useRegion } from "@/lib/useRegion";
 
 type SortKey = "final" | "age" | "games" | "league_score" | "league_bonus" | "em_score" | StatKey;
 
@@ -26,6 +28,8 @@ const STAT_COLUMNS: { key: StatKey; label: string; oe?: boolean }[] = [
 const PAGE = 100;
 
 export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe: boolean }) {
+  const region = useRegion();
+  const R = REGION_INFO[region];
   const [rows, setRows] = useState<RankingRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,17 +50,17 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
   // Une saison = un fichier (chargé à la demande)
   useEffect(() => {
     setRows(null);
-    fetch(`/data/rankings_${season}.json`)
+    fetch(publicData(region, `rankings_${season}.json`))
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .catch(() =>
         // Ancien format : un seul fichier pour toutes les saisons
-        fetch("/data/rankings.json")
+        fetch(publicData(region, "rankings.json"))
           .then((r) => r.json())
           .then((all: RankingRow[]) => all.filter((x) => x.season === season)),
       )
       .then(setRows)
       .catch(() => setError("Impossible de charger les données."));
-  }, [season]);
+  }, [season, region]);
 
   const leagues = useMemo(
     () => [...new Set((rows ?? []).filter((r) => r.season === season).map((r) => r.league_code))].sort(),
@@ -140,6 +144,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
             ))}
           </select>
         </label>
+        {R.hasEm && (
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Niveau
           <select className={control} value={tier} onChange={(e) => setTier(e.target.value)}>
@@ -148,6 +153,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
             <option>ERL2</option>
           </select>
         </label>
+        )}
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Ligue
           <select className={control} value={league} onChange={(e) => setLeague(e.target.value)}>
@@ -191,12 +197,13 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
         <div className="flex flex-col gap-1 pb-1 text-sm text-ink-2">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={includeLec} onChange={(e) => setIncludeLec(e.target.checked)} />
-            Inclure les joueurs passés par la LEC (cette saison ou avant)
+            Inclure les joueurs passés par la {R.top} (cette saison ou avant)
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={unknownAge} onChange={(e) => setUnknownAge(e.target.checked)} />
             Garder les âges inconnus (filtre âge)
           </label>
+          {R.hasLeagues && (
           <label
             className="flex items-center gap-2"
             title="Score sans le bonus/malus de niveau de ligue : qui domine le plus sa propre ligue"
@@ -204,6 +211,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
             <input type="checkbox" checked={noLeague} onChange={(e) => setNoLeague(e.target.checked)} />
             Score sans le niveau de ligue
           </label>
+          )}
         </div>
       </div>
 
@@ -213,8 +221,10 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
       {rows && (
         <>
           <p className="text-xs text-ink-3">
-            {filtered.length} joueurs · clic sur une colonne pour trier · Score = perf. dans sa ligue + bonus de
-            niveau de ligue + EMEA Masters
+            {filtered.length} joueurs · clic sur une colonne pour trier · Score ={" "}
+            {R.hasEm
+              ? "perf. dans sa ligue + bonus de niveau de ligue + EMEA Masters"
+              : "perf. comparée aux joueurs du même poste"}
           </p>
           <div className="overflow-x-auto rounded-lg border border-border bg-surface">
             <table className="tabular w-full text-sm">
@@ -235,8 +245,8 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                   {header("games", "Parties")}
                   {header("final", "Score", "Score final")}
                   {header("league_score", "Ligue", "Performance dans sa ligue (z-score pondéré)")}
-                  {header("league_bonus", "Bonus", "Bonus de niveau de ligue")}
-                  {header("em_score", "EM", "Performance à l'EMEA Masters")}
+                  {R.hasLeagues && header("league_bonus", "Bonus", "Bonus de niveau de ligue")}
+                  {R.hasEm && header("em_score", "EM", "Performance à l'EMEA Masters")}
                   {columns.map((c) => header(c.key, c.label))}
                 </tr>
               </thead>
@@ -245,7 +255,7 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                   <tr key={`${r.id}-${r.season}`} className="border-b border-border last:border-0 hover:bg-surface-2">
                     <td className="px-2 py-1.5 text-ink-3">{i + 1}</td>
                     <td className="px-2 py-1.5">
-                      <Link href={`/joueurs/${r.id}`} className="flex items-center gap-2 hover:underline">
+                      <Link href={playerLink(region, r.id)} className="flex items-center gap-2 hover:underline">
                         <Avatar name={r.name} src={r.photo} size={28} />
                         <span className="whitespace-nowrap">
                           <PlayerName name={r.name} />
@@ -254,9 +264,9 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                         {(r.ex_lec || r.played_lec) && (
                           <span
                             className="rounded border border-border px-1 text-[10px] text-ink-3"
-                            title={r.played_lec ? "A joué en LEC cette saison" : `Ancien joueur de LEC : ${r.ex_lec}`}
+                            title={r.played_lec ? `A joué en ${R.top} cette saison` : `Ancien joueur de ${R.top} : ${r.ex_lec}`}
                           >
-                            {r.played_lec ? "LEC" : "ex-LEC"}
+                            {r.played_lec ? R.top : `ex-${R.top}`}
                           </span>
                         )}
                       </Link>
@@ -288,7 +298,8 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                       })()}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-ink-2">
-                      {r.league_code} <span className="text-xs text-ink-3">{r.tier}</span>
+                      {r.league_code}{" "}
+                      {r.league_code !== tierName(r.tier, region) && <span className="text-xs text-ink-3">{tierName(r.tier, region)}</span>}
                     </td>
                     <td className="px-2 py-1.5 text-right" title={r.age_approx ? "Âge approximatif (année de naissance seule)" : undefined}>
                       {r.age !== undefined ? `${r.age_approx ? "~" : ""}${r.age}` : "–"}
@@ -298,10 +309,12 @@ export default function DataTable({ seasons, hasOe }: { seasons: number[]; hasOe
                       {fmtScore(noLeague ? r.final - r.league_bonus : r.final)}
                     </td>
                     <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_score)}</td>
-                    <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_bonus)}</td>
+                    {R.hasLeagues && <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_bonus)}</td>}
+                    {R.hasEm && (
                     <td className="px-2 py-1.5 text-right text-ink-2" title={r.em_games ? `${r.em_games} parties` : ""}>
                       {fmtScore(r.em_score)}
                     </td>
+                    )}
                     {columns.map((c) => (
                       <td key={c.key} className="whitespace-nowrap px-2 py-1.5 text-right">
                         {fmtStat(c.key, r[c.key])}

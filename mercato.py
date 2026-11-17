@@ -19,9 +19,10 @@ import os
 import pandas as pd
 
 from leaguepedia import cargo_query
+from region import RAW_DIR
 from rosters import ROLES, build_rosters, load_mercato
 
-CACHE = "data/raw/mercato_{season}_{kind}.csv"
+CACHE = RAW_DIR + "/mercato_{season}_{kind}.csv"
 
 # Fin de contrat (base de contrats de Riot, le GCD, reprise par Leaguepedia) :
 # un joueur sans nouvelle dont le contrat avec son club se termine au plus tard
@@ -56,7 +57,7 @@ def fetch_events(season, refresh=False):
         fields="Date_Sort=date,Player=player,Team=team,Direction=direction,Role=role",
         where=f"Date_Sort>='{since}'"),
         columns=["date", "player", "team", "direction", "role"])
-    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs(RAW_DIR, exist_ok=True)
     rumors.to_csv(paths["rumors"], index=False)
     changes.to_csv(paths["changes"], index=False)
     return rumors, changes
@@ -101,7 +102,7 @@ def fetch_contracts(players, season, refresh=False):
                                 where=f"Player IN ({quoted}) AND IsRemoval=0")
         cached = pd.concat([cached, pd.DataFrame(rows, columns=["player", "team", "end"]),
                             pd.DataFrame({"checked": todo})], ignore_index=True)
-        os.makedirs("data/raw", exist_ok=True)
+        os.makedirs(RAW_DIR, exist_ok=True)
         cached.to_csv(path, index=False)
     return cached.dropna(subset=["player"])
 

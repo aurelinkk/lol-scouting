@@ -39,6 +39,8 @@ OE_LEAGUE_MAP = {
     "LFL2": "LFL2",    # LFL Division 2 (2025)
     "LVP SL": "ES",    # LVP SuperLiga (2025, avant la LES)
     "NEXO": "ES2",     # Liga Nexo (2e division espagnole depuis 2025)
+    # Amérique du Nord (SCOUT_REGION=na)
+    "LCS": "LCS", "NACL": "NACL", "LTA N": "LCS", "LTA": "LCS",
 }
 
 # Différences par saison (None = ligue qui n'est pas dans nos ligues cette saison)

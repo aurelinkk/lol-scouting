@@ -19,6 +19,7 @@ import argparse
 import pandas as pd
 
 from league_strength import coef_window, load_games
+from region import DATA_DIR, IS_EU
 from league_talent import season_coefficients, self_up_adjustment
 from oracles import OE_STATS, attach_oe
 import scoring
@@ -264,7 +265,7 @@ def main():
     if args.tier:
         ranking = ranking[ranking["tier"].isin(args.tier)]
 
-    path = f"data/prospects_{args.season}.csv"
+    path = f"{DATA_DIR}/prospects_{args.season}.csv"
     ranking.to_csv(path, index=False)
 
     pd.set_option("display.width", 250)

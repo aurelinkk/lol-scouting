@@ -74,7 +74,7 @@ _LEGACY_ERL = {   # 2023-2024
     "Arabian League 2nd Division": ("AL2", "ERL2"),
 }
 
-LEAGUES = {
+LEAGUES_EU = {
     2023: {**_LEGACY_ERL, "PG Nationals": ("LIT", "ERL1"), "PG Proving Grounds": ("LIT2", "ERL2")},
     2024: {**_LEGACY_ERL, "LIT": ("LIT", "ERL1"), "PG Proving Grounds": ("LIT2", "ERL2")},
     2025: {
@@ -98,6 +98,29 @@ LEAGUES = {
         "Road to LES": ("ES2", "ERL2"),
     },
 }
+
+
+# Amérique du Nord (SCOUT_REGION=na, voir region.py) : "LEC" = 1re division,
+# "ERL1" = NACL. En 2025, la LCS est remplacée par la LTA (conférence North +
+# finales communes avec le Brésil). Les tournois de promotion vers la LCS
+# (« LTA North 2026 Promotion », « LCS 2027 Promotion ») ne sont pas pris.
+_NA_COMMON = {
+    "League of Legends Championship Series": ("LCS", "LEC"),
+    "North American Challengers League": ("NACL", "ERL1"),
+}
+LEAGUES_NA = {
+    2023: _NA_COMMON,
+    2024: _NA_COMMON,
+    2025: {
+        "League of Legends Championship of The Americas North": ("LCS", "LEC"),
+        "League of Legends Championship of The Americas": ("LCS", "LEC"),
+        "North American Challengers League": ("NACL", "ERL1"),
+    },
+    2026: _NA_COMMON,
+}
+
+from region import IS_EU  # noqa: E402
+LEAGUES = LEAGUES_EU if IS_EU else LEAGUES_NA
 
 
 def leagues_for(year):

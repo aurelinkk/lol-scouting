@@ -25,11 +25,13 @@ import re
 import time
 import unicodedata
 
+from region import DATA_DIR
+
 import pandas as pd
 
 import riot_api
 
-DIR = "data/soloq"
+DIR = f"{DATA_DIR}/soloq"
 SNAP_DIR = os.path.join(DIR, "snapshots")
 ACCOUNTS = os.path.join(DIR, "accounts.csv")
 PROFILES = os.path.join(DIR, "profiles.csv")

@@ -16,9 +16,10 @@ import os
 import pandas as pd
 
 from leaguepedia import cargo_query
+from region import RAW_DIR, TOP_LEAGUES, not_region_sql, region_sql
 
-TITLES = "data/raw/titles.csv"
-AWARDS = "data/raw/awards.csv"
+TITLES = f"{RAW_DIR}/titles.csv"
+AWARDS = f"{RAW_DIR}/awards.csv"
 
 # Tournois qui donnent un titre (pas les saisons régulières ni les qualifs)
 TITLE_PATTERN = r"Playoffs|Finals|Final Four|Main Event|Grand Final|Invitational|Kick-off|Cup"
@@ -35,11 +36,11 @@ def fetch_titles(seasons, refresh=False):
         join_on="TR.OverviewPage=T.OverviewPage",
         fields="T.Name=tournament,T.Year=season,TR.Team=team,TR.Place_Number=place",
         where=f"T.Year IN ({','.join(map(str, seasons))}) AND TR.Place_Number=1 "
-              "AND (T.Region='EMEA' OR T.Region='International')",
+              f"AND ({region_sql()} OR T.Region='International')",
     )
     df = pd.DataFrame(rows, columns=["tournament", "season", "team", "place"])
     df["season"] = pd.to_numeric(df["season"], errors="coerce")
-    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs(RAW_DIR, exist_ok=True)
     df.to_csv(TITLES, index=False)
     return df
 
@@ -52,11 +53,11 @@ def fetch_awards(refresh=False):
         join_on="IA.OverviewPage=T.OverviewPage",
         fields="IA.Player=player,IA.Team=team,IA.Display=award,T.Name=tournament,"
                "T.Year=season,T.League=league",
-        where="IA.Player IS NOT NULL AND (T.Region='EMEA' OR T.Region='International')",
+        where=f"IA.Player IS NOT NULL AND ({region_sql()} OR T.Region='International')",
     )
     df = pd.DataFrame(rows, columns=["player", "team", "award", "tournament", "season", "league"])
     df = df[df["player"].astype(str).str.len() > 0]
-    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs(RAW_DIR, exist_ok=True)
     df.to_csv(AWARDS, index=False)
     return df
 
@@ -107,6 +108,7 @@ def titles_by_player(games, titles):
 
 def level_totals(st):
     """Parties et durée (jours) par niveau, par joueur."""
+    st = st.assign(start=pd.to_datetime(st["start"]), end=pd.to_datetime(st["end"]))
     st = st.assign(days=(st["end"] - st["start"]).dt.days + 1)
     return st.groupby(["player", "tier"]).agg(games=("games", "sum"), days=("days", "sum")).reset_index()
 
@@ -115,7 +117,7 @@ def level_totals(st):
 # Parties hors EMEA (joueurs venus d'une autre région : ex. Zest et Feisty,
 # LØS en CBLOL en 2026, avant de rejoindre la LEC en 2027)
 # --------------------------------------------------------------------------
-OUTSIDE = "data/raw/outside_{season}.csv"
+OUTSIDE = RAW_DIR + "/outside_{season}.csv"
 INTERNATIONAL = r"World Championship|Mid-Season Invitational|Esports World Cup|First Stand|Asian Games"
 LEAGUE_SHORT = {
     "Circuit Brazilian League of Legends": "CBLOL",
@@ -128,6 +130,11 @@ LEAGUE_SHORT = {
     "League of Legends Championship Pacific": "LCP",
     "North American Challengers League": "NACL",
     "Liga Latinoamérica": "LLA",
+    # Vu depuis la NA
+    "LoL EMEA Championship": "LEC", "La Ligue Française": "LFL",
+    "Prime League Pro Division": "PRM", "Liga Española de League of Legends": "LES",
+    "LVP SuperLiga": "LVP SL", "Northern League of Legends Championship": "NLC",
+    "EMEA Masters": "EM",
 }
 
 
@@ -146,17 +153,19 @@ def fetch_outside_games(players, season, refresh=False):
                 join_on="SP.GameId=SG.GameId,SG.OverviewPage=T.OverviewPage,SP.Link=PR.AllName",
                 fields="PR.OverviewPage=player,SP.Team=team,T.League=league,T.Region=region,"
                        "T.Name=tournament,SG.DateTime_UTC=date,SG.GameId=game_id",
-                where=f"PR.OverviewPage IN ({quoted}) AND T.Year={season} AND T.Region!='EMEA'")
+                where=f"PR.OverviewPage IN ({quoted}) AND T.Year={season} AND {not_region_sql()}")
         new = pd.DataFrame(rows, columns=["player", "team", "league", "region", "tournament", "date", "game_id"])
         # On note aussi les joueurs vérifiés sans partie hors EMEA (pour ne pas redemander)
         checked = pd.DataFrame({"checked": todo})
         cached = pd.concat([cached, new, checked], ignore_index=True)
-        os.makedirs("data/raw", exist_ok=True)
+        os.makedirs(RAW_DIR, exist_ok=True)
         cached.to_csv(path, index=False)
     out = cached.dropna(subset=["player"]).copy()
     out["date"] = pd.to_datetime(out["date"], errors="coerce")
     out["league_code"] = out["league"].map(LEAGUE_SHORT).fillna(out["league"])
-    out["international"] = (out["region"].eq("International")
+    for col in ("league", "region", "tournament", "team"):
+        out[col] = out[col].astype("string")
+    out["international"] = (out["region"].eq("International").fillna(False)
                             | out["league"].str.contains(INTERNATIONAL, case=False, na=False)
                             | out["tournament"].str.contains(INTERNATIONAL, case=False, na=False))
     return out[out["player"].isin(players)]
@@ -177,8 +186,8 @@ def outside_stints(outside):
 # --------------------------------------------------------------------------
 # Historique LEC complet (LEC depuis 2019 + EU LCS avant), toutes années
 # --------------------------------------------------------------------------
-LEC_HISTORY = "data/raw/lec_history.csv"
-LEC_LEAGUES = ("LoL EMEA Championship", "Europe League Championship Series")
+LEC_HISTORY = f"{RAW_DIR}/lec_history.csv"
+LEC_LEAGUES = TOP_LEAGUES  # LEC + EU LCS (ou LCS + LTA en NA, voir region.py)
 # Une équipe invitée (ex : KC Blue / Los Ratones en LEC Versus 2026) ne compte
 # pas : est invitée une équipe qui n'a joué que des tournois spéciaux cette année
 # (ex : NAVI, arrivé au Summer 2025 avec ~10 parties, compte bien)
@@ -205,7 +214,7 @@ def fetch_lec_history(refresh=False):
     regular_teams = df[~special].groupby(["year", "team"]).size().reset_index()[["year", "team"]]
     df = df.merge(regular_teams, on=["year", "team"])
     df = df.groupby(["player", "team", "year"], as_index=False)["games"].sum()
-    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs(RAW_DIR, exist_ok=True)
     df.to_csv(LEC_HISTORY, index=False)
     return df
 

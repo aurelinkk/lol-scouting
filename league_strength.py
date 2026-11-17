@@ -26,12 +26,15 @@ import pandas as pd
 
 from leaguepedia import cargo_query
 from leagues import leagues_for
+from region import DATA_DIR, HAS_EM, RAW_DIR
 import scoring
 from scoring import ERL2_DISCOUNT, ERL2_PARENT, EXCLUDED_EM_TEAMS, SHRINK_APPEARANCES
 
 
 def fetch_em_results(seasons, refresh=False):
-    path = "data/raw/em_results.csv"
+    path = f"{RAW_DIR}/em_results.csv"
+    if not HAS_EM:  # pas d'EMEA Masters (NA) : pas de coefficient de ligue
+        return pd.DataFrame(columns=["tournament", "season", "team", "place"])
     if os.path.exists(path) and not refresh:
         df = pd.read_csv(path)
         if set(seasons) <= set(df["season"]):
@@ -48,7 +51,7 @@ def fetch_em_results(seasons, refresh=False):
     df["place"] = pd.to_numeric(df["place"], errors="coerce")
     df = df[df["team"].ne("") & df["place"].notna()]
 
-    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs(RAW_DIR, exist_ok=True)
     df.to_csv(path, index=False)
     return df
 
@@ -85,6 +88,8 @@ def team_leagues(games):
 
 def league_coefficients(games, seasons, verbose=False):
     em = fetch_em_results(seasons)
+    if em.empty:  # pas d'EMEA Masters (NA) : pas de coefficient de ligue
+        return pd.DataFrame(columns=["em_teams", "raw_mean", "coef"], dtype=float)
     results = edition_percentiles(em[~em["team"].isin(EXCLUDED_EM_TEAMS)])
     results = results.merge(team_leagues(games), on=["season", "team"], how="left")
 
@@ -122,7 +127,7 @@ def load_season(season):
     restent utilisables, et une correction de leagues.py s'applique sans
     retélécharger.
     """
-    path = f"data/pro_games_{season}.csv"
+    path = f"{DATA_DIR}/pro_games_{season}.csv"
     if not os.path.exists(path):
         return None
     df = pd.read_csv(path, parse_dates=["date", "birthdate"])
@@ -197,7 +202,7 @@ def apply_birthdates(df):
 def available_seasons():
     """Saisons configurées dans leagues.py dont le fichier de parties existe."""
     from leagues import LEAGUES
-    return sorted(s for s in LEAGUES if os.path.exists(f"data/pro_games_{s}.csv"))
+    return sorted(s for s in LEAGUES if os.path.exists(f"{DATA_DIR}/pro_games_{s}.csv"))
 
 
 def coef_window(season, years=2):

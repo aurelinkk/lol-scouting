@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { playerLink, REGION_INFO } from "@/lib/region";
+import { useRegion } from "@/lib/useRegion";
+
 import { useMemo, useState } from "react";
 import { TeamLogo } from "./Images";
 
@@ -27,9 +30,10 @@ function short(name: string) {
 }
 
 function PlayerLink({ p, className }: { p: MercatoSlot["after"]; className?: string }) {
+  const region = useRegion();
   if (!p) return <span className="text-ink-3">—</span>;
   return p.id ? (
-    <Link href={`/joueurs/${p.id}`} className={`hover:underline ${className ?? ""}`} title={p.name}>
+    <Link href={playerLink(region, p.id)} className={`hover:underline ${className ?? ""}`} title={p.name}>
       {short(p.name)}
     </Link>
   ) : (
@@ -66,11 +70,13 @@ export default function MercatoBoard({
   teams: MercatoTeam[];
   undecided?: { player: string; id?: string; options: string[] }[];
 }) {
+  const region = useRegion();
+  const top = REGION_INFO[region].top;
   const leagues = useMemo(() => {
     const codes = [...new Set(teams.map((t) => t.league))];
-    return codes.sort((a, b) => (a === "LEC" ? -1 : b === "LEC" ? 1 : a.localeCompare(b)));
+    return codes.sort((a, b) => (a === top ? -1 : b === top ? 1 : a.localeCompare(b)));
   }, [teams]);
-  const [league, setLeague] = useState("LEC");
+  const [league, setLeague] = useState(top);
   const [onlyChanged, setOnlyChanged] = useState(false);
   const shown = teams.filter((t) => t.league === league && (!onlyChanged || t.changed));
 
@@ -141,7 +147,7 @@ export default function MercatoBoard({
             {undecided.map((u) => (
               <li key={u.player}>
                 {u.id ? (
-                  <Link href={`/joueurs/${u.id}`} className="font-medium hover:underline">
+                  <Link href={playerLink(region, u.id!)} className="font-medium hover:underline">
                     {short(u.player)}
                   </Link>
                 ) : (

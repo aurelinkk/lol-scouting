@@ -1,6 +1,7 @@
 import "server-only";
 import fs from "node:fs";
 import path from "node:path";
+import type { Region } from "./region";
 import type { League, Meta, Player, Promotion, RankingRow } from "./types";
 
 // Fichiers générés par `python export_web.py` à la racine du dépôt
@@ -12,18 +13,26 @@ function read<T>(...parts: string[]): T {
   return cache.get(file) as T;
 }
 
-export const getMeta = () => read<Meta>("data", "meta.json");
-export const getLeagues = () => read<League[]>("data", "leagues.json");
-export const getPromotions = () => read<Promotion[]>("data", "promotions.json");
-export const getPlayers = () => read<Record<string, Player>>("data", "players.json");
-export const getRankings = (): RankingRow[] => {
+// Europe : data/ ; Amérique du Nord : data/na/
+const dir = (region: Region) => (region === "eu" ? ["data"] : ["data", "na"]);
+const pub = (region: Region) => (region === "eu" ? ["public", "data"] : ["public", "data", "na"]);
+
+/** La région a-t-elle été exportée ? (SCOUT_REGION=na python export_web.py) */
+export const hasRegion = (region: Region) =>
+  fs.existsSync(path.join(process.cwd(), ...dir(region), "meta.json"));
+
+export const getMeta = (region: Region = "eu") => read<Meta>(...dir(region), "meta.json");
+export const getLeagues = (region: Region = "eu") => read<League[]>(...dir(region), "leagues.json");
+export const getPromotions = (region: Region = "eu") => read<Promotion[]>(...dir(region), "promotions.json");
+export const getPlayers = (region: Region = "eu") => read<Record<string, Player>>(...dir(region), "players.json");
+export const getRankings = (region: Region = "eu"): RankingRow[] => {
   // Un fichier par saison ; ancien format (un seul rankings.json) accepté aussi
-  const legacy = path.join(process.cwd(), "public", "data", "rankings.json");
-  if (fs.existsSync(legacy)) return read<RankingRow[]>("public", "data", "rankings.json");
-  return getMeta().seasons.flatMap((season) => read<RankingRow[]>("public", "data", `rankings_${season}.json`));
+  const legacy = path.join(process.cwd(), ...pub(region), "rankings.json");
+  if (fs.existsSync(legacy)) return read<RankingRow[]>(...pub(region), "rankings.json");
+  return getMeta(region).seasons.flatMap((season) => read<RankingRow[]>(...pub(region), `rankings_${season}.json`));
 };
 
-export const getPlayer = (id: string): Player | undefined => getPlayers()[id];
+export const getPlayer = (id: string, region: Region = "eu"): Player | undefined => getPlayers(region)[id];
 
 import type { MercatoTeam } from "@/components/MercatoBoard";
 export interface Mercato {
@@ -32,7 +41,7 @@ export interface Mercato {
   undecided?: { player: string; id?: string; options: string[] }[];
 }
 
-export const getMercato = (): Mercato | null => {
-  const file = path.join(process.cwd(), "data", "mercato.json");
-  return fs.existsSync(file) ? read<Mercato>("data", "mercato.json") : null;
+export const getMercato = (region: Region = "eu"): Mercato | null => {
+  const file = path.join(process.cwd(), ...dir(region), "mercato.json");
+  return fs.existsSync(file) ? read<Mercato>(...dir(region), "mercato.json") : null;
 };

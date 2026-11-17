@@ -11,6 +11,8 @@ import argparse
 
 import pandas as pd
 
+from region import DATA_DIR
+
 from league_strength import load_games
 from prospects import build_ranking
 
@@ -33,7 +35,7 @@ def main():
     pd.set_option("display.width", 200)
     print(missing[cols].head(args.top).round(2).to_string(index=False))
 
-    path = f"data/missing_ages_{args.season}.csv"
+    path = f"{DATA_DIR}/missing_ages_{args.season}.csv"
     missing[cols].to_csv(path, index=False)
     print(f"\nListe complète : {path}")
 

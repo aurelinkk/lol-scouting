@@ -17,6 +17,7 @@ import argparse
 import pandas as pd
 
 from league_strength import coef_window, load_games
+from region import DATA_DIR
 from prospects import build_ranking
 
 COLUMNS = ["player", "role", "age", "league_code", "tier", "team", "games",
@@ -198,7 +199,7 @@ def main():
     print("\n=== Taux de montée selon le rang en saison N (dans son niveau) ===")
     print(hit_rates(merged).to_string(index=False))
 
-    path = f"data/promotions_{args.season_from}_{args.season_to}.csv"
+    path = f"{DATA_DIR}/promotions_{args.season_from}_{args.season_to}.csv"
     merged.to_csv(path, index=False)
     print(f"\nDétail complet : {path}")
 

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { TeamLogo } from "./Images";
-import { TIER_COLOR, TIER_NAME } from "@/lib/tiers";
+import { TIER_COLOR } from "@/lib/tiers";
+import { type Region, tierName } from "@/lib/region";
 import type { Career, CareerStint, CareerTitle } from "@/lib/types";
 
 const TIER_ORDER = ["LEC", "ERL1", "ERL2"];
@@ -26,7 +27,7 @@ export function fmtDuration(days: number) {
 /* ------------------------------------------------------------------ */
 /* Temps passé par niveau                                              */
 /* ------------------------------------------------------------------ */
-export function LevelSummary({ career }: { career: Career }) {
+export function LevelSummary({ career, region = "eu" }: { career: Career; region?: Region }) {
   const levels = TIER_ORDER.filter((t) => career.levels[t]);
   if (!levels.length) return null;
   const emGames = career.stints.reduce((n, s) => n + (s.em_games ?? 0), 0);
@@ -38,7 +39,7 @@ export function LevelSummary({ career }: { career: Career }) {
           <div key={t} className="rounded-lg border border-border p-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
               <span className="h-2.5 w-2.5 rounded-sm" style={{ background: TIER_COLOR[t] }} />
-              {TIER_NAME[t]}
+              {tierName(t, region)}
             </div>
             <div className="mt-1 text-lg font-semibold">{fmtDuration(l.days)}</div>
             <div className="text-xs text-ink-3">{l.games} parties</div>
@@ -62,7 +63,7 @@ export function LevelSummary({ career }: { career: Career }) {
 /* ------------------------------------------------------------------ */
 /* Frise chronologique des clubs                                      */
 /* ------------------------------------------------------------------ */
-export function CareerTimeline({ career }: { career: Career }) {
+export function CareerTimeline({ career, region = "eu" }: { career: Career; region?: Region }) {
   const [hover, setHover] = useState<number | null>(null);
   const stints = career.stints;
   if (!stints.length) return <p className="text-sm text-ink-3">Pas de parties dans nos données.</p>;
@@ -82,9 +83,9 @@ export function CareerTimeline({ career }: { career: Career }) {
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-4 text-xs text-ink-2">
-        {["LEC", "ERL1", "ERL2"].map((t) => (
+        {["LEC", "ERL1", "ERL2"].filter((t) => region === "eu" || career.stints.some((s) => s.tier === t)).map((t) => (
           <span key={t} className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: TIER_COLOR[t] }} /> {TIER_NAME[t]}
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: TIER_COLOR[t] }} /> {tierName(t, region)}
           </span>
         ))}
         {career.stints.some((s) => s.tier === "OTHER") && (
@@ -168,7 +169,7 @@ export function CareerTimeline({ career }: { career: Career }) {
                     >
                       <div className="font-semibold">{s.team}</div>
                       <div className="text-ink-3">
-                        {TIER_NAME[s.tier] ?? s.tier} · {s.league_code} · {s.role}
+                        {tierName(s.tier, region)} · {s.league_code} · {s.role}
                       </div>
                       <div>
                         {fmtMonth(s.start)} → {fmtMonth(s.end)}
