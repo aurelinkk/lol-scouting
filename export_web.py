@@ -208,8 +208,12 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
         for (league, tier, team), grp in board.groupby(["league", "tier", "team"], sort=False):
             changed = (any(st not in ("inchangé", "") for st in grp["status"])
                        or any(isinstance(o, str) and o for o in grp.get("options", [])))
-            teams.append({"league": league, "tier": tier, "team": team, "logo": logos.get(team),
-                          "changed": changed, "slots": [
+            former = grp["former_team"].iloc[0] if "former_team" in grp else ""
+            teams.append({"league": league, "tier": tier, "team": team,
+                          "logo": logos.get(team) or logos.get(former),
+                          "former_team": former or None,
+                          "team_source": (grp["team_source"].iloc[0] or None) if former else None,
+                          "changed": changed or bool(former), "slots": [
                 {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
                  "status": r["status"], "source": r["source"] or None,
                  "options": r.get("options") or None, "to": destination(r.get("to")),

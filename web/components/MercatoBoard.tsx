@@ -34,6 +34,9 @@ export interface MercatoTeam {
   logo?: string;
   changed: boolean;
   slots: MercatoSlot[];
+  /** Équipe remplacée / renommée (ex : OpTic Gaming à la place de Dignitas) */
+  former_team?: string | null;
+  team_source?: string | null;
 }
 
 function short(name: string) {
@@ -135,6 +138,20 @@ export default function MercatoBoard({
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
               <TeamLogo team={t.team} src={t.logo} size={22} />
               <span className="truncate text-sm font-semibold">{t.team}</span>
+              {t.former_team &&
+                (t.team_source?.startsWith("http") ? (
+                  <a
+                    href={t.team_source}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-[11px] text-ink-3 hover:text-accent"
+                    title="Source"
+                  >
+                    ex-{t.former_team} ↗
+                  </a>
+                ) : (
+                  <span className="shrink-0 text-[11px] text-ink-3">ex-{t.former_team}</span>
+                ))}
               <span className="ml-auto text-[10px] text-ink-3">{t.league}</span>
             </div>
             <ul className="divide-y divide-border">

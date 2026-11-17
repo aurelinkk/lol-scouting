@@ -147,9 +147,37 @@ def apply_contract_ends(board, season):
     return board
 
 
+TEAM_CHANGES_FILE = "team_changes.csv"
+
+
+def team_changes(season):
+    """Équipes renommées ou remplacées pour `season` : {ancien nom: (nouveau, source)}.
+    Leaguepedia (table TeamRenames) + team_changes.csv (saisie manuelle, prioritaire :
+    season,old_team,new_team,source), ex. OpTic Gaming à la place de Dignitas en LCS 2027."""
+    out = {}
+    try:
+        rows = cargo_query(tables="TeamRenames", fields="Date=date,OriginalName=old,NewName=new",
+                           where=f"Date>='{season - 1}-09-01'", order_by="Date")
+        for r in rows:
+            if r["old"] and r["new"]:
+                out[r["old"]] = (r["new"], "Leaguepedia")
+    except Exception as e:  # pas de réseau
+        print(f"  (renommages d'équipes indisponibles : {e})")
+    if os.path.exists(TEAM_CHANGES_FILE):
+        manual = pd.read_csv(TEAM_CHANGES_FILE, dtype=str).fillna("")
+        for _, m in manual[manual["season"] == str(season)].iterrows():
+            out[m["old_team"]] = (m["new_team"], m["source"] or "saisie manuelle")
+    return out
+
+
 def build_mercato(games, season, refresh=False):
     """Effectif projeté de `season` pour chaque équipe LEC / ERL1 de `season - 1`."""
     board = base_rosters(games, season - 1)
+    # Équipes renommées / remplacées (ex : Dignitas -> OpTic Gaming en LCS 2027)
+    renames = team_changes(season)
+    board["former_team"] = board["team"].map(lambda t: t if t in renames else "")
+    board["team_source"] = board["team"].map(lambda t: renames[t][1] if t in renames else "")
+    board["team"] = board["team"].map(lambda t: renames[t][0] if t in renames else t)
     board["after"] = board["before"]
     board["status"] = board["before"].map(lambda p: "inchangé" if p else "")
     board["source"] = ""
@@ -162,6 +190,11 @@ def build_mercato(games, season, refresh=False):
     canon = lambda name: known.get(str(name).lower(), name)
     rumors["player"] = rumors["player"].map(canon)
     changes["player"] = changes["player"].map(canon)
+    # Rumeurs / transferts sous l'ancien nom de l'équipe -> nouveau nom
+    rename = lambda t: renames[t][0] if t in renames else t
+    rumors["team_start"] = rumors["team_start"].map(rename)
+    rumors["team_end"] = rumors["team_end"].map(rename)
+    changes["team"] = changes["team"].map(rename)
 
     events = []
     for _, c in changes.iterrows():
@@ -183,9 +216,26 @@ def build_mercato(games, season, refresh=False):
                for p in undecided}
     board["options"] = ""
 
+    # Plusieurs joueurs pour le même poste dans le même article (ex : Sheep du
+    # 10/11, « Shopify Rebellion envisage Vulcan ou Isles ») : une piste pour le
+    # poste, pas un transfert de chacun. Un article plus récent tranche.
+    rumors["role_n"] = rumors["role"].map(_role)
+    article = rumors["link"].fillna(rumors["source"]) if "link" in rumors else rumors["source"]
+    rumors["src_key"] = (rumors["day"] + "|" + rumors["team_end"].astype(str) + "|"
+                         + rumors["role_n"].astype(str) + "|" + article.astype(str))
+    n_players = (rumors[rumors["team_end"] != rumors["team_start"]]
+                 .groupby("src_key")["player"].nunique())
+    shortlist = set(n_players[n_players > 1].index)
+    for key in shortlist:
+        grp = rumors[rumors["src_key"] == key]
+        team, role = grp["team_end"].iloc[0], grp["role_n"].iloc[0]
+        slot = (board["team"] == team) & (board["role"] == role)
+        names = " ou ".join(sorted({str(p).split(" (")[0] for p in grp["player"]}))
+        board.loc[slot, "options"] = f"piste : {names} · {grp['source'].iloc[0]}"
+
     for _, r in rumors.iterrows():
         role = _role(r["role"])
-        if not role:
+        if not role or r["src_key"] in shortlist:
             continue
         status = "confirmé" if r["status"] == "Confirmed" else "rumeur"
         if r["player"] in undecided and r["team_end"] in options[r["player"]]:
@@ -215,40 +265,55 @@ def build_mercato(games, season, refresh=False):
     # départ avant l'arrivée (un départ + une arrivée le même jour = prolongation)
     order = {"Leave": 0, "Out": 0, "Stay": 1, "Join": 1}
     events.sort(key=lambda e: (e[0], e[1], order.get(e[2], 1)))
-    dest_of = {}  # dernière destination connue de chaque joueur
+    dest_of = {}     # dernière destination connue de chaque joueur
+    leave_info = {}  # dernier départ annoncé de chaque joueur : (statut, source, lien)
     board["url"] = None  # lien vers l'article / le post qui annonce le mouvement
+    cols = ["after", "status", "source", "url"]
+
+    def vacate(idx, player, info):
+        """Libère un poste. Si le joueur n'en était pas le titulaire de départ (une
+        rumeur l'y avait placé), le poste reprend le départ de son titulaire :
+        ex. Vitality jungle = départ de Lyncas, pas le lien de l'article Yukino."""
+        before = board.at[idx, "before"]
+        if isinstance(before, str) and before != player:
+            info = leave_info.get(before, ("départ", "", None))
+        board.loc[idx, cols] = [None, *info]
+
     for date, _, direction, player, team, role, status, source, dest, url in events:
         if dest:
             dest_of[player] = dest
         elif direction == "Join":
             dest_of[player] = team
-        if direction == "Out":
-            # parti hors de nos ligues : son poste se libère (son ancien poste s'il
-            # y était, ou celui où une rumeur plus ancienne l'avait placé)
-            for idx in board.index[board["after"] == player]:
-                board.loc[idx, ["after", "status", "source", "url"]] = [None, f"départ ({status})", source, url]
+        if direction in ("Leave", "Out"):
+            info = (f"départ ({status})", source, url)
+            leave_info[player] = info
+            scope = board.index if direction == "Out" else board.index[board["team"] == team]
+            # poste qu'il occupe (le sien, ou celui où une rumeur l'avait placé)
+            for idx in scope[board.loc[scope, "after"] == player]:
+                vacate(idx, player, info)
+            # son poste d'origine déjà libéré : on garde l'annonce la plus récente
+            # (ex : Naak Nako, tweet du 31/10 puis article Sheep du 17/11)
+            for idx in scope[(board.loc[scope, "before"] == player) & board.loc[scope, "after"].isna()]:
+                # ... sans repasser en « rumeur » un départ déjà officiel
+                if "confirmé" in str(board.at[idx, "status"]) and status != "confirmé":
+                    continue
+                board.loc[idx, ["status", "source", "url"]] = list(info)
             continue
         slot = (board["team"] == team) & (board["role"] == role)
         if not slot.any():
             continue
-        current = board.loc[slot, "after"].iloc[0]
-        if direction == "Leave":
-            if current == player:
-                board.loc[slot, ["after", "status", "source", "url"]] = [None, f"départ ({status})", source, url]
-            # le joueur quitte peut-être un autre poste de l'équipe
-            other = (board["team"] == team) & (board["after"] == player)
-            board.loc[other, ["after", "status", "source", "url"]] = [None, f"départ ({status})", source, url]
-        else:
-            # un joueur ne peut être qu'à un seul endroit
-            board.loc[board["after"] == player, ["after", "status", "source"]] = [None, "parti", source]
-            label = status if direction == "Join" else f"reste ({status})"
-            # Une rumeur qui remplace un joueur officialisé : on garde la trace
-            # (ex : LYON, Castle officiel le 08/09 puis rumeur Naak Nako le 17/11)
-            prev_status = board.loc[slot, "status"].iloc[0]
-            if (status == "rumeur" and prev_status == "confirmé" and isinstance(current, str)
-                    and current != player):
-                board.loc[slot, "options"] = f"officiel : {current}"
-            board.loc[slot, ["after", "status", "source", "url"]] = [player, label, source, url]
+        # un joueur ne peut être qu'à un seul endroit
+        leave_info[player] = ("parti", source, url)
+        for idx in board.index[(board["after"] == player) & ~slot]:
+            vacate(idx, player, ("parti", source, url))
+        label = status if direction == "Join" else f"reste ({status})"
+        board.loc[slot, cols] = [player, label, source, url]
+
+    # Piste tranchée depuis (ex : « Vulcan ou Isles », puis Vulcan annoncé) : note retirée
+    for idx in board.index[board["options"].astype(str).str.startswith("piste : ")]:
+        after = board.at[idx, "after"]
+        if isinstance(after, str) and after.split(" (")[0] in board.at[idx, "options"]:
+            board.at[idx, "options"] = ""
 
     # Destination des joueurs qui quittent leur équipe (si une rumeur ou un
     # transfert la donne) : ex. Yukino -> FlyQuest, Carzzy -> Movistar KOI
