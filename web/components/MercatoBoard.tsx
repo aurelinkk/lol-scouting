@@ -1,16 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { playerLink, REGION_INFO } from "@/lib/region";
+import { playerLink, REGION_INFO, type Region } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 
 import { useMemo, useState } from "react";
 import { TeamLogo } from "./Images";
 
+/** region : fiche dans l'autre région (ex : Naak Nako, joueur d'ERL, dans le mercato NA) */
+export interface MercatoPlayer {
+  name: string;
+  id?: string;
+  region?: Region;
+}
+
 export interface MercatoSlot {
   role: string;
-  before: { name: string; id?: string } | null;
-  after: { name: string; id?: string } | null;
+  before: MercatoPlayer | null;
+  after: MercatoPlayer | null;
+  /** Article / post qui annonce le mouvement (Sheep Esports, X...) */
+  url?: string | null;
   status: string;
   source?: string;
   /** Piste non tranchée (plusieurs destinations le même jour) */
@@ -35,7 +44,11 @@ function PlayerLink({ p, className }: { p: MercatoSlot["after"]; className?: str
   const region = useRegion();
   if (!p) return <span className="text-ink-3">—</span>;
   return p.id ? (
-    <Link href={playerLink(region, p.id)} className={`hover:underline ${className ?? ""}`} title={p.name}>
+    <Link
+      href={playerLink(p.region ?? region, p.id)}
+      className={`hover:underline ${className ?? ""}`}
+      title={p.region && p.region !== region ? `${p.name} · fiche ${REGION_INFO[p.region].name}` : p.name}
+    >
       {short(p.name)}
     </Link>
   ) : (
@@ -45,11 +58,11 @@ function PlayerLink({ p, className }: { p: MercatoSlot["after"]; className?: str
   );
 }
 
-function Badge({ status }: { status: string }) {
+function Badge({ status, url, source }: { status: string; url?: string | null; source?: string }) {
   if (!status || status === "inchangé") return null;
   const confirmed = status.includes("confirmé") || status === "manuel" || status.startsWith("fin de contrat");
   // Pastille pleine = officiel, anneau = rumeur (forme + couleur, pas la couleur seule)
-  return (
+  const dot = (
     <span
       className="inline-block h-2 w-2 shrink-0 rounded-full"
       style={
@@ -57,9 +70,24 @@ function Badge({ status }: { status: string }) {
           ? { background: "var(--good)" }
           : { border: "1.5px solid var(--text-3)", background: "transparent" }
       }
-      title={status}
       aria-label={status}
     />
+  );
+  // Avec un lien : la pastille + ↗ ouvrent l'article (Sheep Esports, X...)
+  return url ? (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex shrink-0 items-center gap-0.5 text-[10px] text-ink-3 hover:text-accent"
+      title={`${status}${source ? ` · ${source}` : ""} — ouvrir la source`}
+    >
+      {dot}↗
+    </a>
+  ) : (
+    <span className="flex shrink-0" title={status}>
+      {dot}
+    </span>
   );
 }
 
@@ -127,7 +155,7 @@ export default function MercatoBoard({
                       <span className="truncate">
                         <PlayerLink p={s.after} className={unchanged ? "text-ink-3" : "font-semibold"} />
                       </span>
-                      <Badge status={s.status} />
+                      <Badge status={s.status} url={s.url} source={s.source} />
                     </span>
                     {s.to && (
                       <span className="col-span-4 -mt-1 truncate text-right text-[11px] text-ink-3">
@@ -177,7 +205,7 @@ export default function MercatoBoard({
           (Sheep Esports, X…)
         </span>
         <span>
-          Saison {season} · survole un poste pour voir sa source · corrections possibles dans{" "}
+          ↗ = ouvrir l&apos;article ou le post · Saison {season} · corrections possibles dans{" "}
           <code>rosters_{season}.csv</code>
         </span>
       </p>

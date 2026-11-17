@@ -42,6 +42,10 @@ def _role(r):
     return r if r in ROLES else None
 
 
+def _url(value):
+    return value if isinstance(value, str) and value.startswith("http") else None
+
+
 def fetch_events(season, refresh=False):
     """Rumeurs et changements officiels depuis septembre de la saison précédente."""
     since = f"{season - 1}-09-01"
@@ -51,18 +55,24 @@ def fetch_events(season, refresh=False):
              and all(time.time() - os.path.getmtime(p) < EVENTS_MAX_AGE_HOURS * 3600
                      for p in paths.values()))
     if fresh:
-        return pd.read_csv(paths["rumors"]), pd.read_csv(paths["changes"])
+        rumors, changes = pd.read_csv(paths["rumors"]), pd.read_csv(paths["changes"])
+        if "link" in rumors and "link" in changes:  # ancien cache sans les liens : on retélécharge
+            return rumors, changes
     rumors = pd.DataFrame(cargo_query(
         tables="RosterRumors",
         fields="Date=date,Player=player,TeamStart=team_start,TeamEnd=team_end,"
-               "RoleEnd=role,Status=status,NotHappening=not_happening,SourceSite=source",
+               "RoleEnd=role,Status=status,NotHappening=not_happening,SourceSite=source,"
+               "SourceLink=link",
         where=f"Date>='{since}'"),
-        columns=["date", "player", "team_start", "team_end", "role", "status", "not_happening", "source"])
+        columns=["date", "player", "team_start", "team_end", "role", "status", "not_happening", "source",
+                 "link"])
     changes = pd.DataFrame(cargo_query(
         tables="RosterChanges",
-        fields="Date_Sort=date,Player=player,Team=team,Direction=direction,Role=role",
+        fields="Date_Sort=date,Player=player,Team=team,Direction=direction,Role=role,Source=ref",
         where=f"Date_Sort>='{since}'"),
-        columns=["date", "player", "team", "direction", "role"])
+        columns=["date", "player", "team", "direction", "role", "ref"])
+    # Source : "https://x.com/...;;;Titre;;;x.com;;;..." -> première URL
+    changes["link"] = changes["ref"].astype(str).str.extract(r"(https?://[^;\s]+)")[0]
     os.makedirs(RAW_DIR, exist_ok=True)
     rumors.to_csv(paths["rumors"], index=False)
     changes.to_csv(paths["changes"], index=False)
@@ -158,7 +168,7 @@ def build_mercato(games, season, refresh=False):
         role = _role(c["role"])
         if role and c["team"] in teams:
             events.append((str(c["date"])[:10], 1, c["direction"], c["player"], c["team"], role,
-                           "confirmé", "Leaguepedia", None))
+                           "confirmé", "Leaguepedia", None, _url(c.get("link"))))
     # Plusieurs destinations le même jour pour un joueur (ex : SkewMond, article
     # Sheep du 10/11 citant Karmine Corp ET Team Vitality) : rien n'est tranché,
     # on ne le place nulle part et on garde les pistes pour l'affichage
@@ -186,27 +196,28 @@ def build_mercato(games, season, refresh=False):
                                           f" · {r['source']}")
             if r["team_start"] in teams:
                 events.append((str(r["date"])[:10], 0, "Leave", r["player"], r["team_start"], role,
-                               status, r["source"], None))
+                               status, r["source"], None, _url(r.get("link"))))
             continue
         if r["team_start"] in teams and r["team_start"] != r["team_end"]:
             events.append((str(r["date"])[:10], 0, "Leave", r["player"], r["team_start"], role,
-                           status, r["source"], r["team_end"]))
+                           status, r["source"], r["team_end"], _url(r.get("link"))))
         if r["team_end"] not in teams and r["team_start"] != r["team_end"]:
             # Destination hors de nos ligues (ex : Yukino, KC Blue -> FlyQuest en
             # LCS) : il quitte le poste où une rumeur plus ancienne l'avait placé
             events.append((str(r["date"])[:10], 0, "Out", r["player"], r["team_end"], role,
-                           status, r["source"], r["team_end"]))
+                           status, r["source"], r["team_end"], _url(r.get("link"))))
         if r["team_end"] in teams:
             kind = "Stay" if r["team_start"] == r["team_end"] else "Join"
             events.append((str(r["date"])[:10], 0, kind, r["player"], r["team_end"], role,
-                           status, r["source"], None))
+                           status, r["source"], None, _url(r.get("link"))))
 
     # Ordre chronologique ; à date égale : la rumeur avant l'officiel, et le
     # départ avant l'arrivée (un départ + une arrivée le même jour = prolongation)
     order = {"Leave": 0, "Out": 0, "Stay": 1, "Join": 1}
     events.sort(key=lambda e: (e[0], e[1], order.get(e[2], 1)))
     dest_of = {}  # dernière destination connue de chaque joueur
-    for date, _, direction, player, team, role, status, source, dest in events:
+    board["url"] = None  # lien vers l'article / le post qui annonce le mouvement
+    for date, _, direction, player, team, role, status, source, dest, url in events:
         if dest:
             dest_of[player] = dest
         elif direction == "Join":
@@ -215,7 +226,7 @@ def build_mercato(games, season, refresh=False):
             # parti hors de nos ligues : son poste se libère (son ancien poste s'il
             # y était, ou celui où une rumeur plus ancienne l'avait placé)
             for idx in board.index[board["after"] == player]:
-                board.loc[idx, ["after", "status", "source"]] = [None, f"départ ({status})", source]
+                board.loc[idx, ["after", "status", "source", "url"]] = [None, f"départ ({status})", source, url]
             continue
         slot = (board["team"] == team) & (board["role"] == role)
         if not slot.any():
@@ -223,15 +234,21 @@ def build_mercato(games, season, refresh=False):
         current = board.loc[slot, "after"].iloc[0]
         if direction == "Leave":
             if current == player:
-                board.loc[slot, ["after", "status", "source"]] = [None, f"départ ({status})", source]
+                board.loc[slot, ["after", "status", "source", "url"]] = [None, f"départ ({status})", source, url]
             # le joueur quitte peut-être un autre poste de l'équipe
             other = (board["team"] == team) & (board["after"] == player)
-            board.loc[other, ["after", "status", "source"]] = [None, f"départ ({status})", source]
+            board.loc[other, ["after", "status", "source", "url"]] = [None, f"départ ({status})", source, url]
         else:
             # un joueur ne peut être qu'à un seul endroit
             board.loc[board["after"] == player, ["after", "status", "source"]] = [None, "parti", source]
             label = status if direction == "Join" else f"reste ({status})"
-            board.loc[slot, ["after", "status", "source"]] = [player, label, source]
+            # Une rumeur qui remplace un joueur officialisé : on garde la trace
+            # (ex : LYON, Castle officiel le 08/09 puis rumeur Naak Nako le 17/11)
+            prev_status = board.loc[slot, "status"].iloc[0]
+            if (status == "rumeur" and prev_status == "confirmé" and isinstance(current, str)
+                    and current != player):
+                board.loc[slot, "options"] = f"officiel : {current}"
+            board.loc[slot, ["after", "status", "source", "url"]] = [player, label, source, url]
 
     # Destination des joueurs qui quittent leur équipe (si une rumeur ou un
     # transfert la donne) : ex. Yukino -> FlyQuest, Carzzy -> Movistar KOI

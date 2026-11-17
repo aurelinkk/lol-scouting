@@ -179,11 +179,30 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
             return {"team": team, "logo": logos.get(team), "league": league, "tier": tier,
                     "region": region}
 
+        # Joueurs de l'autre région (ex : Naak Nako, Yukino dans le mercato NA) :
+        # lien vers leur fiche Europe / NA
+        other_region, other_dir = ("na", "web/data/na") if REGION == "eu" else ("eu", "web/data")
+        other, other_last = {}, {}
+        if os.path.exists(f"{other_dir}/players.json"):
+            with open(f"{other_dir}/players.json", encoding="utf-8") as f:
+                for pid, p in json.load(f).items():
+                    other.setdefault(p["name"].lower(), pid)
+                    other.setdefault(re.sub(r"\s*\(.*\)$", "", p["name"]).lower(), pid)
+                    other_last[pid] = max((l["season"] for l in p.get("lines", [])), default=0)
+        own_last = games.groupby("player")["season"].max().to_dict()
+
         def slot(name):
             if not isinstance(name, str) or not name:
                 return None
             pid = resolve_name(name, games)
-            return {"name": name, "id": ids.get(pid) if pid else None}
+            oid = other.get(name.lower()) or other.get(re.sub(r"\s*\(.*\)$", "", name).lower())
+            # Même pseudo dans les deux régions (ex : Yukino de KC Blue et un Yukino
+            # NA de 2024) : on prend celui qui a joué le plus récemment
+            if oid and (not pid or other_last.get(oid, 0) > own_last.get(pid, 0)):
+                return {"name": name, "id": oid, "region": other_region}
+            if pid and pid in ids:
+                return {"name": name, "id": ids[pid]}
+            return {"name": name}
 
         teams = []
         for (league, tier, team), grp in board.groupby(["league", "tier", "team"], sort=False):
@@ -193,7 +212,8 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                           "changed": changed, "slots": [
                 {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
                  "status": r["status"], "source": r["source"] or None,
-                 "options": r.get("options") or None, "to": destination(r.get("to"))}
+                 "options": r.get("options") or None, "to": destination(r.get("to")),
+                 "url": r.get("url") if isinstance(r.get("url"), str) else None}
                 for _, r in grp.iterrows()
                 if r["role"] != "Coach" or isinstance(r["before"], str) or isinstance(r["after"], str)]})
         board_teams = set(board["team"])
