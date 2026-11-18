@@ -146,19 +146,21 @@ def weighted_zscores(stats, group_keys):
 
 
 def blend_international(league_rows, season):
-    """1re division (LEC / LCS) : ajoute les tournois internationaux (Worlds,
-    MSI, EWC, First Stand, voir intl.py) et écarte davantage les joueurs de LEC
-    entre eux (scoring.TOP_LEAGUE_SPREAD).
+    """1re division (LEC / LCS) : bonus des tournois internationaux (Worlds, MSI,
+    EWC, First Stand, voir intl.py) et écart élargi entre joueurs de LEC
+    (scoring.TOP_LEAGUE_SPREAD).
 
     Aux internationaux, chaque joueur est comparé à tous ceux de son poste (LCK,
-    LPL...). Ce z-score est ramené à l'échelle de la LEC (écart moyen entre le
-    score LEC et le score international des joueurs de LEC présents), puis
-    mélangé au score LEC selon le nombre de parties (une partie internationale
-    compte INTL_GAME_WEIGHT fois)."""
+    LPL...) : z-score. On y ajoute l'écart de niveau entre l'international et
+    la LEC (écart moyen entre le score LEC et le score international des
+    joueurs de LEC présents), pour qu'une perf. moyenne aux Worlds rapporte déjà.
+    Bonus = INTL_WEIGHT x (z + écart) x parties / (parties + INTL_SHRINK_GAMES),
+    comme le bonus EMEA Masters des joueurs d'ERL."""
     league_rows = league_rows.copy()
     top = league_rows["tier"] == "LEC"
     league_rows["intl_games"] = 0
     league_rows["intl_score"] = float("nan")
+    league_rows["intl_bonus"] = 0.0
     try:
         from intl import load_intl
         intl = load_intl(season)
@@ -172,13 +174,13 @@ def blend_international(league_rows, season):
         n = istats.set_index("player")["games"]
         rows = league_rows[top & league_rows["player"].isin(z.index)]
         if len(rows):
-            gap = (rows["score"] - rows["player"].map(z)).mean() if len(rows) >= 5 else 0.0
+            gap = max(0.0, (rows["score"] - rows["player"].map(z)).mean()) if len(rows) >= 5 else 0.0
             for idx, r in rows.iterrows():
-                n_lec, n_int = r["games"], n[r["player"]] * scoring.INTL_GAME_WEIGHT
-                on_scale = z[r["player"]] + gap
-                league_rows.at[idx, "score"] = (n_lec * r["score"] + n_int * on_scale) / (n_lec + n_int)
-                league_rows.at[idx, "intl_games"] = int(n[r["player"]])
+                games = n[r["player"]]
+                league_rows.at[idx, "intl_games"] = int(games)
                 league_rows.at[idx, "intl_score"] = round(float(z[r["player"]]), 3)
+                league_rows.at[idx, "intl_bonus"] = (scoring.INTL_WEIGHT * (z[r["player"]] + gap)
+                                                     * games / (games + scoring.INTL_SHRINK_GAMES))
     league_rows.loc[top, "score"] = league_rows.loc[top, "score"] * scoring.TOP_LEAGUE_SPREAD
     return league_rows
 
@@ -287,7 +289,8 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
             ranking["soloq_bonus"] = (SOLOQ_WEIGHT * (1 - (ranking["soloq_rank"] - 1)
                                                       / ranking["soloq_ladder_size"])).fillna(0)
 
-    ranking["final"] = (ranking["league_score"] + ranking["league_bonus"]
+    ranking["intl_bonus"] = ranking.get("intl_bonus", pd.Series(0.0, index=ranking.index)).fillna(0.0)
+    ranking["final"] = (ranking["league_score"] + ranking["league_bonus"] + ranking["intl_bonus"]
                         + EM_WEIGHT * ranking["em_score"].fillna(0) + ranking["soloq_bonus"]
                         + ranking["ex_lec_malus"])
 

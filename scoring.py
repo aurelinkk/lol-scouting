@@ -137,10 +137,11 @@ TEAM_ADJUST = {"LEC": 0.2, "ERL1": 0.0, "ERL2": 0.0}
 # facteur (les meilleurs de LEC se détachent nettement des meilleurs prospects).
 TOP_LEAGUE_SPREAD = 1.5
 # Tournois internationaux (Worlds, MSI, EWC, First Stand ; python intl.py) :
-# parties nécessaires pour compter, et poids d'une partie internationale par
-# rapport à une partie de LEC dans le score.
+# bonus = INTL_WEIGHT x (perf. vs le monde + écart de niveau international / LEC)
+# x parties / (parties + INTL_SHRINK_GAMES), comme le bonus EMEA Masters.
+INTL_WEIGHT = 0.5
 INTL_MIN_GAMES = 3
-INTL_GAME_WEIGHT = 2.0
+INTL_SHRINK_GAMES = 10
 
 CROSS_MIN_GAMES = 5      # parties ERL2 vs ERL1 nécessaires pour compter
 CROSS_SHRINK_GAMES = 10  # tirées vers la moyenne générale avec ce poids

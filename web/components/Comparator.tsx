@@ -223,9 +223,12 @@ function Header({ pick, row, leagues }: { pick: Pick; row: RankingRow; leagues: 
         <dd className="text-right">{row.games}</dd>
         {row.intl_games ? (
           <>
-            <dt className="text-ink-3">Internationaux</dt>
+            <dt className="text-ink-3">Bonus internationaux</dt>
             <dd className="text-right">
-              {fmtScore(row.intl_score)} <span className="text-xs text-ink-3">({row.intl_games} p. vs le monde)</span>
+              {fmtScore(row.intl_bonus)}{" "}
+              <span className="text-xs text-ink-3">
+                ({row.intl_games} p., {fmtScore(row.intl_score)} vs le monde)
+              </span>
             </dd>
           </>
         ) : null}

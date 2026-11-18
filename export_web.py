@@ -363,7 +363,7 @@ def main():
     # --- Classements par saison --------------------------------------------
     rank_fields = ["season", "role", "team", "league_code", "tier", "age", "age_approx", "games",
                    "final", "league_score", "league_score_raw", "sample_factor",
-                   "league_bonus", "league_coef", "league_coef_base", "team_adjust", "team_mates", "intl_games", "intl_score", "em_score", "em_score_raw", "em_games",
+                   "league_bonus", "league_coef", "league_coef_base", "team_adjust", "team_mates", "intl_games", "intl_score", "intl_bonus", "em_score", "em_score_raw", "em_games",
                    "ex_lec", "ex_lec_malus", "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
                    "soloq_games", "soloq_winrate", "soloq_lp_7d", "soloq_games_7d",
                    "role_percentile", "played_lec"] + STATS
