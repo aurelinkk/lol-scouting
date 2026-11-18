@@ -139,11 +139,14 @@ TALENT_USE_NEXT_SEASON = True
 # montés (python prospects.py --calibrate-top).
 # Calibré avec Oracle's Elixir : Europe 1.43 (39 montés, 1.16 à 1.66 selon la
 # saison), NA 0.70 avec Oracle's Elixir (17 montés). Recalculer : python prospects.py --calibrate-top
-TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.70, "kr": 1.0}  # kr : provisoire, à calibrer
+# Recalibré le 18/11 avec les poids actuels (winrate, supports) : Europe 1.50
+# (39 montés), NA 0.93 (17), Corée 0.32 (23 : les meilleurs de LCK CL sont
+# déjà au niveau d'un titulaire moyen de LCK).
+TOP_LEAGUE_BONUS = {"eu": 1.5, "na": 0.9, "kr": 0.3}
 # Régions sans EMEA Masters mais avec une 3e division (Corée : LCK Academy Series) :
 # malus fixe des joueurs de 3e division par rapport à la 2e (calibré comme le
 # bonus de 1re division : python prospects.py --calibrate-top)
-THIRD_TIER_MALUS = {"kr": -0.5}  # provisoire, à calibrer
+THIRD_TIER_MALUS = {"kr": -0.6}  # calibré le 18/11 : 49 montés Academy -> LCK CL
 # Part de la moyenne des coéquipiers retirée au score d'un joueur, par niveau :
 # 0.5 = on juge à moitié sa performance par rapport à son équipe. 0 en ERL pour
 # garder le calibrage des montées (ajustable).
