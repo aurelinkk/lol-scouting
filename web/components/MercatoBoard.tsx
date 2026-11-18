@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { playerLink, REGION_INFO, type Region } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { TeamLogo } from "./Images";
@@ -18,6 +18,7 @@ export type CellState = "team" | "rumor_in" | "rumor_out" | "out" | "in" | "fa" 
 export type Change = "stay" | "leave" | "new";
 
 export interface MercatoCoach extends MercatoPlayer {
+  live?: boolean;
   role: string;
   change: Change;
   state?: CellState;
@@ -29,6 +30,8 @@ export interface MercatoCoach extends MercatoPlayer {
 
 export interface MercatoSlot {
   role: string;
+  /** Modifié par le rafraîchissement en ligne (depuis l'export) */
+  live?: boolean;
   before: MercatoPlayer | null;
   after: MercatoPlayer | null;
   left?: CellState | null;
@@ -118,6 +121,7 @@ function Cell({
   title,
   bold,
   note,
+  fresh,
 }: {
   p: MercatoPlayer | null;
   state?: CellState | null;
@@ -125,13 +129,21 @@ function Cell({
   title: string;
   bold?: boolean;
   note?: string;
+  /** Nouveauté depuis l'export (rafraîchissement en ligne) */
+  fresh?: boolean;
 }) {
-  if (!p) return <div className="rounded-[5px] border border-dashed border-border px-2 py-1 text-ink-3">—</div>;
+  const ring = fresh ? { boxShadow: "inset 0 0 0 1.5px var(--accent)" } : undefined;
+  if (!p)
+    return (
+      <div className="rounded-[5px] border border-dashed border-border px-2 py-1 text-ink-3" style={ring}>
+        —
+      </div>
+    );
   return (
     <div
       className="flex min-w-0 items-center rounded-[5px] px-2 py-1"
-      style={{ background: bg(state) }}
-      title={title}
+      style={{ background: bg(state), ...ring }}
+      title={fresh ? `Nouveau depuis l'export · ${title}` : title}
     >
       <span className="min-w-0 truncate">
         <PlayerLink p={p} className={bold ? "font-semibold" : ""} />
@@ -188,7 +200,7 @@ function TeamCard({ t, season }: { t: MercatoTeam; season: number }) {
             <div key={s.role} className="contents">
               <span className="self-center text-[10px] font-medium uppercase tracking-wide text-ink-3">{s.role}</span>
               <Cell p={s.before} state={s.left} title={title} />
-              <Cell p={s.after} state={s.right} url={s.url} title={title} bold={!unchanged} />
+              <Cell p={s.after} state={s.right} url={s.url} title={title} bold={!unchanged} fresh={s.live} />
               {(note || piste) && (
                 <span className="col-span-2 col-start-2 -mt-0.5 truncate text-right text-[10.5px] text-ink-3" title={piste ?? note ?? ""}>
                   {note}
@@ -224,6 +236,7 @@ function TeamCard({ t, season }: { t: MercatoTeam; season: number }) {
                   title={`${c.role} · ${c.status ?? ""}${c.source ? ` · ${c.source}` : ""}`}
                   bold={c.change === "new"}
                   note={coachNote(c.role)}
+                  fresh={c.live}
                 />
               ))}
             </div>
@@ -234,16 +247,69 @@ function TeamCard({ t, season }: { t: MercatoTeam; season: number }) {
   );
 }
 
+interface LiveChange {
+  date: string;
+  text: string;
+  url: string | null;
+  official: boolean;
+}
+interface Live {
+  updatedAt: number;
+  since: string;
+  mercato: { teams: MercatoTeam[]; undecided?: { player: string; id?: string; options: string[] }[]; generated?: string };
+  changes: LiveChange[];
+}
+
+function ago(ms: number) {
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
+}
+
 export default function MercatoBoard({
   season,
-  teams,
-  undecided = [],
+  teams: baseTeams,
+  undecided: baseUndecided = [],
+  generated,
 }: {
   season: number;
   teams: MercatoTeam[];
   undecided?: { player: string; id?: string; options: string[] }[];
+  /** Date de l'export du mercato publié */
+  generated?: string;
 }) {
   const region = useRegion();
+  const [live, setLive] = useState<Live | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Version rafraîchie en ligne, seulement si elle part du mercato publié actuel
+  const usable = live && live.mercato.generated === generated ? live : null;
+  const teams = usable?.mercato.teams ?? baseTeams;
+  const undecided = usable?.mercato.undecided ?? baseUndecided;
+
+  useEffect(() => {
+    fetch(`/api/mercato?region=${region}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.live && setLive(d.live))
+      .catch(() => {});
+  }, [region]);
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/mercato?region=${region}`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
+      if (d.live) setLive(d.live);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
   const top = REGION_INFO[region].top;
   const leagues = useMemo(() => {
     const codes = [...new Set(teams.map((t) => t.league))];
@@ -273,8 +339,40 @@ export default function MercatoBoard({
         </label>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-md border border-accent bg-accent-soft px-3 py-1.5 text-sm font-medium text-ink hover:brightness-95 disabled:opacity-70"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" strokeLinecap="round" />
+            <path d="M21 3v6h-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {loading ? "Recherche des nouveautés…" : "Actualiser le mercato"}
+        </button>
+        <span className="text-ink-3">
+          {loading
+            ? "Rumeurs (Sheep Esports, X…) et transferts officiels sur Leaguepedia"
+            : usable
+              ? `À jour ${ago(usable.updatedAt)} · ${usable.changes.length} nouveauté${usable.changes.length > 1 ? "s" : ""} depuis l'export du ${generated ?? "?"}`
+              : `Export du ${generated ?? "?"} · actualise pour voir les dernières news`}
+        </span>
+        {error && <span className="text-critical">Échec : {error}</span>}
+      </div>
+
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div
+          className={`relative grid flex-1 gap-3 transition-opacity sm:grid-cols-2 xl:grid-cols-3 ${loading ? "pointer-events-none opacity-50" : ""}`}
+          aria-busy={loading}
+        >
           {shown.map((t) => (
             <TeamCard key={t.team} t={t} season={season} />
           ))}
@@ -282,6 +380,38 @@ export default function MercatoBoard({
         </div>
 
         <aside className="shrink-0 space-y-3 lg:sticky lg:top-20 lg:w-60">
+          {usable && usable.changes.length > 0 && (
+            <div className="rounded-lg border border-accent bg-surface p-3">
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-3">
+                Nouveautés ({usable.changes.length})
+              </div>
+              <ul className="max-h-72 space-y-1.5 overflow-y-auto text-xs">
+                {usable.changes.map((c, i) => (
+                  <li key={i} className="flex gap-1.5">
+                    <span
+                      className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
+                      style={
+                        c.official
+                          ? { background: "var(--good)" }
+                          : { border: "1.5px solid var(--text-3)" }
+                      }
+                      title={c.official ? "officiel" : "rumeur"}
+                    />
+                    <span className="min-w-0">
+                      <span className="text-ink-3">{c.date.slice(5).split("-").reverse().join("/")} · </span>
+                      {c.text}
+                      {c.url && (
+                        <a href={c.url} target="_blank" rel="noreferrer" className="ml-1 text-ink-3 hover:text-accent">
+                          ↗
+                        </a>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[11px] text-ink-3">Cases entourées = nouveautés depuis l&apos;export.</p>
+            </div>
+          )}
           <div className="rounded-lg border border-border bg-surface p-3">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Légende</div>
             {[

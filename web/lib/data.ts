@@ -39,6 +39,8 @@ export interface Mercato {
   season: number;
   teams: MercatoTeam[];
   undecided?: { player: string; id?: string; options: string[] }[];
+  /** Date de l'export (« 2026-11-18 08:10 ») : le rafraîchissement en ligne part de là */
+  generated?: string;
 }
 
 export const getMercato = (region: Region = "eu"): Mercato | null => {

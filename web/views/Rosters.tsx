@@ -32,7 +32,7 @@ export default function RostersPage({ region }: { region: Region }) {
               transferts officiels et rumeurs. Sert aussi aux montées {mercato.season - 1} → {mercato.season}.
             </p>
           </div>
-          <MercatoBoard season={mercato.season} teams={mercato.teams} undecided={mercato.undecided} />
+          <MercatoBoard season={mercato.season} teams={mercato.teams} undecided={mercato.undecided} generated={mercato.generated} />
         </section>
       )}
 

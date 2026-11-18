@@ -71,11 +71,23 @@ def record(row, fields):
     return out
 
 
+def no_nan(value):
+    """NaN / infini -> None partout (le JSON ne les accepte pas : le site ne
+    compilerait plus)."""
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return None
+    if isinstance(value, dict):
+        return {k: no_nan(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [no_nan(v) for v in value]
+    return value
+
+
 def write(name, data, directory=OUT_DIR):
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, name)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+        json.dump(no_nan(data), f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     print(f"  {path} ({os.path.getsize(path) / 1024:.0f} Ko)")
 
 
@@ -270,10 +282,12 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
             changed = (any(st not in ("inchangé", "") for st in grp["status"])
                        or any(isinstance(o, str) and o for o in grp.get("options", [])))
             former = grp["former_team"].iloc[0] if "former_team" in grp else ""
+            former = former if isinstance(former, str) and former else None
+            source = grp["team_source"].iloc[0] if former and "team_source" in grp else None
             teams.append({"league": league, "tier": tier, "team": team,
-                          "logo": logos.get(team) or logos.get(former),
-                          "former_team": former or None,
-                          "team_source": (grp["team_source"].iloc[0] or None) if former else None,
+                          "logo": logos.get(team) or (logos.get(former) if former else None),
+                          "former_team": former,
+                          "team_source": source if isinstance(source, str) and source else None,
                           "coaches": coach_list(team),
                           "changed": changed or bool(former), "slots": [
                 {"role": r["role"], "before": slot(r["before"]), "after": slot(r["after"]),
@@ -287,7 +301,8 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
         undecided = [{"player": p, "id": ids.get(resolve_name(p, games) or ""), "options": o}
                      for p, o in board.attrs.get("undecided", {}).items()
                      if any(t in board_teams for t in o)]
-        write("mercato.json", {"season": next_season, "teams": teams, "undecided": undecided})
+        write("mercato.json", {"season": next_season, "teams": teams, "undecided": undecided,
+                               "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")})
     elif os.path.exists(os.path.join(OUT_DIR, "mercato.json")):
         os.remove(os.path.join(OUT_DIR, "mercato.json"))
 
