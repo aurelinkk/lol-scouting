@@ -4,6 +4,7 @@
     python run_all.py --regions kr     # une seule région
     python run_all.py --full           # retélécharge aussi la saison en cours
     python run_all.py --no-push        # sans envoyer sur GitHub
+    python run_all.py --mercato        # seulement le mercato (rumeurs Sheep, X, transferts) : 2 min
 
 Étapes (chacune est sautée proprement si elle échoue, le résumé le dit) :
   1. git pull (arrêt si ça échoue : rien n'est lancé sur un vieux code)
@@ -72,6 +73,8 @@ def main():
     parser.add_argument("--full", action="store_true", help="retélécharger aussi la saison en cours")
     parser.add_argument("--no-push", action="store_true")
     parser.add_argument("--skip-soloq", action="store_true")
+    parser.add_argument("--mercato", action="store_true",
+                        help="seulement le mercato des régions (rumeurs, transferts, contrats)")
     args = parser.parse_args()
     py = sys.executable
     status = {}
@@ -79,6 +82,13 @@ def main():
 
     # 1. Code à jour (sinon on calcule avec une vieille version)
     run(["git", "pull", "--no-rebase"], check=True)
+
+    if args.mercato:
+        for region in args.regions:
+            status[f"mercato {region}"] = run([py, "export_web.py", "--only", "mercato"], region)
+        push(args, status)
+        summary(status)
+        return
 
     # 2. Matchs pros
     for region in args.regions:
@@ -108,15 +118,23 @@ def main():
         run([py, "prospects.py", "--calibrate-top"], region)
 
     # 7. Envoi
-    if not args.no_push:
-        run(["git", "add", "web/data", "web/public/data"])
-        run(["git", "commit", "-m", f"Donnees {datetime.date.today()}"])
-        if not run(["git", "push"]):
-            run(["git", "pull", "--no-rebase"])
-            status["envoi"] = run(["git", "push"])
-        else:
-            status["envoi"] = True
+    push(args, status)
+    summary(status)
 
+
+def push(args, status):
+    if args.no_push:
+        return
+    run(["git", "add", "web/data", "web/public/data"])
+    run(["git", "commit", "-m", f"Donnees {datetime.date.today()}"])
+    if not run(["git", "push"]):
+        run(["git", "pull", "--no-rebase"])
+        status["envoi"] = run(["git", "push"])
+    else:
+        status["envoi"] = True
+
+
+def summary(status):
     log("===== Résumé =====")
     for step, ok in status.items():
         log(f"  {'OK    ' if ok else 'ÉCHEC '} {step}")
