@@ -337,8 +337,13 @@ def main():
         games = load_games(seasons)
         _, logos = get_image_urls()
         print("Export web :")
-        export_mercato(games, player_ids(games["player"].unique()), logos, max(seasons) + 1,
-                       refresh=True)
+        # Identifiants déjà publiés (fiches du site), complétés si besoin
+        ids = player_ids(games["player"].unique())
+        published = os.path.join(OUT_DIR, "players.json")
+        if os.path.exists(published):
+            with open(published, encoding="utf-8") as f:
+                ids.update({p["name"]: pid for pid, p in json.load(f).items()})
+        export_mercato(games, ids, logos, max(seasons) + 1, refresh=True)
         return
 
     games = load_games(seasons)
