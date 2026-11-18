@@ -193,11 +193,11 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
             with open(path, encoding="utf-8") as f:
                 for pid, p in json.load(f).items():
                     last = max((l["season"] for l in p.get("lines", [])), default=0)
+                    other_last[(other_region, pid)] = last
                     for key in (p["name"].lower(), re.sub(r"\s*\(.*\)$", "", p["name"]).lower()):
                         # même pseudo dans plusieurs régions : le plus récent
                         if key not in other or other_last[other[key]] < last:
                             other[key] = (other_region, pid)
-                    other_last[(other_region, pid)] = last
         own_last = games.groupby("player")["season"].max().to_dict()
 
         def slot(name):
