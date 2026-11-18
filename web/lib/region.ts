@@ -3,8 +3,8 @@
 // (web/data/na, web/public/data/na). Même code de niveaux qu'en Europe :
 // "LEC" = 1re division (LCS en NA), "ERL1" = 2e division (NACL).
 
-export type Region = "eu" | "na";
-export const REGIONS: Region[] = ["eu", "na"];
+export type Region = "eu" | "na" | "kr";
+export const REGIONS: Region[] = ["eu", "na", "kr"];
 
 export interface RegionInfo {
   name: string;
@@ -17,6 +17,8 @@ export interface RegionInfo {
   hasEm: boolean;
   hasLeagues: boolean;
   hasSoloq: boolean;
+  /** 3e division suivie (ERL2 en Europe, LCK Academy Series en Corée) */
+  hasErl2: boolean;
   /** Âge max des « meilleurs prospects » (la NACL est plus âgée que les ERL) */
   prospectMaxAge: number;
 }
@@ -31,6 +33,7 @@ export const REGION_INFO: Record<Region, RegionInfo> = {
     hasEm: true,
     hasLeagues: true,
     hasSoloq: true,
+    hasErl2: true,
     prospectMaxAge: 21,
   },
   na: {
@@ -42,23 +45,41 @@ export const REGION_INFO: Record<Region, RegionInfo> = {
     hasEm: false,
     hasLeagues: false,
     hasSoloq: false,
+    hasErl2: false,
     prospectMaxAge: 23,
+  },
+  kr: {
+    name: "Corée",
+    short: "KR",
+    tiers: { LEC: "LCK", ERL1: "LCK CL", ERL2: "Academy", EM: "Tournoi international", OTHER: "Autre région" },
+    top: "LCK",
+    lower: "LCK CL et Academy",
+    hasEm: false,
+    hasLeagues: false,
+    hasSoloq: false,
+    hasErl2: true,
+    prospectMaxAge: 21,
   },
 };
 
 export const tierName = (tier: string, region: Region = "eu") => REGION_INFO[region].tiers[tier] ?? tier;
 
 export function regionFromPath(pathname: string): Region {
-  return pathname === "/na" || pathname.startsWith("/na/") ? "na" : "eu";
+  for (const r of ["na", "kr"] as const) if (pathname === `/${r}` || pathname.startsWith(`/${r}/`)) return r;
+  return "eu";
 }
+
+/** Chemin sans le préfixe de région : "/kr/donnees" -> "/donnees" */
+export const stripRegion = (pathname: string) => pathname.replace(/^\/(na|kr)(?=\/|$)/, "") || "/";
 
 /** Lien interne dans la région : link("na", "/donnees") -> "/na/donnees" */
 export function link(region: Region, path: string): string {
   if (region === "eu") return path;
-  return path === "/" ? "/na" : `/na${path}`;
+  return path === "/" ? `/${region}` : `/${region}${path}`;
 }
 
 export const playerLink = (region: Region, id: string) => link(region, `/joueurs/${id}`);
 
 /** Fichier public (téléchargé par le navigateur) de la région */
-export const publicData = (region: Region, file: string) => (region === "eu" ? `/data/${file}` : `/data/na/${file}`);
+export const publicData = (region: Region, file: string) =>
+  region === "eu" ? `/data/${file}` : `/data/${region}/${file}`;

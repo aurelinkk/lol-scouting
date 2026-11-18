@@ -1,15 +1,14 @@
 import { Suspense } from "react";
 import Comparator, { type LeagueInfo } from "@/components/Comparator";
 import { getLeagues, getMeta, hasRegion } from "@/lib/data";
-import type { Region } from "@/lib/region";
+import { type Region, REGIONS } from "@/lib/region";
 
 export const metadata = { title: "Comparer · LoL Scouting" };
 
 export default function ComparerPage() {
-  const seasons = { eu: getMeta("eu").seasons, na: hasRegion("na") ? getMeta("na").seasons : [] } as Record<
-    Region,
-    number[]
-  >;
+  const seasons = Object.fromEntries(
+    REGIONS.map((r) => [r, hasRegion(r) ? getMeta(r).seasons : []]),
+  ) as Record<Region, number[]>;
   // Niveau des ligues européennes saison par saison (coef EM + niveau des joueurs)
   const leagues: LeagueInfo[] = getLeagues("eu").map((l) => ({
     code: l.code,

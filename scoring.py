@@ -113,6 +113,7 @@ ERL2_PARENT = {
     "PRM2": "PRM", "LFL2": "LFL", "ES2": "ES", "HM2": "HM",
     "ROL2": "ROL", "HLL2": "HLL", "AL2": "AL",
     "NLC2": "NLC", "RL2": "RL", "TCL2": "TCL", "LPLOL2": "LPLOL", "LIT2": "LIT",
+    "LCKAS": "LCKCL",
 }
 
 # Niveau de la ligue saison par saison, d'après ses joueurs (league_talent.py).
@@ -138,7 +139,11 @@ TALENT_USE_NEXT_SEASON = True
 # montés (python prospects.py --calibrate-top).
 # Calibré avec Oracle's Elixir : Europe 1.43 (39 montés, 1.16 à 1.66 selon la
 # saison), NA 0.70 avec Oracle's Elixir (17 montés). Recalculer : python prospects.py --calibrate-top
-TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.70}
+TOP_LEAGUE_BONUS = {"eu": 1.4, "na": 0.70, "kr": 1.0}  # kr : provisoire, à calibrer
+# Régions sans EMEA Masters mais avec une 3e division (Corée : LCK Academy Series) :
+# malus fixe des joueurs de 3e division par rapport à la 2e (calibré comme le
+# bonus de 1re division : python prospects.py --calibrate-top)
+THIRD_TIER_MALUS = {"kr": -0.5}  # provisoire, à calibrer
 # Part de la moyenne des coéquipiers retirée au score d'un joueur, par niveau :
 # 0.5 = on juge à moitié sa performance par rapport à son équipe. 0 en ERL pour
 # garder le calibrage des montées (ajustable).

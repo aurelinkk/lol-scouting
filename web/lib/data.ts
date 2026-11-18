@@ -14,8 +14,8 @@ function read<T>(...parts: string[]): T {
 }
 
 // Europe : data/ ; Amérique du Nord : data/na/
-const dir = (region: Region) => (region === "eu" ? ["data"] : ["data", "na"]);
-const pub = (region: Region) => (region === "eu" ? ["public", "data"] : ["public", "data", "na"]);
+const dir = (region: Region) => (region === "eu" ? ["data"] : ["data", region]);
+const pub = (region: Region) => (region === "eu" ? ["public", "data"] : ["public", "data", region]);
 
 /** La région a-t-elle été exportée ? (SCOUT_REGION=na python export_web.py) */
 export const hasRegion = (region: Region) =>

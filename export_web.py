@@ -143,7 +143,9 @@ def team_levels(season):
     (fichiers data/pro_games_* et data/na/pro_games_*) : sert à situer la
     destination d'un joueur qui change de région (ex : Yukino -> FlyQuest, LCS)."""
     out = {}
-    for region, data_dir in (("eu", "data"), ("na", "data/na")):
+    from region import ALL_REGIONS, data_dir as region_data_dir
+    for region in ALL_REGIONS:
+        data_dir = region_data_dir(region)
         path = f"{data_dir}/pro_games_{season}.csv"
         if not os.path.exists(path):
             continue
@@ -182,14 +184,20 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
 
         # Joueurs de l'autre région (ex : Naak Nako, Yukino dans le mercato NA) :
         # lien vers leur fiche Europe / NA
-        other_region, other_dir = ("na", "web/data/na") if REGION == "eu" else ("eu", "web/data")
-        other, other_last = {}, {}
-        if os.path.exists(f"{other_dir}/players.json"):
-            with open(f"{other_dir}/players.json", encoding="utf-8") as f:
+        from region import OTHER_REGIONS, web_data_dir
+        other, other_last = {}, {}  # nom -> (région, id) ; (région, id) -> dernière saison
+        for other_region in OTHER_REGIONS:
+            path = f"{web_data_dir(other_region)}/players.json"
+            if not os.path.exists(path):
+                continue
+            with open(path, encoding="utf-8") as f:
                 for pid, p in json.load(f).items():
-                    other.setdefault(p["name"].lower(), pid)
-                    other.setdefault(re.sub(r"\s*\(.*\)$", "", p["name"]).lower(), pid)
-                    other_last[pid] = max((l["season"] for l in p.get("lines", [])), default=0)
+                    last = max((l["season"] for l in p.get("lines", [])), default=0)
+                    for key in (p["name"].lower(), re.sub(r"\s*\(.*\)$", "", p["name"]).lower()):
+                        # même pseudo dans plusieurs régions : le plus récent
+                        if key not in other or other_last[other[key]] < last:
+                            other[key] = (other_region, pid)
+                    other_last[(other_region, pid)] = last
         own_last = games.groupby("player")["season"].max().to_dict()
 
         def slot(name):
@@ -197,10 +205,10 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                 return None
             pid = resolve_name(name, games)
             oid = other.get(name.lower()) or other.get(re.sub(r"\s*\(.*\)$", "", name).lower())
-            # Même pseudo dans les deux régions (ex : Yukino de KC Blue et un Yukino
-            # NA de 2024) : on prend celui qui a joué le plus récemment
+            # Même pseudo dans plusieurs régions (ex : Yukino de KC Blue, aussi en
+            # NACL en 2024) : on prend celui qui a joué le plus récemment
             if oid and (not pid or other_last.get(oid, 0) > own_last.get(pid, 0)):
-                return {"name": name, "id": oid, "region": other_region}
+                return {"name": name, "id": oid[1], "region": oid[0]}
             if pid and pid in ids:
                 return {"name": name, "id": ids[pid]}
             return {"name": name}
@@ -288,19 +296,20 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
 def other_region_games(players):
     """Parties de `players` dans l'autre région suivie (data/na/ vu d'Europe, data/
     vu de NA), pour la frise de carrière."""
-    other, data_dir = ("na", "data/na") if REGION == "eu" else ("eu", "data")
+    from region import OTHER_REGIONS, data_dir
     frames = []
-    for path in glob.glob(f"{data_dir}/pro_games_*.csv"):
-        season = int(re.search(r"(\d{4})\.csv$", path).group(1))
-        config = leagues_by_region(other).get(season)
-        if not config:
-            continue
-        g = pd.read_csv(path, parse_dates=["date"])
-        g = g[g["player"].isin(players)]
-        g["season"] = season
-        g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
-        g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
-        frames.append(g)
+    for other in OTHER_REGIONS:
+        for path in glob.glob(f"{data_dir(other)}/pro_games_*.csv"):
+            season = int(re.search(r"(\d{4})\.csv$", path).group(1))
+            config = leagues_by_region(other).get(season)
+            if not config:
+                continue
+            g = pd.read_csv(path, parse_dates=["date"])
+            g = g[g["player"].isin(players)]
+            g["season"] = season
+            g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
+            g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
+            frames.append(g)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 

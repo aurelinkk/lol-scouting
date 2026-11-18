@@ -119,13 +119,23 @@ LEAGUES_NA = {
     2026: _NA_COMMON,
 }
 
-from region import IS_EU  # noqa: E402
-LEAGUES = LEAGUES_EU if IS_EU else LEAGUES_NA
+# Corée (SCOUT_REGION=kr) : LCK = 1re division, LCK CL = 2e, LCK Academy Series = 3e
+_KR = {
+    "LoL Champions Korea": ("LCK", "LEC"),
+    "LCK Challengers League": ("LCKCL", "ERL1"),
+    "LCK Academy Series": ("LCKAS", "ERL2"),
+}
+LEAGUES_KR = {2023: _KR, 2024: _KR, 2025: _KR, 2026: _KR}
+
+_BY_REGION = {"eu": LEAGUES_EU, "na": LEAGUES_NA, "kr": LEAGUES_KR}
+
+from region import REGION  # noqa: E402
+LEAGUES = _BY_REGION[REGION]
 
 
 def leagues_by_region(region):
-    """Configuration d'une région précise (eu / na), quelle que soit SCOUT_REGION."""
-    return LEAGUES_EU if region == "eu" else LEAGUES_NA
+    """Configuration d'une région précise (eu / na / kr), quelle que soit SCOUT_REGION."""
+    return _BY_REGION[region]
 
 
 def leagues_for(year):

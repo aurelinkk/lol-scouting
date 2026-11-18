@@ -86,20 +86,26 @@ def mid_season_promotions(games, season):
 
 
 def other_region_destination(season):
-    """Plus haut niveau atteint en `season` dans l'AUTRE région (Europe <-> NA),
-    d'après ses matchs téléchargés (data/na/ ou data/). Ex : Gakgos, LFL2 2025
+    """Plus haut niveau atteint en `season` dans les AUTRES régions suivies
+    (Europe, NA, Corée), d'après leurs matchs téléchargés. Ex : Gakgos, LFL2 2025
     (Project Conquerors) -> FlyQuest en LCS 2026 : une montée en 1re division."""
     from leagues import leagues_by_region
-    from region import IS_EU
-    other, data_dir = ("na", "data/na") if IS_EU else ("eu", "data")
-    path = f"{data_dir}/pro_games_{season}.csv"
-    config = leagues_by_region(other).get(season)
-    if not os.path.exists(path) or not config:
+    from region import OTHER_REGIONS, data_dir
+    frames = []
+    for other in OTHER_REGIONS:
+        path = f"{data_dir(other)}/pro_games_{season}.csv"
+        config = leagues_by_region(other).get(season)
+        if not os.path.exists(path) or not config:
+            continue
+        g = pd.read_csv(path, parse_dates=["date"])
+        g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
+        g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
+        frames.append(destination(g))
+    if not frames:
         return pd.DataFrame(columns=["player", "new_level", "new_team", "new_league", "first_game"])
-    g = pd.read_csv(path, parse_dates=["date"])
-    g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
-    g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
-    return destination(g)
+    order = {"LEC": 0, "ERL1": 1, "ERL2": 2}
+    d = pd.concat(frames, ignore_index=True)
+    return d.assign(_l=d["new_level"].map(order)).sort_values("_l").drop_duplicates("player").drop(columns="_l")
 
 
 def previous_club(games, promoted):

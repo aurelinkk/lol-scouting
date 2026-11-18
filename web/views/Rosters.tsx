@@ -14,7 +14,11 @@ export default function RostersPage({ region }: { region: Region }) {
       <div>
         <h1 className="text-xl font-semibold">Rosters</h1>
         <p className="text-sm text-ink-2">
-          {region === "eu" ? "Effectifs de la LEC et des ERL1" : "Effectifs de la LCS et de la NACL"} depuis 2023, d&apos;après les parties jouées, et le mercato de la saison à
+          {region === "eu"
+            ? "Effectifs de la LEC et des ERL1"
+            : region === "na"
+              ? "Effectifs de la LCS et de la NACL"
+              : "Effectifs de la LCK et de la LCK CL"} depuis 2023, d&apos;après les parties jouées, et le mercato de la saison à
           venir.
         </p>
       </div>

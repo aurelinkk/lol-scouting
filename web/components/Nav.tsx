@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { link, REGION_INFO, type Region, REGIONS, regionFromPath } from "@/lib/region";
+import { link, REGION_INFO, type Region, REGIONS, regionFromPath, stripRegion } from "@/lib/region";
 
 // Onglets : les pages Ligues, Ladder et Analyses n'existent que pour l'Europe
 // global : même page pour les deux régions (pas de version /na)
@@ -20,7 +20,7 @@ const SHARED = ["/", "/donnees", "/montees", "/rosters"];
 
 /** Même page dans l'autre région (fiche joueur -> Données : les fiches sont propres à chaque région). */
 function switchTo(pathname: string, target: Region): string {
-  const path = pathname.replace(/^\/na(?=\/|$)/, "") || "/";
+  const path = stripRegion(pathname);
   if (SHARED.includes(path)) return link(target, path);
   if (path.startsWith("/joueurs/")) return link(target, "/donnees");
   if (path === "/comparer") return "/comparer";
@@ -30,7 +30,7 @@ function switchTo(pathname: string, target: Region): string {
 export default function Nav() {
   const pathname = usePathname() ?? "/";
   const region = regionFromPath(pathname);
-  const current = pathname.replace(/^\/na(?=\/|$)/, "") || "/";
+  const current = stripRegion(pathname);
   return (
     <>
       <div className="flex shrink-0 rounded-md border border-border p-0.5 text-xs" role="group" aria-label="Région">

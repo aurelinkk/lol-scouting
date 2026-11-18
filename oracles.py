@@ -41,6 +41,8 @@ OE_LEAGUE_MAP = {
     "NEXO": "ES2",     # Liga Nexo (2e division espagnole depuis 2025)
     # Amérique du Nord (SCOUT_REGION=na)
     "LCS": "LCS", "NACL": "NACL", "LTA N": "LCS", "LTA": "LCS",
+    # Corée (SCOUT_REGION=kr)
+    "LCK": "LCK", "LCKC": "LCKCL", "LCK CL": "LCKCL", "LAS": "LCKAS",
 }
 
 # Différences par saison (None = ligue qui n'est pas dans nos ligues cette saison)

@@ -163,14 +163,14 @@ export default function DataTable({
             ))}
           </select>
         </label>
-        {(R.hasEm || includeLec) && (
+        {(R.hasErl2 || includeLec) && (
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Niveau
           <select className={control} value={tier} onChange={(e) => setTier(e.target.value)}>
             <option value="">Tous</option>
             {includeLec && <option value="LEC">{R.top}</option>}
             <option value="ERL1">{tierName("ERL1", region)}</option>
-            {R.hasEm && <option value="ERL2">ERL2</option>}
+            {R.hasErl2 && <option value="ERL2">{tierName("ERL2", region)}</option>}
           </select>
         </label>
         )}

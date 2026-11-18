@@ -278,6 +278,9 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
     # 1re division : bonus fixe de niveau (calibré sur les montés, voir scoring.py)
     from region import REGION
     ranking.loc[top, "league_bonus"] = scoring.TOP_LEAGUE_BONUS.get(REGION, 0.0)
+    # Sans EMEA Masters pour situer les ligues (Corée) : malus fixe de 3e division
+    if REGION in scoring.THIRD_TIER_MALUS:
+        ranking.loc[ranking["tier"] == "ERL2", "league_bonus"] = scoring.THIRD_TIER_MALUS[REGION]
 
     # SoloQ : seulement pour la saison en cours (le relevé est d'aujourd'hui)
     ranking["soloq_bonus"] = 0.0
@@ -331,6 +334,20 @@ def calibrate_top_bonus():
     print(f"{len(m)} montés ; bonus conseillé = {m['gap'].mean():.2f} (médiane {m['gap'].median():.2f})")
     print(m.groupby("season")["gap"].agg(["count", "mean"]).round(2).to_string())
     print("-> à reporter dans scoring.TOP_LEAGUE_BONUS")
+    # 3e division sans EMEA Masters (Corée) : écart entre le score en 3e division
+    # (sans malus) et le score en 2e division l'année suivante
+    from region import REGION
+    if REGION in scoring.THIRD_TIER_MALUS:
+        rows = []
+        for s in seasons[:-1]:
+            a = rk[s][rk[s]["tier"] == "ERL2"].assign(
+                raw=lambda d: d["final"] - d["league_bonus"])[["player", "raw"]]
+            b = rk[s + 1][rk[s + 1]["tier"] == "ERL1"][["player", "final"]]
+            rows.append(a.merge(b, on="player"))
+        m = pd.concat(rows)
+        if len(m):
+            print(f"{len(m)} montés de 3e en 2e division ; malus conseillé = {-(m['raw'] - m['final']).mean():.2f}"
+                  " -> scoring.THIRD_TIER_MALUS")
 
 
 def main():

@@ -129,14 +129,16 @@ export default function Dashboard({ region }: { region: Region }) {
         <p className="text-sm text-ink-2">
           {region === "eu"
             ? "Prospects européens : ERL1, ERL2, EMEA Masters et montées en LEC."
-            : "Prospects nord-américains : NACL et montées en LCS."}
+            : region === "na"
+              ? "Prospects nord-américains : NACL et montées en LCS."
+              : "Prospects coréens : LCK CL, LCK Academy Series et montées en LCK."}
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Joueurs suivis" value={meta.players.toLocaleString("fr-FR")} />
         <Kpi label="Parties analysées" value={meta.games.toLocaleString("fr-FR")} hint={`Saisons ${meta.seasons.join(", ")}`} />
-        <Kpi label="Ligues" value={String(meta.leagues)} hint={region === "eu" ? "LEC, EM, ERL1, ERL2" : "LCS, NACL"} />
+        <Kpi label="Ligues" value={String(meta.leagues)} hint={region === "eu" ? "LEC, EM, ERL1, ERL2" : region === "na" ? "LCS, NACL" : "LCK, LCK CL, Academy"} />
         <Kpi
           label={`Montés en ${R.top} ${lastPromo ? `(${lastPromo.from}→${lastPromo.to})` : ""}`}
           value={String(lecUp)}
@@ -147,7 +149,7 @@ export default function Dashboard({ region }: { region: Region }) {
       {multiRegion && (
         <Card
           title="Meilleurs cracks — toutes régions"
-          subtitle="Europe et Amérique du Nord mélangées, classées par rang dans leur poste au sein de leur région (top 1 % d'abord) : les scores ne se comparent pas directement d'une région à l'autre. 21 ans ou moins en Europe, 23 en NA, jamais passés par la 1re division."
+          subtitle="Europe, Amérique du Nord et Corée mélangées, classées par rang dans leur poste au sein de leur région (top 1 % d'abord) : les scores ne se comparent pas directement d'une région à l'autre. 21 ans ou moins (23 en NA), jamais passés par la 1re division."
         >
           <div className="grid gap-4 md:grid-cols-5">
             {ROLES.map((role) => (
@@ -173,7 +175,12 @@ export default function Dashboard({ region }: { region: Region }) {
                               <span
                                 className="rounded px-1 text-[10px] font-semibold"
                                 style={{
-                                  background: p.region === "eu" ? "var(--accent-soft)" : "color-mix(in srgb, var(--series-2) 22%, transparent)",
+                                  background:
+                                    p.region === "eu"
+                                      ? "var(--accent-soft)"
+                                      : p.region === "na"
+                                        ? "color-mix(in srgb, var(--series-2) 22%, transparent)"
+                                        : "color-mix(in srgb, var(--series-3) 22%, transparent)",
                                 }}
                               >
                                 {REGION_INFO[p.region].short}
@@ -271,8 +278,8 @@ export default function Dashboard({ region }: { region: Region }) {
               </Card>
               {(lastPromo.hit_rates ?? []).some((h) => h.from === "ERL2" && h.total > 0) && (
               <Card
-                title={`ERL2 → ERL1 : taux de montée (${lastPromo.from} → ${lastPromo.to})`}
-                subtitle={`Selon le rang du joueur parmi les ERL2 de son poste en ${lastPromo.from}.`}
+                title={`${T("ERL2")} → ${T("ERL1")} : taux de montée (${lastPromo.from} → ${lastPromo.to})`}
+                subtitle={`Selon le rang du joueur parmi les ${T("ERL2")} de son poste en ${lastPromo.from}.`}
               >
                 <HBarChart data={hitBars("ERL2")} max={1} />
               </Card>

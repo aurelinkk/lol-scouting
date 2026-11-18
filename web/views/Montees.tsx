@@ -165,12 +165,12 @@ function PromotionSeason({ promo, region }: { promo: Promotion; region: Region }
 
             {erl.length > 0 && (
             <section className="rounded-lg border border-border bg-surface p-4">
-              <h3 className="text-sm font-semibold">ERL2 → ERL1 · {erl.length} joueurs</h3>
+              <h3 className="text-sm font-semibold">{T("ERL2")} → {T("ERL1")} · {erl.length} joueurs</h3>
               <p className="mb-3 mt-0.5 text-xs text-ink-3">
-                {top10(erl)} sur {erl.length} étaient dans le top 10 % des ERL2 de leur poste en {promo.from}. Beaucoup
+                {top10(erl)} sur {erl.length} étaient dans le top 10 % des {T("ERL2")} de leur poste en {promo.from}. Beaucoup
                 montent avec toute leur équipe (promotion), indépendamment du niveau individuel.
               </p>
-              <PromotionTable players={erl} rankLabel={`Rang ERL2 ${promo.from}`} region={region} />
+              <PromotionTable players={erl} rankLabel={`Rang ${T("ERL2")} ${promo.from}`} region={region} />
             </section>
             )}
           </div>

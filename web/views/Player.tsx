@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Avatar, TeamLogo } from "@/components/Images";
 import { CareerTimeline, LevelSummary, Trophies } from "@/components/Career";
 import { TIER_COLOR } from "@/lib/tiers";
-import { link, REGION_INFO, type Region, tierName } from "@/lib/region";
+import { link, REGION_INFO, type Region, REGIONS, tierName } from "@/lib/region";
 import DeepButton from "@/components/DeepButton";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
 import { getMeta, getPlayer, getRankings, hasRegion } from "@/lib/data";
@@ -38,9 +38,9 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
   const meta = getMeta(region);
   const R = REGION_INFO[region];
   // Même joueur dans l'autre région (même page Leaguepedia) : ex. Yukino, NACL puis KC Blue
-  const otherRegion: Region = region === "eu" ? "na" : "eu";
-  const twin = hasRegion(otherRegion) ? getPlayer(id, otherRegion) : undefined;
-  const hasTwin = twin?.name === player.name;
+  const twins = REGIONS.filter(
+    (r) => r !== region && hasRegion(r) && getPlayer(id, r)?.name === player.name,
+  );
 
   const [pseudo, realName] = (() => {
     const m = player.name.match(/^(.*?)\s*\((.*)\)$/);
@@ -130,11 +130,11 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                   Comparer →
                 </Link>
               )}
-              {hasTwin && (
-                <Link href={link(otherRegion, `/joueurs/${id}`)} className="text-accent hover:underline">
-                  Fiche {REGION_INFO[otherRegion].name} →
+              {twins.map((r) => (
+                <Link key={r} href={link(r, `/joueurs/${id}`)} className="text-accent hover:underline">
+                  Fiche {REGION_INFO[r].name} →
                 </Link>
-              )}
+              ))}
             </dl>
           </div>
           {career && (

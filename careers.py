@@ -135,6 +135,7 @@ LEAGUE_SHORT = {
     "Prime League Pro Division": "PRM", "Liga Española de League of Legends": "LES",
     "LVP SuperLiga": "LVP SL", "Northern League of Legends Championship": "NLC",
     "EMEA Masters": "EM",
+    "LCK Challengers League": "LCK CL", "LCK Academy Series": "LCK AS",
 }
 
 
