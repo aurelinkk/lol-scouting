@@ -59,10 +59,14 @@ ROLE_WEIGHTS = {
         "csd15": 1.5, "gd15": 1.5, "xpd15": 1.0, "ahead_cs15": 0.5,
         "fb_part": 0.25, "fb_victim": -0.5,
     },
+    # Support : l'impact se voit mal dans les stats de fin de partie ; le winrate
+    # et la lane à 2 (gold / XP @15) pèsent plus, la vision et la KP moins
+    # (dépendent du style de l'équipe). Backtest : 9 supports montés en LEC sur 9
+    # dans le top 10 % des supports d'ERL l'année d'avant (7 avant).
     "Support": {
-        "kda": 1.0, "kp": 1.0, "vision_min": 1.0, "assists_pg": 0.5,
-        "deaths_pg": -0.5, "winrate": 0.25,
-        "gd15": 0.5, "xpd15": 1.0, "fb_part": 1.0, "fb_victim": -0.5,
+        "kda": 1.0, "kp": 0.5, "vision_min": 0.5, "assists_pg": 0.5,
+        "deaths_pg": -0.75, "winrate": 0.75,
+        "gd15": 1.0, "xpd15": 1.0, "fb_part": 0.5, "fb_victim": -0.5,
     },
 }
 

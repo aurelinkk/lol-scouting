@@ -290,6 +290,9 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
                                                       / ranking["soloq_ladder_size"])).fillna(0)
 
     ranking["intl_bonus"] = ranking.get("intl_bonus", pd.Series(0.0, index=ranking.index)).fillna(0.0)
+    # Un joueur classé en LEC n'a pas de bonus EMEA Masters (ex : Stend 2026,
+    # EM avec Vitality.Bee puis LEC avec Shifters) : il est jugé au niveau LEC
+    ranking.loc[ranking["tier"] == "LEC", "em_score"] = float("nan")
     ranking["final"] = (ranking["league_score"] + ranking["league_bonus"] + ranking["intl_bonus"]
                         + EM_WEIGHT * ranking["em_score"].fillna(0) + ranking["soloq_bonus"]
                         + ranking["ex_lec_malus"])
