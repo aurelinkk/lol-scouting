@@ -29,7 +29,7 @@ prospects.py. Aucun retéléchargement n'est nécessaire.
 # Principes des poids actuels :
 #   - la phase de lane (@15) pèse le plus : elle dépend le moins de l'équipe
 #   - les dégâts sont comparés au champion joué et pèsent moins
-#   - le winrate pèse peu : il reflète surtout le niveau de l'équipe
+#   - le winrate pèse un peu : une équipe qui gagne, c'est aussi un joueur qui ne la plombe pas
 
 # Winrate : 0.5 (0.25 avant). Backtest : 31 montés en LEC sur 35 dans le top 10 %
 # l'année d'avant (29 avant), 73 montés ERL2 -> ERL1 dans le top 10 % (71 avant).
