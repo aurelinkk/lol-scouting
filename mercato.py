@@ -434,7 +434,8 @@ def build_mercato(games, season, refresh=False):
     coaches = build_coaches(board, changes, rumors, season, refresh)
     board = add_contract_ends(board, season)
 
-    # Corrections manuelles (prioritaires)
+    # Corrections manuelles (prioritaires). Colonnes facultatives : status
+    # (« rumeur » ou « officiel ») et source (lien de l'article / du post)
     manual = load_mercato(season)
     if manual is not None:
         col = f"player_{season}"
@@ -446,7 +447,23 @@ def build_mercato(games, season, refresh=False):
                     "team": m["team"], "role": m["role"], "before": m.get(f"player_{season - 1}") or None,
                     "after": None, "status": "", "source": ""}])], ignore_index=True)
                 slot = (board["team"] == m["team"]) & (board["role"] == m["role"])
-            board.loc[slot, ["after", "status", "source"]] = [m[col] or None, "manuel", "saisie manuelle"]
+            player = canon(m[col]) if m[col] else None
+            kind = str(m.get("status", "")).strip().lower()
+            status = "rumeur" if kind.startswith("rum") else "confirmé" if kind.startswith("off") else "manuel"
+            src = str(m.get("source", "")).strip()
+            url = src if src.startswith("http") else None
+            site = ("Sheep Esports" if "sheepesports" in src else "X" if "x.com" in src or "twitter" in src
+                    else "saisie manuelle")
+            if player:
+                # il n'est plus ailleurs ; son ancien poste indique où il part
+                for idx in board.index[(board["after"] == player) & ~slot]:
+                    board.loc[idx, ["after", "status", "source", "url"]] = [None, f"départ ({status})", site, url]
+                board.loc[(board["before"] == player) & ~slot, "to"] = m["team"]
+                options.pop(player, None)  # piste tranchée
+                short = player.split(" (")[0]
+                notes = board["options"].astype(str).str.contains(f"piste : {short}", regex=False)
+                board.loc[notes, "options"] = ""
+            board.loc[slot, ["after", "status", "source", "url"]] = [player, status, site, url]
     board.attrs["undecided"] = options
     board.attrs["coaches"] = coaches
     return board

@@ -68,7 +68,7 @@ Corrections à la main (prioritaires sur les données automatiques) :
 | Fichier | Pour |
 |---|---|
 | `birthdates.csv` | Âges manquants (`joueur,2004-06-28,source` ; une année seule = âge approximatif « ~22 ans ») — `python missing_ages.py` liste les prioritaires |
-| `rosters_2027.csv` | Corriger un poste du mercato |
+| `rosters_2027.csv` | Corriger un poste du mercato (`LEC,Karmine Corp,Jungle,Yike,SkewMond,rumeur,lien-sheep` ; statut `rumeur` ou `officiel`) |
 | `team_changes.csv` | Équipe remplacée ou renommée au mercato (`2027,Dignitas,OpTic Gaming,lien`) |
 | `soloq_accounts.csv` | Lier un pro à son compte soloQ (`joueur,Pseudo#TAG`) |
 | `player_overrides.csv` | Séparer deux joueurs que Leaguepedia a confondus |
