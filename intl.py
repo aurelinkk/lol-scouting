@@ -21,6 +21,9 @@ INTL_LEAGUES = {
     "First Stand": "FST",
 }
 DIR = "data/intl"
+# Pas l'international : qualifications EWC (équipes d'une même région entre
+# elles), finales régionales qualificatives pour les Worlds
+NOT_INTERNATIONAL = r"Qualifier|Regional Finals|Regional Qualifier"
 RAW = "data/raw/intl"
 
 
@@ -47,6 +50,7 @@ def fetch_intl(year, refresh=False):
     if not frames:
         return None
     data = clean(pd.concat(frames, ignore_index=True))
+    data = data[~data["tournament"].str.contains(NOT_INTERNATIONAL, case=False, na=False)]
     # Une seule « ligue » : on compare chaque joueur à tous ceux de son poste
     data["league_code"] = "INTL"
     data["tier"] = "INTL"
@@ -62,7 +66,8 @@ def load_intl(season):
     path = f"{DIR}/pro_games_{season}.csv"
     if not os.path.exists(path):
         return None
-    return pd.read_csv(path, parse_dates=["date", "birthdate"])
+    df = pd.read_csv(path, parse_dates=["date", "birthdate"])
+    return df[~df["tournament"].str.contains(NOT_INTERNATIONAL, case=False, na=False)]
 
 
 def main():
