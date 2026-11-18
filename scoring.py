@@ -31,31 +31,33 @@ prospects.py. Aucun retéléchargement n'est nécessaire.
 #   - les dégâts sont comparés au champion joué et pèsent moins
 #   - le winrate pèse peu : il reflète surtout le niveau de l'équipe
 
+# Winrate : 0.5 (0.25 avant). Backtest : 31 montés en LEC sur 35 dans le top 10 %
+# l'année d'avant (29 avant), 73 montés ERL2 -> ERL1 dans le top 10 % (71 avant).
 ROLE_WEIGHTS = {
     "Top": {
         "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5,
         "dpm_vs_champ": 0.5, "dmg_share_vs_champ": 0.5,
-        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.25,
+        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
         "csd15": 1.5, "gd15": 1.5, "xpd15": 1.5, "ahead_cs15": 0.5,
         "fb_part": 0.25, "fb_victim": -0.5,
     },
     "Jungle": {
         "kda": 1.0, "cs_min": 0.5, "gold_min": 0.5, "dpm_vs_champ": 0.5, "kp": 1.0,
-        "vision_min": 0.5, "deaths_pg": -0.5, "winrate": 0.25,
+        "vision_min": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
         "csd15": 0.5, "gd15": 1.5, "xpd15": 1.5,
         "fb_part": 1.0, "fb_victim": -0.5,
     },
     "Mid": {
         "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5,
         "dpm_vs_champ": 0.5, "dmg_share_vs_champ": 0.5,
-        "gold_share": 0.5, "kp": 0.75, "deaths_pg": -0.5, "winrate": 0.25,
+        "gold_share": 0.5, "kp": 0.75, "deaths_pg": -0.5, "winrate": 0.5,
         "csd15": 1.5, "gd15": 1.5, "xpd15": 1.5, "ahead_cs15": 0.5,
         "fb_part": 0.5, "fb_victim": -0.5,
     },
     "Bot": {
         "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5,
         "dpm_vs_champ": 0.75, "dmg_share_vs_champ": 0.75,
-        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.25,
+        "gold_share": 0.5, "kp": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
         "csd15": 1.5, "gd15": 1.5, "xpd15": 1.0, "ahead_cs15": 0.5,
         "fb_part": 0.25, "fb_victim": -0.5,
     },
