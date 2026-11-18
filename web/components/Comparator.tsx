@@ -24,7 +24,8 @@ type Pick = { region: Region; season: number; id: string };
 const STATS: StatKey[] = [
   "winrate", "kda", "deaths_pg", "kp", "cs_min", "gold_min", "dpm", "dmg_share",
   "dpm_vs_champ", "dmg_share_vs_champ", "gold_share", "vision_min",
-  "csd15", "gd15", "xpd15", "ahead_cs15", "fb_part", "fb_victim", "champions",
+  "csd15", "gd15", "xpd15", "ahead_cs15", "ka15", "fb_part", "fb_victim",
+  "cw_min", "wards_killed_min", "enemy_jungle_min", "champions",
 ];
 const LOWER_IS_BETTER: StatKey[] = ["deaths_pg", "fb_victim"];
 

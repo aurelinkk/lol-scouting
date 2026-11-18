@@ -21,6 +21,10 @@ export const STAT_LABELS: Record<StatKey, string> = {
   ahead_cs15: "Devant en CS @15",
   fb_part: "First blood (participation)",
   fb_victim: "First blood (victime)",
+  cw_min: "Control wards/min",
+  wards_killed_min: "Wards détruites/min",
+  enemy_jungle_min: "Camps adverses/min",
+  ka15: "Kills + assists @15",
 };
 
 const PERCENT: StatKey[] = ["winrate", "kp", "dmg_share", "gold_share", "ahead_cs15", "fb_part", "fb_victim"];

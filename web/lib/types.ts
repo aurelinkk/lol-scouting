@@ -5,7 +5,8 @@ export type StatKey =
   | "winrate" | "kda" | "cs_min" | "gold_min" | "dpm" | "kp" | "dmg_share"
   | "gold_share" | "vision_min" | "deaths_pg" | "assists_pg" | "champions"
   | "dpm_vs_champ" | "dmg_share_vs_champ"
-  | "csd15" | "gd15" | "xpd15" | "ahead_cs15" | "fb_part" | "fb_victim";
+  | "csd15" | "gd15" | "xpd15" | "ahead_cs15" | "fb_part" | "fb_victim"
+  | "cw_min" | "wards_killed_min" | "enemy_jungle_min" | "ka15";
 
 /** Une ligne du classement (un joueur, une saison, sa ligue principale). */
 export interface RankingRow extends Partial<Record<StatKey, number>> {
