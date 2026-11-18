@@ -64,19 +64,17 @@ OE_COLUMNS = [
     "firstbloodkill", "firstbloodassist", "firstbloodvictim",
     "csdiffat15", "golddiffat15", "xpdiffat15",
     # vision (supports) et jungle
-    "gamelength", "controlwardsbought", "wardskilled", "monsterkillsenemyjungle",
-    "killsat15", "assistsat15",
+    "gamelength", "controlwardsbought", "wardskilled", "killsat15", "assistsat15",
 ]
 NUMERIC = ["kills", "deaths", "assists", "totalgold", "firstbloodkill", "firstbloodassist",
            "firstbloodvictim", "csdiffat15", "golddiffat15", "xpdiffat15",
-           "gamelength", "controlwardsbought", "wardskilled", "monsterkillsenemyjungle",
-           "killsat15", "assistsat15"]
+           "gamelength", "controlwardsbought", "wardskilled", "killsat15", "assistsat15"]
 
 # Stats produites (par partie, puis moyennées par joueur), utilisables dans scoring.py
 OE_STATS = ["csd15", "gd15", "xpd15", "ahead_cs15", "fb_part", "fb_victim",
-            # control wards achetées / wards détruites / camps de la jungle adverse
-            # par minute, kills + assists à 15 min (implication en début de partie)
-            "cw_min", "wards_killed_min", "enemy_jungle_min", "ka15"]
+            # control wards achetées / wards détruites par minute, kills + assists
+            # à 15 min (implication en début de partie). Affichées, poids 0
+            "cw_min", "wards_killed_min", "ka15"]
 
 _cache = {}
 
@@ -128,7 +126,6 @@ def load_oe(season):
     col = lambda c: df[c] if c in df else float("nan")
     df["cw_min"] = col("controlwardsbought") / minutes
     df["wards_killed_min"] = col("wardskilled") / minutes
-    df["enemy_jungle_min"] = col("monsterkillsenemyjungle") / minutes
     df["ka15"] = (col("killsat15") + col("assistsat15")).where(complete)
     _cache[season] = df
     return df

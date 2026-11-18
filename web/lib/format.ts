@@ -23,7 +23,6 @@ export const STAT_LABELS: Record<StatKey, string> = {
   fb_victim: "First blood (victime)",
   cw_min: "Control wards/min",
   wards_killed_min: "Wards détruites/min",
-  enemy_jungle_min: "Camps adverses/min",
   ka15: "Kills + assists @15",
 };
 

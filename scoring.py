@@ -46,8 +46,6 @@ ROLE_WEIGHTS = {
         "vision_min": 0.5, "deaths_pg": -0.5, "winrate": 0.5,
         "csd15": 0.5, "gd15": 1.5, "xpd15": 1.5,
         "fb_part": 1.0, "fb_victim": -0.5,
-        # Oracle's Elixir : impact en début de partie, contre-jungle, wards détruites
-        "ka15": 0.5, "enemy_jungle_min": 0.5, "wards_killed_min": 0.25,
     },
     "Mid": {
         "kda": 0.5, "cs_min": 0.5, "gold_min": 0.5,
@@ -71,8 +69,6 @@ ROLE_WEIGHTS = {
         "kda": 1.0, "kp": 0.5, "vision_min": 0.5, "assists_pg": 0.5,
         "deaths_pg": -0.75, "winrate": 0.75,
         "gd15": 1.0, "xpd15": 1.0, "fb_part": 0.5, "fb_victim": -0.5,
-        # Oracle's Elixir : control wards achetées, wards détruites (par minute)
-        "cw_min": 0.5, "wards_killed_min": 0.25,
     },
 }
 
@@ -86,8 +82,10 @@ STAT_LABELS = {
     "csd15": "CS diff @15", "gd15": "Gold diff @15", "xpd15": "XP diff @15",
     "ahead_cs15": "Devant en CS @15", "fb_part": "First blood (participation)",
     "fb_victim": "First blood (victime)",
+    # Affichées seulement (poids 0) : testées sur les montées 2023-2025, elles ne
+    # repèrent pas mieux les futurs montés (vision = plan de jeu de l'équipe)
     "cw_min": "Control wards/min", "wards_killed_min": "Wards détruites/min",
-    "enemy_jungle_min": "Camps adverses/min", "ka15": "Kills + assists @15",
+    "ka15": "Kills + assists @15",
 }
 
 # Nombre minimum de joueurs du même rôle dans une ligue pour comparer
