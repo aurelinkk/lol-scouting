@@ -40,14 +40,19 @@ def login():
         print("Leaguepedia : pas d'identifiants dans .env, mode anonyme (plus lent)")
         return
 
-    token = session.get(API_URL, params={
-        "action": "query", "meta": "tokens", "type": "login", "format": "json",
-    }, timeout=60).json()["query"]["tokens"]["logintoken"]
+    # Réponse vide ou invalide (Leaguepedia en difficulté) : on continue en anonyme
+    try:
+        token = session.get(API_URL, params={
+            "action": "query", "meta": "tokens", "type": "login", "format": "json",
+        }, timeout=60).json()["query"]["tokens"]["logintoken"]
 
-    result = session.post(API_URL, data={
-        "action": "login", "lgname": user, "lgpassword": password,
-        "lgtoken": token, "format": "json",
-    }, timeout=60).json()["login"]
+        result = session.post(API_URL, data={
+            "action": "login", "lgname": user, "lgpassword": password,
+            "lgtoken": token, "format": "json",
+        }, timeout=60).json()["login"]
+    except (ValueError, KeyError, requests.RequestException) as e:
+        print(f"Leaguepedia : connexion impossible ({type(e).__name__}), mode anonyme")
+        return
 
     if result["result"] == "Success":
         print(f"Leaguepedia : connecté en tant que {result['lgusername']}")
