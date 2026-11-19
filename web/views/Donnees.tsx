@@ -2,6 +2,7 @@ import DataTable from "@/components/DataTable";
 import RegionMissing from "@/components/RegionMissing";
 import { getMercato, getMeta, getPromotions, hasRegion } from "@/lib/data";
 import type { Promoted } from "@/components/DataTable";
+import { signedFromMercato } from "@/lib/mercato/signed";
 import { REGION_INFO, type Region } from "@/lib/region";
 
 export const metadata = { title: "Données · LoL Scouting" };
@@ -62,7 +63,14 @@ export default function DonneesPage({ region }: { region: Region }) {
           Tous les joueurs de {REGION_INFO[region].lower} classés. Chaque stat est comparée aux joueurs du même poste dans la même ligue.
         </p>
       </div>
-      <DataTable seasons={meta.seasons} hasOe={meta.has_oe} promoted={promoted} />
+      <DataTable
+        seasons={meta.seasons}
+        hasOe={meta.has_oe}
+        promoted={promoted}
+        signed={signedFromMercato(getMercato(region)?.teams ?? [], region)}
+        mercatoGenerated={getMercato(region)?.generated}
+        mercatoSeason={mercatoSeason}
+      />
     </div>
   );
 }

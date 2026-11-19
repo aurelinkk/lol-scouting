@@ -7,6 +7,7 @@ import { fmtScore, fmtStat, topPercent } from "@/lib/format";
 import { ROLES, type RankingRow, type StatKey } from "@/lib/types";
 import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
+import { type Signed, signedFromMercato } from "@/lib/mercato/signed";
 
 type SortKey = "final" | "age" | "games" | "league_score" | "league_bonus" | "em_score" | StatKey;
 
@@ -41,13 +42,33 @@ export default function DataTable({
   seasons,
   hasOe,
   promoted = {},
+  signed: publishedSigned = {},
+  mercatoGenerated,
+  mercatoSeason,
 }: {
   seasons: number[];
   hasOe: boolean;
   promoted?: Record<string, Promoted>;
+  /** Joueurs qui ont déjà un club pour la saison suivante (mercato publié) */
+  signed?: Record<string, Signed>;
+  mercatoGenerated?: string;
+  mercatoSeason?: number;
 }) {
   const region = useRegion();
   const R = REGION_INFO[region];
+  // Mercato rafraîchi en ligne (bouton « Actualiser » de Rosters) s'il part du mercato publié
+  const [liveSigned, setLiveSigned] = useState<Record<string, Signed> | null>(null);
+  useEffect(() => {
+    fetch(`/api/mercato?region=${region}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.live && d.live.mercato.generated === mercatoGenerated)
+          setLiveSigned(signedFromMercato(d.live.mercato.teams, region));
+      })
+      .catch(() => {});
+  }, [region, mercatoGenerated]);
+  const signed = liveSigned ?? publishedSigned;
+  const [onlyFree, setOnlyFree] = useState(false);
   const [rows, setRows] = useState<RankingRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +119,10 @@ export default function DataTable({
         (!league || r.league_code === league) &&
         (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
+        // Seulement les joueurs encore libres pour la saison suivante (saison en cours)
+        (!onlyFree ||
+          r.season !== Math.max(...seasons) ||
+          (!signed[r.id] && !promoted[`${r.season}:${r.id}`])) &&
         // Les joueurs montés en cours de saison (ex : SamD 2025) restent visibles
         (includeLec || (!r.played_lec && !r.ex_lec) || (!r.ex_lec && !!promoted[`${r.season}:${r.id}`])) &&
         (!q ||
@@ -119,15 +144,42 @@ export default function DataTable({
       return (va - vb) * dir;
     });
     return out;
-  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted]);
+  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted, onlyFree, signed, seasons]);
 
   useEffect(
     () => setLimit(PAGE),
-    [season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, sort],
+    [season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, sort, onlyFree],
   );
 
   const columns = STAT_COLUMNS.filter((c) => hasOe || !c.oe);
   const isCurrent = season === Math.max(...seasons);
+  const next = mercatoSeason ?? season + 1;
+  // Couleur de ligne : montée d'un niveau (doré : vers la 1re division, vert : 3e -> 2e)
+  // d'abord, sinon « déjà un club » (bleu clair : reste au même niveau ou descend)
+  const promoOf = (r: RankingRow): Promoted | undefined => {
+    if (r.tier === "LEC") return undefined;
+    const p = promoted[`${r.season}:${r.id}`];
+    if (p) return p.level !== "move" ? p : undefined;
+    // Montée vue seulement dans le mercato (rafraîchi en ligne, correction manuelle...)
+    const sg = isCurrent ? signed[r.id] : undefined;
+    const level = sg?.tier === "LEC" ? "top" : sg?.tier === "ERL1" && r.tier === "ERL2" ? "second" : undefined;
+    return sg && level ? { level, team: sg.team, season: next, rumor: !sg.official } : undefined;
+  };
+  const signedOf = (r: RankingRow) => (isCurrent && !promoOf(r) ? signed[r.id] : undefined);
+  const rowStyle = (r: RankingRow) => {
+    const p = promoOf(r);
+    if (p) return { background: `color-mix(in srgb, ${PROMO_COLOR[p.level]} 13%, transparent)` };
+    const sg = signedOf(r);
+    if (sg) return { background: `color-mix(in srgb, var(--accent) ${sg.official ? 13 : 7}%, transparent)` };
+    return undefined;
+  };
+  const barStyle = (r: RankingRow) => {
+    const p = promoOf(r);
+    if (p) return { boxShadow: `inset 3px 0 0 ${PROMO_COLOR[p.level]}` };
+    const sg = signedOf(r);
+    if (sg?.official) return { boxShadow: "inset 3px 0 0 var(--accent)" };
+    return undefined;
+  };
 
   const header = (key: SortKey, label: string, title?: string) => (
     <th
@@ -223,6 +275,12 @@ export default function DataTable({
             <input type="checkbox" checked={unknownAge} onChange={(e) => setUnknownAge(e.target.checked)} />
             Garder les âges inconnus (filtre âge)
           </label>
+          {isCurrent && Object.keys(signed).length > 0 && (
+            <label className="flex items-center gap-2" title="Masque les joueurs qui ont déjà un club pour la saison suivante d'après le mercato">
+              <input type="checkbox" checked={onlyFree} onChange={(e) => setOnlyFree(e.target.checked)} />
+              Seulement les joueurs encore libres pour {next}
+            </label>
+          )}
           {R.hasLeagues && (
           <label
             className="flex items-center gap-2"
@@ -251,8 +309,18 @@ export default function DataTable({
                 rows.find((r) => r.tier === "LEC")?.league_bonus,
               )}) ; leur « top % » les situe parmi les prospects de leur poste`}
           </p>
-          {Object.entries(promoted).some(([k, p]) => k.startsWith(`${season}:`) && p.level !== "move") && (
+          {(Object.entries(promoted).some(([k, p]) => k.startsWith(`${season}:`) && p.level !== "move") ||
+            (isCurrent && Object.keys(signed).length > 0)) && (
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
+              {isCurrent && Object.keys(signed).length > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="h-2.5 w-2.5 rounded-sm"
+                    style={{ background: "color-mix(in srgb, var(--accent) 35%, transparent)" }}
+                  />
+                  Déjà un club pour {next}, même niveau ou en dessous (plus clair = rumeur ou sous contrat)
+                </span>
+              )}
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-sm" style={{ background: PROMO_COLOR.top }} />
                 Monte en LEC ou LCS en {season + 1}
@@ -295,21 +363,11 @@ export default function DataTable({
                   <tr
                     key={`${r.id}-${r.season}`}
                     className="border-b border-border last:border-0 hover:bg-surface-2"
-                    style={
-                      r.tier !== "LEC" && promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
-                        ? {
-                            background: `color-mix(in srgb, ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]} 13%, transparent)`,
-                          }
-                        : undefined
-                    }
+                    style={rowStyle(r)}
                   >
                     <td
                       className="px-2 py-1.5 text-ink-3"
-                      style={
-                        r.tier !== "LEC" && promoted[`${r.season}:${r.id}`] && promoted[`${r.season}:${r.id}`].level !== "move"
-                          ? { boxShadow: `inset 3px 0 0 ${PROMO_COLOR[promoted[`${r.season}:${r.id}`].level]}` }
-                          : undefined
-                      }
+                      style={barStyle(r)}
                     >
                       {i + 1}
                     </td>
@@ -353,8 +411,21 @@ export default function DataTable({
                           >
                             <TeamLogo team={team} src={logo} size={18} />
                             <span className="max-w-40 truncate">{team}</span>
-                            {r.tier !== "LEC" && promoted[`${r.season}:${r.id}`] && (() => {
-                              const p = promoted[`${r.season}:${r.id}`];
+                            {signedOf(r) && (() => {
+                              const sg = signedOf(r)!;
+                              return (
+                                <span
+                                  className="whitespace-nowrap text-xs text-ink-3"
+                                  title={`${next} : ${sg.team} (${sg.kind === "official" ? "officiel" : sg.kind === "contract" ? "sous contrat" : "rumeur"})`}
+                                >
+                                  {sg.stays ? `✓ ${next}` : `→ ${sg.team}`}
+                                  {sg.kind === "rumor" && " (rumeur)"}
+                                  {sg.kind === "contract" && " (sous contrat)"}
+                                </span>
+                              );
+                            })()}
+                            {(promoOf(r) ?? (r.tier !== "LEC" ? promoted[`${r.season}:${r.id}`] : undefined)) && (() => {
+                              const p = (promoOf(r) ?? promoted[`${r.season}:${r.id}`])!;
                               return (
                                 <span
                                   className="flex items-center gap-1 text-xs"
