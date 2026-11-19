@@ -17,6 +17,7 @@ Usage :
 """
 import argparse
 import os
+import re
 import time
 
 import pandas as pd
@@ -49,6 +50,37 @@ def _url(value):
     return value if isinstance(value, str) and value.startswith("http") else None
 
 
+def change_links(changes):
+    """Lien de chaque transfert officiel.
+
+    Source : "https://x.com/...;;;Titre;;;x.com;;;...:::https://...". Une annonce
+    peut regrouper plusieurs joueurs avec un lien chacun (ex : prolongations de
+    ShowMaker, Smash et cvMax chez DK, 3 tweets) : les liens sont rangés dans
+    l'ordre des joueurs de l'annonce (NewsItems.Players), on donne à chacun le
+    sien ; sinon le premier lien.
+    """
+    urls = changes["ref"].astype(str).map(lambda r: re.findall(r"https?://[^;\s]+", r))
+    multi = sorted({n for n, u in zip(changes["news_id"], urls) if isinstance(n, str) and n and len(u) > 1})
+    order = {}
+    try:
+        for i in range(0, len(multi), 50):
+            ids = ",".join("'" + n.replace("'", "\\'") + "'" for n in multi[i:i + 50])
+            for r in cargo_query(tables="NewsItems", fields="NewsId=news_id,Players=players",
+                                 where=f"NewsId IN ({ids})"):
+                order[r["news_id"]] = [p.strip().lower() for p in str(r.get("players") or "").split(",")]
+    except Exception as e:  # ordre inconnu : premier lien pour tous
+        print(f"  Ordre des liens Leaguepedia indisponible : {e}")
+    links = []
+    for player, news, u in zip(changes["player"], changes["news_id"], urls):
+        players = order.get(news, [])
+        p = str(player).lower()
+        if len(u) > 1 and len(u) == len(players) and p in players:
+            links.append(u[players.index(p)])
+        else:
+            links.append(u[0] if u else None)
+    return links
+
+
 def fetch_events(season, refresh=False):
     """Rumeurs et changements officiels depuis septembre de la saison précédente."""
     since = f"{season - 1}-09-01"
@@ -59,7 +91,7 @@ def fetch_events(season, refresh=False):
                      for p in paths.values()))
     if fresh:
         rumors, changes = pd.read_csv(paths["rumors"]), pd.read_csv(paths["changes"])
-        if "link" in rumors and "link" in changes:  # ancien cache sans les liens : on retélécharge
+        if "link" in rumors and "news_id" in changes:  # ancien cache sans les liens : on retélécharge
             return rumors, changes
     rumors = pd.DataFrame(cargo_query(
         tables="RosterRumors",
@@ -71,11 +103,11 @@ def fetch_events(season, refresh=False):
                  "link"])
     changes = pd.DataFrame(cargo_query(
         tables="RosterChanges",
-        fields="Date_Sort=date,Player=player,Team=team,Direction=direction,Role=role,Source=ref",
+        fields="Date_Sort=date,Player=player,Team=team,Direction=direction,Role=role,Source=ref,"
+               "NewsId=news_id",
         where=f"Date_Sort>='{since}'"),
-        columns=["date", "player", "team", "direction", "role", "ref"])
-    # Source : "https://x.com/...;;;Titre;;;x.com;;;..." -> première URL
-    changes["link"] = changes["ref"].astype(str).str.extract(r"(https?://[^;\s]+)")[0]
+        columns=["date", "player", "team", "direction", "role", "ref", "news_id"])
+    changes["link"] = change_links(changes)
     os.makedirs(RAW_DIR, exist_ok=True)
     rumors.to_csv(paths["rumors"], index=False)
     changes.to_csv(paths["changes"], index=False)

@@ -55,6 +55,33 @@ const urlOf = (v?: string) => {
 const siteOf = (url: string | null, fallback: string) =>
   url?.includes("sheepesports") ? "Sheep Esports" : url && /x\.com|twitter/.test(url) ? "X" : fallback;
 
+/**
+ * Une annonce Leaguepedia peut regrouper plusieurs joueurs avec un lien chacun
+ * (ex : prolongations de ShowMaker, Smash et cvMax chez DK, 3 tweets). Les liens
+ * sont rangés dans l'ordre des joueurs de l'annonce (NewsItems.Players) : on
+ * donne à chacun le sien, sinon le premier lien.
+ */
+async function assignChangeLinks(changes: Row[]) {
+  const urlsOf = (ref?: string) => ref?.match(/https?:\/\/[^;\s]+/g) ?? [];
+  const multi = [...new Set(changes.filter((c) => c.news && urlsOf(c.ref).length > 1).map((c) => c.news))];
+  const order = new Map<string, string[]>();
+  try {
+    for (let i = 0; i < multi.length; i += 50) {
+      const ids = multi.slice(i, i + 50).map((n) => `'${n.replace(/'/g, "\\'")}'`).join(",");
+      for (const r of await cargo("NewsItems", "NewsId=news,Players=players", `NewsId IN (${ids})`))
+        order.set(r.news, (r.players ?? "").split(",").map((p) => p.trim()));
+    }
+  } catch {
+    // ordre inconnu : premier lien pour tous
+  }
+  for (const c of changes) {
+    const urls = urlsOf(c.ref);
+    const players = order.get(c.news) ?? [];
+    const i = players.findIndex((p) => same(p, c.player));
+    c.link = urls.length > 1 && urls.length === players.length && i >= 0 ? urls[i] : (urls[0] ?? "");
+  }
+}
+
 interface Event {
   date: string;
   official: boolean;
@@ -111,10 +138,11 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
     ),
     cargo(
       "RosterChanges",
-      "Date_Sort=date,Player=player,Team=team,Direction=dir,Role=role,Source=ref",
+      "Date_Sort=date,Player=player,Team=team,Direction=dir,Role=role,Source=ref,NewsId=news",
       `Date_Sort>='${since}'`,
     ),
   ]);
+  await assignChangeLinks(changes);
 
   // Scoops Sheep Esports pas encore saisis sur Leaguepedia (titres Google News)
   try {
@@ -139,7 +167,7 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
   for (const c of changes) {
     const role = roleOf(c.role);
     if (!role || !teamOf(c.team) || (c.dir !== "Join" && c.dir !== "Leave")) continue;
-    const url = urlOf(c.ref);
+    const url = c.link || urlOf(c.ref);
     events.push({ date: c.date.slice(0, 10), official: true, kind: c.dir as "Join" | "Leave", player: c.player,
       team: teamOf(c.team)!.team, role, source: siteOf(url, "Leaguepedia"), url });
   }
