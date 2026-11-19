@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { isStale } from "@/lib/mercato/stale";
 import { playerLink, REGION_INFO, type Region } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { TeamLogo } from "./Images";
@@ -289,14 +290,23 @@ export default function MercatoBoard({
   const teams = usable?.mercato.teams ?? baseTeams;
   const undecided = usable?.mercato.undecided ?? baseUndecided;
 
+  const [auto, setAuto] = useState(false);
   useEffect(() => {
     fetch(`/api/mercato?region=${region}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d?.live && setLive(d.live))
+      .then((d) => {
+        if (d?.live) setLive(d.live);
+        // Mise à jour automatique si la dernière recherche date de plus de 20 min
+        if (isStale(d?.live, generated)) {
+          setAuto(true);
+          refresh().finally(() => setAuto(false));
+        }
+      })
       .catch(() => {});
-  }, [region]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [region, generated]);
 
-  const refresh = async () => {
+  async function refresh() {
     setLoading(true);
     setError(null);
     try {
@@ -309,7 +319,7 @@ export default function MercatoBoard({
     } finally {
       setLoading(false);
     }
-  };
+  }
   const top = REGION_INFO[region].top;
   const leagues = useMemo(() => {
     const codes = [...new Set(teams.map((t) => t.league))];
@@ -356,11 +366,11 @@ export default function MercatoBoard({
             <path d="M21 12a9 9 0 1 1-2.64-6.36" strokeLinecap="round" />
             <path d="M21 3v6h-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          {loading ? "Recherche des nouveautés…" : "Actualiser le mercato"}
+          {loading ? (auto ? "Mise à jour automatique…" : "Recherche des nouveautés…") : "Actualiser le mercato"}
         </button>
         <span className="text-ink-3">
           {loading
-            ? "Rumeurs (Sheep Esports, X…) et transferts officiels sur Leaguepedia"
+            ? "Scoops Sheep Esports (Google News), rumeurs et transferts officiels sur Leaguepedia"
             : usable
               ? `À jour ${ago(usable.updatedAt)} · ${usable.changes.length} nouveauté${usable.changes.length > 1 ? "s" : ""} depuis l'export du ${generated ?? "?"}`
               : `Export du ${generated ?? "?"} · actualise pour voir les dernières news`}

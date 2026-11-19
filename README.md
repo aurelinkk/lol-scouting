@@ -63,6 +63,13 @@ git add web/data web/public/data; git commit -m "Données"; git push   # Vercel 
 # (puis la même chose avec SCOUT_REGION=na pour la NA)
 ```
 
+Mercato en direct : les onglets Rosters et Données relancent la recherche tout
+seuls à l'ouverture si la dernière date de plus de 20 min (bouton « Actualiser »
+pour forcer). Sources : Leaguepedia (rumeurs et transferts officiels) et les
+scoops Sheep Esports lus dans les titres Google News (`sheep.py` /
+`web/lib/mercato/sheep.ts`), souvent quelques minutes après leur publication,
+avant leur saisie sur Leaguepedia. Le site de Sheep n'est jamais contacté.
+
 Corrections à la main (prioritaires sur les données automatiques) :
 
 | Fichier | Pour |

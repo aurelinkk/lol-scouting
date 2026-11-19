@@ -2,6 +2,7 @@ import "server-only";
 import type { CellState, MercatoCoach, MercatoPlayer, MercatoSlot, MercatoTeam } from "@/components/MercatoBoard";
 import { getMercato, getPlayers, hasRegion, type Mercato } from "@/lib/data";
 import { type Region, REGIONS } from "@/lib/region";
+import { fetchSheepNews, sheepRumors } from "./sheep";
 
 /**
  * Rafraîchissement du mercato en ligne (onglet Rosters, bouton « Actualiser »).
@@ -9,7 +10,8 @@ import { type Region, REGIONS } from "@/lib/region";
  * Le mercato complet est calculé en Python (mercato.py) avec toutes les données
  * de matchs. Ici, on part du mercato publié et on lui applique les rumeurs
  * (Sheep Esports, X...) et transferts officiels parus sur Leaguepedia depuis sa
- * génération, avec les mêmes règles :
+ * génération, plus les scoops Sheep Esports pas encore saisis sur Leaguepedia
+ * (titres Google News, voir sheep.ts), avec les mêmes règles :
  *  - un transfert officiel (RosterChanges) = vert, une rumeur (RosterRumors) = bleu ;
  *  - plusieurs joueurs pour un même poste dans le même article = piste, pas un transfert ;
  *  - plusieurs destinations le même jour pour un joueur = piste non tranchée ;
@@ -113,6 +115,24 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
       `Date_Sort>='${since}'`,
     ),
   ]);
+
+  // Scoops Sheep Esports pas encore saisis sur Leaguepedia (titres Google News)
+  try {
+    const seen = new Set([
+      ...rumors.map((r) => `${short(r.player)}|${r.te}`),
+      ...changes.map((c) => `${short(c.player)}|${c.team}`),
+    ]);
+    const done = new Set<string>(); // déjà dans le mercato publié (export Python)
+    for (const t of base.teams) for (const s of t.slots) if (s.url) done.add(s.url);
+    for (const r of sheepRumors(await fetchSheepNews(), region, since)) {
+      const key = `${short(r.player)}|${r.te === "Free Agent" ? r.ts : r.te}`;
+      if (seen.has(key) || done.has(r.link)) continue;
+      seen.add(key);
+      rumors.push(r);
+    }
+  } catch {
+    // Google News indisponible : Leaguepedia seul
+  }
 
   const teamOf = (name: string) => m.teams.find((t) => t.team === name || t.former_team === name);
   const events: Event[] = [];

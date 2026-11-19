@@ -6,6 +6,8 @@ l'ordre chronologique :
   - RosterChanges : arrivées / départs officialisés (statut "confirmé")
   - RosterRumors  : rumeurs (Sheep Esports, X...), sauf celles marquées
                     "ne se fera pas" (statut "rumeur")
+  - les scoops Sheep Esports pas encore saisis sur Leaguepedia, lus dans les
+    titres de Google News (voir sheep.py), traités comme des rumeurs
 Les corrections saisies dans rosters_<saison>.csv sont prioritaires (statut
 "manuel"), une ligne par poste : league,team,role,player_<saison-1>,player_<saison>
 
@@ -22,6 +24,7 @@ import pandas as pd
 from leaguepedia import cargo_query
 from region import RAW_DIR
 from rosters import ROLES, build_rosters, load_mercato
+from sheep import Index, fetch_news, sheep_rumors
 
 CACHE = RAW_DIR + "/mercato_{season}_{kind}.csv"
 
@@ -77,6 +80,26 @@ def fetch_events(season, refresh=False):
     rumors.to_csv(paths["rumors"], index=False)
     changes.to_csv(paths["changes"], index=False)
     return rumors, changes
+
+
+def add_sheep_rumors(rumors, changes, board, season, refresh=False):
+    """Ajoute les scoops Sheep Esports (titres Google News) pas encore sur Leaguepedia."""
+    current = board.dropna(subset=["before"])
+    index = Index(extra_players={p: (r, t) for p, r, t in zip(current["before"], current["role"], current["team"])},
+                  extra_teams=set(board["team"]))
+    rows = sheep_rumors(f"{season - 1}-09-01", index, fetch_news(refresh=refresh))
+    if not rows:
+        return rumors
+    low = lambda s: s.astype(str).str.lower().str.replace(r"\s*\(.*\)$", "", regex=True)
+    known = set(zip(low(rumors["player"]), rumors["team_end"].astype(str)))
+    known |= set(zip(low(changes["player"]), changes["team"].astype(str)))
+    sheep = pd.DataFrame(rows)
+    keep = [(p, t) not in known and (p, s) not in known if t == "Free Agent" else (p, t) not in known
+            for p, s, t in zip(low(sheep["player"]), sheep["team_start"], sheep["team_end"])]
+    sheep = sheep[keep].drop(columns=["title"])
+    if len(sheep):
+        print(f"  Sheep Esports (Google News) : {len(sheep)} rumeur(s) pas encore sur Leaguepedia")
+    return pd.concat([rumors, sheep], ignore_index=True) if len(sheep) else rumors
 
 
 def base_rosters(games, season):
@@ -286,6 +309,7 @@ def build_mercato(games, season, refresh=False):
     board["status"] = board["before"].map(lambda p: "inchangé" if p else "")
     board["source"] = ""
     rumors, changes = fetch_events(season, refresh=refresh)
+    rumors = add_sheep_rumors(rumors, changes, board, season, refresh)
     teams = set(board["team"])
 
     # Noms parfois en minuscules dans Leaguepedia ("kyeahoo") : on reprend

@@ -8,6 +8,7 @@ import { ROLES, type RankingRow, type StatKey } from "@/lib/types";
 import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { type Signed, signedFromMercato } from "@/lib/mercato/signed";
+import { isStale } from "@/lib/mercato/stale";
 
 type SortKey = "final" | "age" | "games" | "league_score" | "league_bonus" | "em_score" | StatKey;
 
@@ -59,11 +60,19 @@ export default function DataTable({
   // Mercato rafraîchi en ligne (bouton « Actualiser » de Rosters) s'il part du mercato publié
   const [liveSigned, setLiveSigned] = useState<Record<string, Signed> | null>(null);
   useEffect(() => {
+    const use = (d: { live?: { mercato: { generated?: string; teams: never[] } } } | null) => {
+      if (d?.live && d.live.mercato.generated === mercatoGenerated)
+        setLiveSigned(signedFromMercato(d.live.mercato.teams, region));
+    };
     fetch(`/api/mercato?region=${region}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.live && d.live.mercato.generated === mercatoGenerated)
-          setLiveSigned(signedFromMercato(d.live.mercato.teams, region));
+        use(d);
+        // dernière recherche trop ancienne : on relance en arrière-plan (scoops Sheep, Leaguepedia)
+        if (mercatoGenerated && isStale(d?.live, mercatoGenerated))
+          return fetch(`/api/mercato?region=${region}`, { method: "POST" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then(use);
       })
       .catch(() => {});
   }, [region, mercatoGenerated]);
