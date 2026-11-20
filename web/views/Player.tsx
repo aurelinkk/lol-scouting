@@ -8,6 +8,7 @@ import DeepButton from "@/components/DeepButton";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
 import { getMeta, getPlayer, getRankings, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
+import { similarPlayers } from "@/lib/similar";
 
 // Pages pré-générées pour les joueurs classés ; les autres sont générées à la demande
 export function playerStaticParams(region: Region) {
@@ -289,6 +290,39 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
       <Section title="Évolution">
         <Evolution points={player.evolution} />
       </Section>
+
+      {(() => {
+        const sim = similarPlayers(region, id);
+        if (!sim?.list.length) return null;
+        return (
+          <Section title={`Profils similaires · ${sim.role} ${sim.season}`}>
+            <p className="mb-2 text-xs text-ink-3">
+              Joueurs du même poste dont les stats {sim.season} ressemblent le plus aux siennes (toutes ligues de la
+              région), par exemple pour trouver une alternative moins chère.
+            </p>
+            <ul className="divide-y divide-border">
+              {sim.list.map(({ row, proximity }) => (
+                <li key={row.id} className="flex items-center gap-2 py-1.5 text-sm">
+                  <Avatar name={row.name} src={row.photo} size={24} />
+                  <Link href={link(region, `/joueurs/${row.id}`)} className="font-medium hover:underline">
+                    {row.name}
+                  </Link>
+                  <span className="truncate text-xs text-ink-3">
+                    {row.current_team ?? row.team} · {row.league_code}
+                    {row.age !== undefined && ` · ${row.age} ans`}
+                  </span>
+                  <span className="ml-auto shrink-0 text-xs text-ink-3" title="Proximité des stats (100 = identiques)">
+                    {proximity} %
+                  </span>
+                  <span className="w-12 shrink-0 text-right font-semibold tabular-nums" title="Score final">
+                    {fmtScore(row.final)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        );
+      })()}
     </div>
   );
 }

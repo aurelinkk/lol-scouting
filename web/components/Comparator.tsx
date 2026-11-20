@@ -268,6 +268,101 @@ function Bar({ pct, side }: { pct: number | null; side: "left" | "right" }) {
   );
 }
 
+/** Axes du radar, dans cet ordre quand le percentile existe pour les deux joueurs */
+const RADAR: StatKey[] = [
+  "winrate", "kda", "deaths_pg", "kp", "dpm", "dmg_share", "gold_min", "cs_min", "vision_min", "csd15", "gd15", "xpd15",
+];
+
+function Radar({
+  axes,
+  names,
+  colors,
+}: {
+  axes: { stat: StatKey; pa: number; pb: number }[];
+  names: [string, string];
+  colors: [string, string];
+}) {
+  // large en largeur pour les libellés à gauche et à droite
+  const W = 480;
+  const H = 320;
+  const r = 110;
+  const pt = (i: number, v: number) => {
+    const ang = -Math.PI / 2 + (2 * Math.PI * i) / axes.length;
+    return [W / 2 + Math.cos(ang) * r * v, H / 2 + Math.sin(ang) * r * v] as const;
+  };
+  const c = W / 2;
+  const poly = (key: "pa" | "pb") => axes.map((a, i) => pt(i, Math.max(0.02, a[key])).join(",")).join(" ");
+  const pct = (v: number) => `${Math.max(1, Math.round(v * 100))}e %`;
+  return (
+    <figure className="flex flex-col items-center gap-2">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[32rem]" role="img" aria-label={`Radar ${names[0]} contre ${names[1]}`}>
+        {[0.25, 0.5, 0.75, 1].map((ring) => (
+          <polygon
+            key={ring}
+            points={axes.map((_, i) => pt(i, ring).join(",")).join(" ")}
+            fill="none"
+            stroke="var(--grid)"
+            strokeWidth={1}
+          />
+        ))}
+        {axes.map((a, i) => {
+          const [x, y] = pt(i, 1);
+          const [lx, ly] = pt(i, 1.2);
+          return (
+            <g key={a.stat}>
+              <line x1={c} y1={H / 2} x2={x} y2={y} stroke="var(--grid)" strokeWidth={1} />
+              <text
+                x={lx}
+                y={ly}
+                fontSize={10}
+                textAnchor={Math.abs(lx - c) < 8 ? "middle" : lx > c ? "start" : "end"}
+                dominantBaseline="middle"
+                fill="var(--text-3)"
+              >
+                {STAT_LABELS[a.stat]}
+              </text>
+            </g>
+          );
+        })}
+        {(["pa", "pb"] as const).map((key, k) => (
+          <polygon
+            key={key}
+            points={poly(key)}
+            fill={colors[k]}
+            fillOpacity={0.15}
+            stroke={colors[k]}
+            strokeWidth={2}
+            strokeLinejoin="round"
+          />
+        ))}
+        {(["pa", "pb"] as const).map((key, k) =>
+          axes.map((a, i) => {
+            const [x, y] = pt(i, Math.max(0.02, a[key]));
+            return (
+              <g key={`${key}-${a.stat}`}>
+                <circle cx={x} cy={y} r={4} fill={colors[k]} stroke="var(--surface)" strokeWidth={2} />
+                {/* zone de survol plus grande que le point */}
+                <circle cx={x} cy={y} r={10} fill="transparent">
+                  <title>{`${STAT_LABELS[a.stat]} : ${names[0]} ${pct(a.pa)} · ${names[1]} ${pct(a.pb)}`}</title>
+                </circle>
+              </g>
+            );
+          }),
+        )}
+      </svg>
+      <figcaption className="flex items-center gap-4 text-xs text-ink-2">
+        {names.map((n, k) => (
+          <span key={n + k} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: colors[k] }} />
+            {n}
+          </span>
+        ))}
+        <span className="text-ink-3">percentile au poste dans sa ligue (bord = meilleur)</span>
+      </figcaption>
+    </figure>
+  );
+}
+
 export default function Comparator({
   seasons,
   leagues,
@@ -347,7 +442,17 @@ export default function Comparator({
             </span>
           );
         };
+        const axes = RADAR.map((stat) => lines.find((l) => l.stat === stat))
+          .filter((l): l is (typeof lines)[number] => !!l && l.pa !== null && l.pb !== null)
+          .map((l) => ({ stat: l.stat, pa: l.pa as number, pb: l.pb as number }));
         return (
+          <>
+          {axes.length >= 5 && (
+            <section className="rounded-lg border border-border bg-surface p-4">
+              <h2 className="mb-2 text-sm font-semibold">Profil</h2>
+              <Radar axes={axes} names={[nameA, nameB]} colors={[COLOR.a, COLOR.b]} />
+            </section>
+          )}
           <section className="rounded-lg border border-border bg-surface p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-semibold">Stats</h2>
@@ -399,6 +504,7 @@ export default function Comparator({
               ))}
             </div>
           </section>
+          </>
         );
       })()}
     </div>
