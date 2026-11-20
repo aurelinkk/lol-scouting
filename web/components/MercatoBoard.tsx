@@ -327,8 +327,12 @@ export default function MercatoBoard({
   }
   const top = REGION_INFO[region].top;
   const leagues = useMemo(() => {
+    // 1re division, puis 2e, puis 3e (LCK AS) ; ordre alphabétique dans une division
+    const rank = (tier?: string) => ({ LEC: 0, ERL1: 1, ERL2: 2 })[tier ?? ""] ?? 3;
+    const tierOf = new Map(teams.map((t) => [t.league, t.tier]));
     const codes = [...new Set(teams.map((t) => t.league))];
-    return codes.sort((a, b) => (a === top ? -1 : b === top ? 1 : a.localeCompare(b)));
+    return codes.sort((a, b) =>
+      a === top ? -1 : b === top ? 1 : rank(tierOf.get(a)) - rank(tierOf.get(b)) || a.localeCompare(b));
   }, [teams, top]);
   const [league, setLeague] = useState(top);
   const [onlyChanged, setOnlyChanged] = useState(false);

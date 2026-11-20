@@ -230,6 +230,22 @@ def base_rosters(games, season):
     last = (rc.sort_values("start").groupby(["league_code", "team"])["tournament"].last()
             .reset_index())
     rc = rc.merge(last, on=["league_code", "team", "tournament"])
+    # Équipes venues seulement pour un tournoi ouvert (LFL Invitational de janvier,
+    # avec des équipes de LFL2) : pas de place dans la ligue
+    rc = rc[~rc["tournament"].str.contains("Invitational", case=False, na=False)]
+    # Équipe renommée en cours de saison (DRX -> Kiwoom DRX, BRION -> HANJIN
+    # BRION) : l'ancien nom a les mêmes joueurs qu'une équipe plus récente de la
+    # même ligue (au moins 3 en commun) -> écarté
+    t_start = rc.groupby(["league_code", "team"])["start"].min()
+    players = rc.groupby(["league_code", "team"])["player"].agg(set)
+    stale = set()
+    for (league, team), ps in players.items():
+        for (league2, team2), ps2 in players.items():
+            if (league2 == league and team2 != team and len(ps & ps2) >= 3
+                    and t_start[(league2, team2)] > t_start[(league, team)]):
+                stale.add((league, team))
+    if stale:
+        rc = rc[[(lg, t) not in stale for lg, t in zip(rc["league_code"], rc["team"])]]
     starters = (rc.sort_values("games", ascending=False)
                 .drop_duplicates(["league_code", "team", "role"]))
     rows = []
@@ -579,11 +595,16 @@ def build_mercato(games, season, refresh=False):
     manual = load_mercato(season)
     if manual is not None:
         col = f"player_{season}"
+        leagues = set(board["league"])
         for _, m in manual.iterrows():
+            # fichier commun aux régions : une ligne ne vaut que pour la région de sa ligue
+            if m["league"] not in leagues:
+                continue
             slot = (board["team"] == m["team"]) & (board["role"] == m["role"])
             if not slot.any():
                 board = pd.concat([board, pd.DataFrame([{
-                    "league": m["league"], "tier": "LEC" if m["league"] == "LEC" else "ERL1",
+                    "league": m["league"],
+                    "tier": board.loc[board["league"] == m["league"], "tier"].iloc[0],
                     "team": m["team"], "role": m["role"], "before": m.get(f"player_{season - 1}") or None,
                     "after": None, "status": "", "source": ""}])], ignore_index=True)
                 slot = (board["team"] == m["team"]) & (board["role"] == m["role"])

@@ -21,14 +21,15 @@ import os
 REGIONS = {
     "eu": {"data": "data", "web": "", "home": ("EMEA",),
            "top": ("LoL EMEA Championship", "Europe League Championship Series"), "top_name": "LEC",
-           "has_em": True},
+           "has_em": True, "roster_tiers": ("LEC", "ERL1")},
     "na": {"data": "data/na", "web": "/na", "home": ("North America", "Americas"),
            "top": ("League of Legends Championship Series",
                    "League of Legends Championship of The Americas North",
                    "League of Legends Championship of The Americas"), "top_name": "LCS",
-           "has_em": False},
+           "has_em": False, "roster_tiers": ("LEC", "ERL1")},
     "kr": {"data": "data/kr", "web": "/kr", "home": ("Korea",),
-           "top": ("LoL Champions Korea",), "top_name": "LCK", "has_em": False},
+           "top": ("LoL Champions Korea",), "top_name": "LCK", "has_em": False,
+           "roster_tiers": ("LEC", "ERL1", "ERL2")},
 }
 ALL_REGIONS = tuple(REGIONS)
 
@@ -51,6 +52,11 @@ HOME_REGIONS = _cfg["home"]
 # Ligue(s) de 1re division, toutes années (historique « ex-LEC » / « ex-LCS » / « ex-LCK »)
 TOP_LEAGUES = _cfg["top"]
 TOP_NAME = _cfg["top_name"]
+
+# Divisions affichées dans l'onglet Rosters (effectifs + mercato) : la Corée
+# a aussi sa 3e division (LCK Academy Series) ; en Europe, les ERL2 sont trop
+# nombreuses pour le mercato
+ROSTER_TIERS = _cfg["roster_tiers"]
 
 # Tournoi international de la 2e division (coefficient de ligue) : EU seulement
 HAS_EM = _cfg["has_em"]

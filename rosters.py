@@ -13,12 +13,14 @@ import re
 import pandas as pd
 
 from leagues import LEAGUES
+from region import ROSTER_TIERS
 
 ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"]
 EXCLUDED = r"Promotion|Relegation|Qualifier|Play-In|LCQ"
 
 
-def build_rosters(games, tiers=("LEC", "ERL1")):
+def build_rosters(games, tiers=None):
+    tiers = tiers or ROSTER_TIERS
     g = games[games["tier"].isin(tiers)
               & ~games["tournament"].str.contains(EXCLUDED, case=False, na=False)]
     counts = (g.groupby(["season", "league_code", "tier", "tournament", "team", "player", "role"])
