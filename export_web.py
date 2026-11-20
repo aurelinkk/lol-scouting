@@ -28,7 +28,7 @@ from leagues import LEAGUES, leagues_by_region
 from mercato import CONTRACT_CUTOFF
 from region import RAW_DIR, REGION, WEB_DATA_DIR, WEB_PUBLIC_DIR
 from promotions import compute_promotions, hit_rates
-from prospects import add_game_metrics, aggregate, build_ranking
+from prospects import add_game_metrics, aggregate, build_ranking, split_trend
 from league_talent import league_talent, season_coefficients
 from scoring import EM_WEIGHT, LEAGUE_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
@@ -404,8 +404,10 @@ def main():
     scores = {}  # (season, player) -> détail du score
     for season in seasons:
         ranking = build_ranking(games, season, coef_window(season))
+        trends = split_trend(games, season)  # progression d'un split à l'autre
         for _, r in ranking.iterrows():
             rec = record(r, rank_fields)
+            rec.update(trends.get(r["player"], {}))
             rec.update(id=ids[r["player"]], name=r["player"], played_lec=bool(r["played_lec"]))
             cur = current_team.get(r["player"], r["team"])
             for key, value in (("photo", photos.get(r["player"])), ("logo", logos.get(r["team"])),

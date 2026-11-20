@@ -12,7 +12,7 @@ import { isStale } from "@/lib/mercato/stale";
 import { HOME_ORIGIN, ORIGINS, originOf } from "@/lib/origin";
 import { useWatchlist } from "@/lib/useWatchlist";
 
-type SortKey = "final" | "age" | "games" | "league_score" | "league_bonus" | "em_score" | StatKey;
+type SortKey = "final" | "age" | "games" | "league_score" | "league_bonus" | "em_score" | "trend" | StatKey;
 
 const STAT_COLUMNS: { key: StatKey; label: string; oe?: boolean }[] = [
   { key: "winrate", label: "WR" },
@@ -175,6 +175,8 @@ export default function DataTable({
   );
 
   const columns = STAT_COLUMNS.filter((c) => hasOe || !c.oe);
+  // Progression split à split : présente après un export récent (export_web.py)
+  const hasTrend = useMemo(() => (rows ?? []).some((r) => r.season === season && r.trend !== undefined), [rows, season]);
   const isCurrent = season === Math.max(...seasons);
   const next = mercatoSeason ?? season + 1;
   // Couleur de ligne : montée d'un niveau (doré : vers la 1re division, vert : 3e -> 2e)
@@ -410,6 +412,7 @@ export default function DataTable({
                   {header("age", "Âge")}
                   {header("games", "Parties")}
                   {header("final", "Score", "Score final")}
+                  {hasTrend && header("trend", "Prog.", "Progression : score du dernier split moins celui du split précédent dans la même ligue")}
                   {header("league_score", "Ligue", "Performance dans sa ligue (z-score pondéré)")}
                   {(R.hasLeagues || includeLec) && header("league_bonus", "Bonus", "Bonus de niveau de ligue")}
                   {R.hasEm && header("em_score", "EM", "Performance à l'EMEA Masters")}
@@ -567,6 +570,20 @@ export default function DataTable({
                     <td className="px-2 py-1.5 text-right font-semibold" title={topPercent(r.role_percentile)}>
                       {fmtScore(noLeague ? r.final - r.league_bonus : r.final)}
                     </td>
+                    {hasTrend && (
+                      <td
+                        className="whitespace-nowrap px-2 py-1.5 text-right text-xs tabular-nums"
+                        title={r.trend !== undefined ? `${r.trend_prev} → ${r.trend_split}` : "Pas deux splits comparables"}
+                      >
+                        {r.trend === undefined ? (
+                          <span className="text-ink-3">–</span>
+                        ) : (
+                          <span style={{ color: r.trend >= 0.15 ? "var(--good)" : r.trend <= -0.15 ? "var(--critical)" : "var(--text-3)" }}>
+                            {r.trend >= 0.15 ? "↑" : r.trend <= -0.15 ? "↓" : "→"} {fmtScore(r.trend)}
+                          </span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_score)}</td>
                     {(R.hasLeagues || includeLec) && (
                       <td className="px-2 py-1.5 text-right text-ink-2">{fmtScore(r.league_bonus)}</td>

@@ -225,3 +225,9 @@ SOLOQ_ROLE_WEIGHTS = {
 }
 SOLOQ_MIN_GAMES = 15          # parties analysées minimum pour avoir un score
 SOLOQ_STANDOUT = 0.95         # « se démarque » = top 5 % de son poste
+
+
+# Poids du dernier split : une partie compte moitié moins quand elle a été jouée
+# RECENCY_HALF_LIFE_DAYS jours avant la dernière partie du joueur dans la ligue
+# (None = toutes les parties de la saison au même poids). Voir le backtest.
+RECENCY_HALF_LIFE_DAYS = None

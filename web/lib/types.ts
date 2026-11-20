@@ -49,6 +49,10 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   soloq_lp_7d?: number;
   soloq_games_7d?: number;
   em_games: number;
+  /** Progression : score du dernier split - score du split précédent (même ligue) */
+  trend?: number;
+  trend_split?: string;
+  trend_prev?: string;
   role_percentile: number;
   played_lec: boolean;
   /** Ancien joueur de LEC (dernière saison en LEC), ex : "Rogue (European Team) (2024)" */

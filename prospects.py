@@ -15,6 +15,7 @@ Usage :
     python prospects.py --tier ERL2
 """
 import argparse
+import re
 
 import pandas as pd
 
@@ -70,16 +71,32 @@ def add_champion_adjusted(df):
 def aggregate(df):
     """Une ligne par saison / joueur / ligue / rôle."""
     keys = ["season", "player", "league_code", "tier", "role"]
-    df = df.sort_values("date")  # pour que "last" = la partie la plus récente
+    df = df.sort_values("date").copy()  # pour que "last" = la partie la plus récente
+    # Poids de chaque partie selon son ancienneté dans la saison (dernier split
+    # plus important) : 1 pour la dernière partie, 0.5 à RECENCY_HALF_LIFE_DAYS
+    half_life = getattr(scoring, "RECENCY_HALF_LIFE_DAYS", None)
+    if half_life:
+        last = df.groupby(keys)["date"].transform("max")
+        df["_w"] = 0.5 ** ((last - df["date"]).dt.days.clip(lower=0) / half_life)
+    else:
+        df["_w"] = 1.0
     grouped = df.groupby(keys)
-    totals = grouped[["kills", "deaths", "assists", "cs", "gold", "damage",
-                      "vision_score", "duration_min"]].sum()
+    sum_cols = ["kills", "deaths", "assists", "cs", "gold", "damage", "vision_score", "duration_min"]
+    totals = df[sum_cols].mul(df["_w"], axis=0).groupby([df[k] for k in keys]).sum()
     games = grouped.size()
+
+    def wmean(col):
+        """Moyenne pondérée par l'ancienneté, en ignorant les valeurs manquantes."""
+        x = pd.to_numeric(df[col], errors="coerce")
+        w = df["_w"].where(x.notna(), 0.0)
+        num = (x.fillna(0) * w).groupby([df[k] for k in keys]).sum()
+        den = w.groupby([df[k] for k in keys]).sum()
+        return num / den.where(den > 0)
 
     stats = pd.DataFrame({
         "games": games,
         "team": grouped["team"].last(),  # équipe la plus récente
-        "winrate": grouped["win"].mean(),
+        "winrate": wmean("win"),
         "kda": (totals["kills"] + totals["assists"]) / totals["deaths"].clip(lower=1),
         "deaths_pg": totals["deaths"] / games,
         "assists_pg": totals["assists"] / games,
@@ -87,14 +104,14 @@ def aggregate(df):
         "gold_min": totals["gold"] / totals["duration_min"],
         "dpm": totals["damage"] / totals["duration_min"],
         "vision_min": totals["vision_score"] / totals["duration_min"],
-        "kp": grouped["kp"].mean(),
-        "dmg_share": grouped["dmg_share"].mean(),
-        "dmg_share_vs_champ": grouped["dmg_share_vs_champ"].mean(),
-        "dpm_vs_champ": grouped["dpm_vs_champ"].mean(),
-        "gold_share": grouped["gold_share"].mean(),
+        "kp": wmean("kp"),
+        "dmg_share": wmean("dmg_share"),
+        "dmg_share_vs_champ": wmean("dmg_share_vs_champ"),
+        "dpm_vs_champ": wmean("dpm_vs_champ"),
+        "gold_share": wmean("gold_share"),
         "champions": grouped["champion"].nunique(),
         # Oracle's Elixir : moyenne sur les parties retrouvées
-        **{stat: grouped[stat].mean() for stat in OE_STATS},
+        **{stat: wmean(stat) for stat in OE_STATS},
         "oe_games": grouped["oe_match"].sum(),
         "birthdate": grouped["birthdate"].first(),
         "age_approx": grouped["birthdate_approx"].any() if "birthdate_approx" in df else False,
@@ -183,6 +200,47 @@ def blend_international(league_rows, season):
                                                      * games / (games + scoring.INTL_SHRINK_GAMES))
     league_rows.loc[top, "score"] = league_rows.loc[top, "score"] * scoring.TOP_LEAGUE_SPREAD
     return league_rows
+
+
+SPLIT_MIN_GAMES = 5  # parties minimum dans un split pour la progression
+_NOT_A_SPLIT = r"Promotion|Relegation|Qualifier|Play-In|LCQ|Cup|Invitational|Versus|Showmatch|All-Star"
+_PLAYOFFS = re.compile(r"\s+(Playoffs|Finals|Season Finals|Grand Finals|Knockouts?|Play-?Ins?|Last Chance.*)$", re.I)
+
+
+def split_trend(games, season):
+    """Progression de chaque joueur d'un split à l'autre (flèche ↑/↓ de l'onglet Données).
+
+    Score d'un split = même calcul que le classement (z-scores pondérés parmi les
+    joueurs du même poste, dans la même ligue et le même split, playoffs compris).
+    Progression = score du dernier split de la saison - score du split précédent
+    (même saison ou fin de la précédente), dans la même ligue : un changement
+    de ligue n'est pas comparable. Promotions, qualifications et coupes exclues.
+    Renvoie {joueur: {"trend", "trend_split", "trend_prev"}}.
+    """
+    g = games[games["season"].isin([season - 1, season]) & games["tier"].isin(["ERL1", "ERL2", "LEC"])
+              & ~games["tournament"].astype(str).str.contains(_NOT_A_SPLIT, case=False, na=False)]
+    if g.empty:
+        return {}
+    g = add_game_metrics(g).copy()
+    g["split"] = g["tournament"].astype(str).str.replace(_PLAYOFFS, "", regex=True)
+    split_season = dict(zip(g["split"], g["season"]))
+    g["season"] = g["split"]  # aggregate() regroupe par « saison » : ici, par split
+    stats = aggregate(g)
+    stats = stats[stats["games"] >= SPLIT_MIN_GAMES]
+    stats = weighted_zscores(stats, ["season", "league_code", "role"])
+    stats = stats.dropna(subset=["score"]).sort_values("last_game")
+    out = {}
+    for player, grp in stats.groupby("player"):
+        if len(grp) < 2:
+            continue
+        last = grp.iloc[-1]
+        same = grp[grp["league_code"] == last["league_code"]]  # même ligue seulement
+        if len(same) < 2 or split_season.get(last["season"]) != season:
+            continue
+        prev = same.iloc[-2]
+        out[player] = {"trend": round(float(last["score"] - prev["score"]), 3),
+                       "trend_split": last["season"], "trend_prev": prev["season"]}
+    return out
 
 
 def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=None):
