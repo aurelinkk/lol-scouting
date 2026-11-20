@@ -183,7 +183,7 @@ function Header({ pick, row, leagues }: { pick: Pick; row: RankingRow; leagues: 
     return m ? [m[1], m[2]] : [row.name, null];
   })();
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-surface p-4">
+    <div className="space-y-3 card p-4">
       <div className="flex items-center gap-3">
         <Avatar name={row.name} src={row.photo} size={64} />
         <div className="min-w-0">
@@ -449,12 +449,12 @@ export default function Comparator({
         return (
           <>
           {axes.length >= 5 && (
-            <section className="rounded-lg border border-border bg-surface p-4">
+            <section className="card p-4">
               <h2 className="mb-2 text-sm font-semibold">Profil</h2>
               <Radar axes={axes} names={[nameA, nameB]} colors={[COLOR.a, COLOR.b]} />
             </section>
           )}
-          <section className="rounded-lg border border-border bg-surface p-4">
+          <section className="card p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-semibold">Stats</h2>
               <div className="flex items-center gap-3 text-sm">

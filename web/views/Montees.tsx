@@ -128,7 +128,7 @@ function PromotionSeason({ promo, region, during = false }: { promo: Promotion; 
         return (
           <div className="space-y-6">
 
-            <section className="rounded-lg border border-border bg-surface p-4">
+            <section className="card p-4">
               <h3 className="text-sm font-semibold">
                 {during ? `Montés en ${R.top} pendant la saison ${promo.from}` : `${T("ERL1")} → ${R.top}`} · {lec.length} joueurs
               </h3>
@@ -184,7 +184,7 @@ function PromotionSeason({ promo, region, during = false }: { promo: Promotion; 
             </section>
 
             {erl.length > 0 && (
-            <section className="rounded-lg border border-border bg-surface p-4">
+            <section className="card p-4">
               <h3 className="text-sm font-semibold">{T("ERL2")} → {T("ERL1")} · {erl.length} joueurs</h3>
               <p className="mb-3 mt-0.5 text-xs text-ink-3">
                 {top10(erl)} sur {erl.length} étaient dans le top 10 % des {T("ERL2")} de leur poste en {promo.from}. Beaucoup

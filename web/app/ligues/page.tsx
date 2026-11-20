@@ -236,7 +236,7 @@ export default function LiguesPage() {
         <p className="text-sm text-ink-3">Relance export_web.py pour générer le niveau des ligues par saison.</p>
       ) : (
         <>
-          <section className="rounded-lg border border-border bg-surface p-4">
+          <section className="card p-4">
             <h2 className="text-sm font-semibold">Évolution du coefficient</h2>
             <p className="mt-0.5 text-xs text-ink-3">▲ ▼ : variation d&apos;au moins 0,03 par rapport à la saison d&apos;avant.</p>
             <div className="mt-3">
@@ -251,7 +251,7 @@ export default function LiguesPage() {
               content: (
                 <div className="space-y-6">
                   {(["ERL1", "ERL2"] as const).map((tier) => (
-                    <section key={tier} className="rounded-lg border border-border bg-surface p-4">
+                    <section key={tier} className="card p-4">
                       <h2 className="text-sm font-semibold">
                         {tier} {season}
                       </h2>

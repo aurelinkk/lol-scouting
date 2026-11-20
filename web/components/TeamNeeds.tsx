@@ -139,7 +139,7 @@ export default function TeamNeeds({
             return o && o !== home;
           });
           return (
-            <section key={t.team} className="rounded-2xl border border-border bg-surface p-3">
+            <section key={t.team} className="card p-3">
               <header className="mb-2 flex items-center gap-2">
                 <TeamLogo team={t.team} src={t.logo} size={20} />
                 <h2 className="font-semibold">{t.team}</h2>

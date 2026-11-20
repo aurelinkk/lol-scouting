@@ -67,7 +67,7 @@ export default function AnalysesPage() {
       </div>
 
       {state && (!state.persistent || !state.riotKey) && (
-        <div className="rounded-lg border border-border bg-surface p-3 text-sm">
+        <div className="card p-3 text-sm">
           <div className="font-semibold">Configuration Vercel à terminer</div>
           <ul className="mt-1 list-disc pl-5 text-ink-2">
             {!state.persistent && (
@@ -86,7 +86,7 @@ export default function AnalysesPage() {
         </div>
       )}
 
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-3">
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 card p-3">
         <label className="flex min-w-56 flex-1 flex-col gap-1 text-xs text-ink-3">
           Riot ID
           <input
@@ -127,7 +127,7 @@ export default function AnalysesPage() {
       </form>
       {error && <p className="text-sm text-critical">{error}</p>}
 
-      <section className="rounded-lg border border-border bg-surface">
+      <section className="card">
         <h2 className="border-b border-border px-4 py-2 text-sm font-semibold">Analyses</h2>
         {!state && <p className="p-4 text-sm text-ink-3">Chargement…</p>}
         {state && !state.jobs.length && <p className="p-4 text-sm text-ink-3">Aucune analyse pour l&apos;instant.</p>}

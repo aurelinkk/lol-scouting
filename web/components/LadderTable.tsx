@@ -112,7 +112,7 @@ export default function LadderTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-3">
+      <div className="flex flex-wrap items-end gap-3 card p-3">
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Joueurs
           <NativeSelect value={who} onChange={(e) => setWho(e.target.value as typeof who)}>
@@ -159,7 +159,7 @@ export default function LadderTable() {
         relevés précédents · Score = stats soloQ de l&apos;année comparées aux joueurs du même poste (⭐ = top 5 %).
       </p>
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+      <div className="overflow-x-auto card">
         <table className="tabular w-full whitespace-nowrap text-sm">
           <thead className="border-b border-border text-xs text-ink-3">
             <tr>

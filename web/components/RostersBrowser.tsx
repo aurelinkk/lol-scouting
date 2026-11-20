@@ -38,7 +38,7 @@ function TeamCard({ team }: { team: RosterTeam }) {
   const starters = ROLES.map((role) => team.players.filter((p) => p.role === role).sort((a, b) => b.games - a.games)[0]);
   const subs = team.players.filter((p) => !starters.includes(p));
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+    <div className="overflow-hidden card">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <TeamLogo team={team.team} src={team.logo} size={24} />
         <span className="truncate text-sm font-semibold">{team.team}</span>
@@ -139,7 +139,7 @@ export default function RostersBrowser() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-3">
+      <div className="flex flex-wrap items-end gap-3 card p-3">
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Saison
           <NativeSelect value={season} onChange={(e) => setSeason(Number(e.target.value))}>

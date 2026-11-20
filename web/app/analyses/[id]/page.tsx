@@ -42,7 +42,7 @@ const monthLabel = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slic
 
 function Tile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-3">
+    <div className="card p-3">
       <div className="text-xs uppercase tracking-wide text-ink-3">{label}</div>
       <div className="tabular mt-1 text-xl font-semibold">{value}</div>
     </div>
@@ -116,7 +116,7 @@ export default function DeepReportPage() {
         <Tile label="Vision/min" value={s.vision_min.toFixed(2)} />
       </div>
 
-      <section className="rounded-lg border border-border bg-surface p-4">
+      <section className="card p-4">
         <h2 className="mb-3 text-sm font-semibold">Évolution mois par mois</h2>
         <div className="mb-3 flex flex-wrap gap-1.5">
           {METRICS.map((x) => (
@@ -152,7 +152,7 @@ export default function DeepReportPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
-        <section className="rounded-lg border border-border bg-surface p-4">
+        <section className="card p-4">
           <h2 className="mb-3 text-sm font-semibold">Postes</h2>
           <HBarChart
             max={1}
@@ -166,7 +166,7 @@ export default function DeepReportPage() {
           />
         </section>
 
-        <section className="rounded-lg border border-border bg-surface p-4">
+        <section className="card p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">Pool de champions ({report.champions.length} joués)</h2>
             <label className="flex items-center gap-1.5 text-xs text-ink-3">

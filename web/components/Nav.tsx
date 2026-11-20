@@ -34,19 +34,22 @@ export default function Nav() {
   const current = stripRegion(pathname);
   return (
     <>
-      <div className="flex shrink-0 rounded-md border border-border p-0.5 text-xs" role="group" aria-label="Région">
+      <div className="flex shrink-0 rounded-full border border-border bg-surface-2/60 p-0.5 text-[11px]" role="group" aria-label="Région">
         {REGIONS.map((r) => (
           <Link
             key={r}
             href={switchTo(pathname, r)}
             title={REGION_INFO[r].name}
-            className={`rounded px-2 py-1 ${r === region ? "bg-accent-soft font-semibold text-ink" : "text-ink-3 hover:text-ink"}`}
+            aria-current={r === region ? "true" : undefined}
+            className={`rounded-full px-2.5 py-1 font-semibold transition-colors ${
+              r === region ? "bg-accent text-white shadow-[0_0_12px_-3px_var(--accent)]" : "text-ink-3 hover:text-ink"
+            }`}
           >
             {REGION_INFO[r].short}
           </Link>
         ))}
       </div>
-      <nav className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1 text-sm [scrollbar-width:none]">
+      <nav className="-mx-1 flex min-w-0 gap-0.5 overflow-x-auto px-1 text-sm [scrollbar-width:none]">
         {NAV.filter((n) => region === "eu" || !n.eu_only).map((n) => {
           const href = n.eu_only || n.global ? n.path : link(region, n.path);
           const active = n.path === "/" ? current === "/" : current.startsWith(n.path);
@@ -54,9 +57,15 @@ export default function Nav() {
             <Link
               key={n.path}
               href={href}
-              className={`shrink-0 rounded-md px-2 py-1.5 hover:bg-surface-2 hover:text-ink sm:px-3 ${active ? "text-ink" : "text-ink-2"}`}
+              aria-current={active ? "page" : undefined}
+              className={`relative shrink-0 rounded-full px-2.5 py-1.5 text-[13px] transition-colors hover:bg-surface-2 hover:text-ink sm:px-3 ${
+                active ? "font-medium text-ink" : "text-ink-2"
+              }`}
             >
               {n.label}
+              {active && (
+                <span aria-hidden className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-accent shadow-[0_0_10px_var(--accent)]" />
+              )}
             </Link>
           );
         })}

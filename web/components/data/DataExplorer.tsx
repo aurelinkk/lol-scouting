@@ -499,7 +499,7 @@ export default function DataExplorer({
       {/* Filtres */}
       <section
         aria-label="Filtres"
-        className="space-y-3 rounded-2xl border border-border bg-surface p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04)] sm:p-4"
+        className="space-y-3 card p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04)] sm:p-4"
       >
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1 sm:max-w-sm">
@@ -644,7 +644,7 @@ export default function DataExplorer({
       {/* Tableau */}
       <div
         ref={scrollRef}
-        className="relative h-[calc(100dvh-15rem)] min-h-[26rem] overflow-auto rounded-2xl border border-border bg-surface"
+        className="relative h-[calc(100dvh-15rem)] min-h-[26rem] overflow-auto card"
       >
         {!rows && !error && <p className="p-4 text-sm text-ink-3">Chargement…</p>}
         {rows && (

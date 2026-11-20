@@ -6,27 +6,80 @@ import { REGIONS } from "@/lib/region";
 import { link, playerLink, REGION_INFO, type Region, tierName } from "@/lib/region";
 import { getLeagues, getMeta, getPromotions, getRankings, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
-import { ROLES } from "@/lib/types";
+import { ROLES, type RankingRow } from "@/lib/types";
+import { ArrowRightIcon, type LucideIcon, SwordsIcon, TrendingUpIcon, TrophyIcon, UsersIcon } from "lucide-react";
 
 const MIN_GAMES = 15;
 
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Kpi({ label, value, hint, icon: Icon, tone = "accent" }: { label: string; value: string; hint?: string; icon: LucideIcon; tone?: "accent" | "gold" }) {
+  const color = tone === "gold" ? "var(--gold)" : "var(--accent)";
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <div className="text-xs uppercase tracking-wide text-ink-3">{label}</div>
-      <div className="tabular mt-1 text-2xl font-semibold">{value}</div>
+    <div className="card relative overflow-hidden p-4">
+      <div
+        aria-hidden
+        className="absolute -right-6 -top-6 size-24 rounded-full opacity-20 blur-2xl"
+        style={{ background: color }}
+      />
+      <div className="flex items-center gap-2">
+        <span className="grid size-7 place-items-center rounded-lg" style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, color }}>
+          <Icon className="size-4" />
+        </span>
+        <span className="eyebrow">{label}</span>
+      </div>
+      <div className="tabular mt-3 text-3xl font-semibold tracking-tight">{value}</div>
       {hint && <div className="mt-1 text-xs text-ink-3">{hint}</div>}
     </div>
   );
 }
 
-function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Card({ title, subtitle, eyebrow, children, action }: { title: string; subtitle?: string; eyebrow?: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      {subtitle && <p className="mt-0.5 text-xs text-ink-3">{subtitle}</p>}
-      <div className="mt-4">{children}</div>
+    <section className="card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
+          <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+          {subtitle && <p className="mt-1 max-w-3xl text-xs text-ink-3">{subtitle}</p>}
+        </div>
+        {action}
+      </div>
+      <div className="mt-5">{children}</div>
     </section>
+  );
+}
+
+/** Meilleur joueur d'un poste : carte mise en avant */
+function Featured({ p, region }: { p: RankingRow; region: Region }) {
+  return (
+    <Link
+      href={playerLink(region, p.id)}
+      className="group relative block overflow-hidden rounded-xl border border-border bg-gradient-to-b from-surface-2 to-surface p-3 transition-colors hover:border-gold/60"
+    >
+      <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/70 to-transparent" />
+      <div className="flex items-center gap-3">
+        <span className="rounded-full p-0.5" style={{ background: "conic-gradient(from 200deg, var(--gold), transparent 70%, var(--gold))" }}>
+          <Avatar name={p.name} src={p.photo} size={52} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold group-hover:underline">
+            <PlayerName name={p.name} />
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-3">
+            <TeamLogo team={p.team} src={p.logo} size={14} />
+            <span className="truncate">{p.team}</span>
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-end justify-between">
+        <div className="text-xs text-ink-3">
+          {p.league_code} · {p.age !== undefined ? `${p.age_approx ? "~" : ""}${p.age} ans` : "âge ?"}
+        </div>
+        <div className="text-right">
+          <div className="tabular text-2xl font-semibold leading-none text-gold">{fmtScore(p.final)}</div>
+          <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-ink-3">{topPercent(p.role_percentile)}</div>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -124,37 +177,65 @@ export default function Dashboard({ region }: { region: Region }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Indicateurs</h1>
-        <p className="text-sm text-ink-2">
-          {region === "eu"
-            ? "Prospects européens : ERL1, ERL2, EMEA Masters et montées en LEC."
-            : region === "na"
-              ? "Prospects nord-américains : NACL et montées en LCS."
-              : "Prospects coréens : LCK CL, LCK Academy Series et montées en LCK."}
-        </p>
-      </div>
+      <section className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-surface via-surface to-accent-soft/40 px-6 py-8 sm:px-10 sm:py-10">
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-80 rounded-full bg-accent/20 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-28 right-40 size-64 rounded-full bg-gold/10 blur-3xl" />
+        <div className="relative max-w-3xl">
+          <div className="eyebrow mb-3 flex items-center gap-2">
+            <span className="size-1.5 rounded-full bg-gold shadow-[0_0_8px_var(--gold)]" />
+            Saison {season} · {R.name}
+          </div>
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Repérer les talents <span className="bg-gradient-to-r from-accent to-gold bg-clip-text text-transparent">avant tout le monde</span>
+          </h1>
+          <p className="mt-3 text-sm text-ink-2 sm:text-base">
+            {region === "eu"
+              ? "Prospects européens : ERL1, ERL2, EMEA Masters et montées en LEC."
+              : region === "na"
+                ? "Prospects nord-américains : NACL et montées en LCS."
+                : "Prospects coréens : LCK CL, LCK Academy Series et montées en LCK."}{" "}
+            Classement par poste, niveau des ligues, mercato en direct.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Link
+              href={link(region, "/donnees")}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-medium text-white shadow-[0_0_20px_-6px_var(--accent)] transition-colors hover:bg-accent/90"
+            >
+              Explorer les joueurs <ArrowRightIcon className="size-4" />
+            </Link>
+            <Link href={link(region, "/besoins")} className="inline-flex h-9 items-center rounded-full border border-border bg-surface/60 px-4 text-sm text-ink-2 transition-colors hover:border-ink-3 hover:text-ink">
+              Besoins des équipes
+            </Link>
+            <Link href={link(region, "/rosters")} className="inline-flex h-9 items-center rounded-full border border-border bg-surface/60 px-4 text-sm text-ink-2 transition-colors hover:border-ink-3 hover:text-ink">
+              Mercato {season + 1}
+            </Link>
+          </div>
+        </div>
+      </section>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi label="Joueurs suivis" value={meta.players.toLocaleString("fr-FR")} />
-        <Kpi label="Parties analysées" value={meta.games.toLocaleString("fr-FR")} hint={`Saisons ${meta.seasons.join(", ")}`} />
-        <Kpi label="Ligues" value={String(meta.leagues)} hint={region === "eu" ? "LEC, EM, ERL1, ERL2" : region === "na" ? "LCS, NACL" : "LCK, LCK CL, Academy"} />
+        <Kpi icon={UsersIcon} label="Joueurs suivis" value={meta.players.toLocaleString("fr-FR")} />
+        <Kpi icon={SwordsIcon} label="Parties analysées" value={meta.games.toLocaleString("fr-FR")} hint={`Saisons ${meta.seasons.join(", ")}`} />
+        <Kpi icon={TrophyIcon} label="Ligues" value={String(meta.leagues)} hint={region === "eu" ? "LEC, EM, ERL1, ERL2" : region === "na" ? "LCS, NACL" : "LCK, LCK CL, Academy"} />
         <Kpi
-          label={`Montés en ${R.top} ${lastPromo ? `(${lastPromo.from}→${lastPromo.to})` : ""}`}
+          icon={TrendingUpIcon}
+          tone="gold"
+          label={`Montés en ${R.top}`}
           value={String(lecUp)}
-          hint="hors équipes invitées"
+          hint={lastPromo ? `${lastPromo.from} → ${lastPromo.to}, hors équipes invitées` : undefined}
         />
       </div>
 
       {multiRegion && (
         <Card
-          title="Meilleurs cracks — toutes régions"
+          eyebrow="Toutes régions"
+          title="Meilleurs cracks"
           subtitle="Europe, Amérique du Nord et Corée mélangées, classées par rang dans leur poste au sein de leur région (top 1 % d'abord) : les scores ne se comparent pas directement d'une région à l'autre. 21 ans ou moins (23 en NA), jamais passés par la 1re division."
         >
           <div className="grid gap-4 md:grid-cols-5">
             {ROLES.map((role) => (
               <div key={role}>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">{role}</div>
+                <div className="eyebrow mb-2">{role}</div>
                 <ol className="space-y-1.5">
                   {crossRegion
                     .filter((p) => p.role === role)
@@ -164,7 +245,7 @@ export default function Dashboard({ region }: { region: Region }) {
                       <li key={`${p.region}-${p.id}`}>
                         <Link
                           href={playerLink(p.region, p.id)}
-                          className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-2"
+                          className="flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-surface-2"
                         >
                           <Avatar name={p.name} src={p.photo} size={34} />
                           <div className="min-w-0 flex-1">
@@ -202,22 +283,29 @@ export default function Dashboard({ region }: { region: Region }) {
       )}
 
       <Card
-        title={`Meilleurs prospects ${season} — ${MAX_AGE} ans ou moins`}
+        eyebrow={`${MAX_AGE} ans ou moins · saison ${season}`}
+        title="Meilleurs prospects"
+        action={
+          <Link href={link(region, "/donnees")} className="inline-flex items-center gap-1 text-sm text-accent hover:underline">
+            Tout le classement <ArrowRightIcon className="size-3.5" />
+          </Link>
+        }
         subtitle={`Hors joueurs déjà passés par la ${R.top}, au moins ${MIN_GAMES} parties. « âge ? » = date de naissance inconnue (à compléter dans birthdates.csv). Score = ${R.hasEm ? "perf. dans sa ligue + niveau de la ligue + EMEA Masters" : "perf. dans la NACL comparée aux joueurs du même poste"}.`}
       >
         <div className="grid gap-4 md:grid-cols-5">
           {ROLES.map((role) => (
             <div key={role}>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">{role}</div>
-              <ol className="space-y-2">
+              <div className="eyebrow mb-2">{role}</div>
+              {prospects.find((p) => p.role === role) && <Featured p={prospects.find((p) => p.role === role)!} region={region} />}
+              <ol className="mt-2 space-y-1">
                 {prospects
                   .filter((p) => p.role === role)
-                  .slice(0, 4)
+                  .slice(1, 4)
                   .map((p) => (
                     <li key={p.id}>
                       <Link
                         href={playerLink(region, p.id)}
-                        className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-2"
+                        className="flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-surface-2"
                       >
                         <Avatar name={p.name} src={p.photo} size={40} />
                         <div className="min-w-0 flex-1">
@@ -242,11 +330,7 @@ export default function Dashboard({ region }: { region: Region }) {
             </div>
           ))}
         </div>
-        <div className="mt-3 text-right">
-          <Link href={link(region, "/donnees")} className="text-sm text-accent hover:underline">
-            Voir tout le classement →
-          </Link>
-        </div>
+
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">

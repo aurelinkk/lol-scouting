@@ -182,7 +182,7 @@ function TeamCard({ t, season }: { t: MercatoTeam; season: number }) {
   const coachNote = (role: string) =>
     role === "Coach" ? undefined : role.replace("Head Coach", "HC").replace(" Coach", "");
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+    <div className="overflow-hidden card">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <TeamLogo team={t.team} src={t.logo} size={22} />
         <span className="truncate text-sm font-semibold">{t.team}</span>
@@ -410,7 +410,7 @@ export default function MercatoBoard({
         </label>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-3 card px-3 py-2 text-xs">
         <Button variant="soft" size="lg" onClick={refresh} disabled={loading}>
           <RefreshCwIcon className={loading ? "animate-spin" : ""} />
           {loading ? (auto ? "Mise à jour automatique…" : "Recherche des nouveautés…") : "Actualiser le mercato"}
@@ -497,7 +497,7 @@ export default function MercatoBoard({
               </p>
             </div>
           )}
-          <div className="rounded-lg border border-border bg-surface p-3">
+          <div className="card p-3">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Légende</div>
             {[
               { title: String(season - 1), items: LEGEND_LEFT },
@@ -520,7 +520,7 @@ export default function MercatoBoard({
             </p>
           </div>
           {undecided.length > 0 && (
-            <div className="rounded-lg border border-border bg-surface p-3 text-sm">
+            <div className="card p-3 text-sm">
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">Pistes non tranchées</div>
               <ul className="space-y-0.5 text-xs">
                 {undecided.map((u) => (

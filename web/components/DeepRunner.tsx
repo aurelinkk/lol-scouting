@@ -91,7 +91,7 @@ export default function DeepRunner() {
         </Link>
       )}
       {toast && (
-        <div className="fixed bottom-16 right-4 z-40 max-w-xs rounded-lg border border-border bg-surface p-3 text-sm shadow-xl">
+        <div className="fixed bottom-16 right-4 z-40 max-w-xs card p-3 text-sm shadow-xl">
           <div className="font-semibold">Analyse terminée</div>
           <div className="text-ink-2">{toast.riotId}</div>
           <div className="mt-2 flex gap-3">

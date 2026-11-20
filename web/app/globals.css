@@ -1,31 +1,81 @@
 @import "tailwindcss";
 
-/* Thème : couleurs définies une seule fois, redéfinies pour le mode sombre */
-:root {
+/* Thème « esport » : sombre bleu nuit par défaut, accents dorés pour la 1re
+   division. Thème clair au choix (bouton de l'en-tête, data-theme="light").
+   Couleurs des graphiques validées (lisibles, daltoniens compris) sur chaque fond. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #070b16;
+  --surface: #0e1424;
+  --surface-2: #151d33;
+  --border: #222c45;
+  --text: #e9edf7;
+  --text-2: #a9b3c9;
+  --text-3: #6c7894;
+  --accent: #4a86f5;
+  --accent-soft: #1a2d55;
+  --series-1: #4a86f5;
+  --series-2: #e5652f;
+  --series-3: #1fa874;
+  --good: #1fa874;
+  --good-text: #4ade80;
+  --critical: #ff5c6c;
+  --grid: #1a2238;
+  /* Niveaux de compétition */
+  --tier-lec: #f2b440;
+  --tier-erl1: #4a86f5;
+  --tier-erl2: #e5652f;
+  --tier-em: #1fa874;
+  --gold: #f2b440;
+  /* Fond : halo bleu et doré en haut de page */
+  --glow-1: rgb(74 134 245 / 0.13);
+  --glow-2: rgb(242 180 64 / 0.07);
+  --card-highlight: rgb(255 255 255 / 0.04);
+  /* Mercato : couleur des cases (légende de l'onglet Rosters) */
+  --m-team: #262f45;
+  --origin-emea: #23345a;
+  --origin-amer: #3a2f5c;
+  --origin-kr: #5a2836;
+  --origin-lpl: #5a4420;
+  --origin-lcp: #1f4a3c;
+  --origin-ink: #eef1f8;
+  --m-rumor_in: #134a5c;
+  --m-rumor_out: #5a3c17;
+  --m-out: #5f2329;
+  --m-in: #1d4b2e;
+  --m-fa: #4a3b36;
+  --m-c2027: #5a2940;
+  --m-c2028: #43303f;
+  --m-retired: #2c3142;
+}
+
+:root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f6f6f4;
-  --surface: #fcfcfb;
-  --surface-2: #f0efec;
-  --border: #e3e2de;
-  --text: #0b0b0b;
-  --text-2: #52514e;
-  --text-3: #8a8984;
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --border: #dfe4ee;
+  --text: #0b1222;
+  --text-2: #4a5468;
+  --text-3: #858fa3;
   --accent: #2a78d6;
-  --accent-soft: #cde2fb;
+  --accent-soft: #d6e6fb;
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --good: #0ca30c;
   --good-text: #006300;
   --critical: #d03b3b;
-  --grid: #e9e8e4;
-  /* Niveaux de compétition */
+  --grid: #e7ebf2;
   --tier-lec: #eda100;
   --tier-erl1: #2a78d6;
   --tier-erl2: #eb6834;
   --tier-em: #1baf7a;
   --gold: #c98500;
-  /* Mercato : couleur des cases (légende de l'onglet Rosters) */
+  --glow-1: rgb(42 120 214 / 0.08);
+  --glow-2: rgb(237 161 0 / 0.06);
+  --card-highlight: rgb(255 255 255 / 0.6);
   --m-team: #e2e1dd;
   --origin-emea: #dbe4f3;
   --origin-amer: #e6dcf5;
@@ -43,90 +93,6 @@
   --m-retired: #efe9e6;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-    --bg: #121211;
-    --surface: #1a1a19;
-    --surface-2: #232321;
-    --border: #2f2f2c;
-    --text: #f0efec;
-    --text-2: #c3c2b7;
-    --text-3: #8f8e86;
-    --accent: #3987e5;
-    --accent-soft: #184f95;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --good: #0ca30c;
-    --good-text: #4cc94c;
-    --critical: #e66767;
-    --grid: #2a2a28;
-    --tier-lec: #c98500;
-    --tier-erl1: #3987e5;
-    --tier-erl2: #d95926;
-    --tier-em: #199e70;
-    --gold: #eda100;
-    /* Mercato */
-    --m-team: #3a3a37;
-    --origin-emea: #2c3a52;
-    --origin-amer: #3d3155;
-    --origin-kr: #5a2c2c;
-    --origin-lpl: #5a4520;
-    --origin-lcp: #234638;
-    --origin-ink: #ecebe7;
-    --m-rumor_in: #164a52;
-    --m-rumor_out: #5c3c14;
-    --m-out: #622220;
-    --m-in: #1f4d1d;
-    --m-fa: #4b3c33;
-    --m-c2027: #5c2a3a;
-    --m-c2028: #45303a;
-    --m-retired: #34302f;
-  }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #121211;
-  --surface: #1a1a19;
-  --surface-2: #232321;
-  --border: #2f2f2c;
-  --text: #f0efec;
-  --text-2: #c3c2b7;
-  --text-3: #8f8e86;
-  --accent: #3987e5;
-  --accent-soft: #184f95;
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --good: #0ca30c;
-  --good-text: #4cc94c;
-  --critical: #e66767;
-  --grid: #2a2a28;
-  --tier-lec: #c98500;
-  --tier-erl1: #3987e5;
-  --tier-erl2: #d95926;
-  --tier-em: #199e70;
-  --gold: #eda100;
-  /* Mercato */
-  --m-team: #3a3a37;
-  --origin-emea: #2c3a52;
-  --origin-amer: #3d3155;
-  --origin-kr: #5a2c2c;
-  --origin-lpl: #5a4520;
-  --origin-lcp: #234638;
-  --origin-ink: #ecebe7;
-  --m-rumor_in: #164a52;
-  --m-rumor_out: #5c3c14;
-  --m-out: #622220;
-  --m-in: #1f4d1d;
-  --m-fa: #4b3c33;
-  --m-c2027: #5c2a3a;
-  --m-c2028: #45303a;
-  --m-retired: #34302f;
-}
-
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -139,11 +105,17 @@
   --color-accent-soft: var(--accent-soft);
   --color-good: var(--good-text);
   --color-critical: var(--critical);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-gold: var(--gold);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(1100px 480px at 12% -12%, var(--glow-1), transparent 70%),
+    radial-gradient(900px 420px at 92% -14%, var(--glow-2), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -151,4 +123,23 @@ body {
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /* Cartes : fine lumière sur le bord haut pour donner de la profondeur */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    box-shadow: inset 0 1px 0 var(--card-highlight), 0 1px 2px rgb(0 0 0 / 0.12);
+  }
+
+  /* Petit titre de section en capitales (« sur-titre ») */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
 }
