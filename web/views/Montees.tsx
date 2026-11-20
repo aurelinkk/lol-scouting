@@ -94,17 +94,32 @@ export default function MonteesPage({ region }: { region: Region }) {
       </div>
 
       <SeasonTabs
-        items={promotions.map((promo) => ({
-          key: `${promo.from}-${promo.to}`,
-          label: `${promo.from} → ${promo.to}`,
-          content: <PromotionSeason promo={promo} region={region} />,
-        }))}
+        items={promotions.flatMap((promo) => {
+          // Montés en cours de saison (ex : Stend, Flakked en 2026) : déjà en 1re
+          // division cette saison, ils ne font pas partie du mercato suivant
+          const mercato = { ...promo, players: promo.players.filter((p) => !p.mid_season) };
+          const during = { ...promo, players: promo.players.filter((p) => p.mid_season) };
+          return [
+            {
+              key: `${promo.from}-${promo.to}`,
+              label: `${promo.from} → ${promo.to}`,
+              content: <PromotionSeason promo={mercato} region={region} />,
+            },
+            ...(during.players.length
+              ? [{
+                  key: `${promo.from}-pendant`,
+                  label: `En cours de saison ${promo.from}`,
+                  content: <PromotionSeason promo={during} region={region} during />,
+                }]
+              : []),
+          ];
+        })}
       />
     </div>
   );
 }
 
-function PromotionSeason({ promo, region }: { promo: Promotion; region: Region }) {
+function PromotionSeason({ promo, region, during = false }: { promo: Promotion; region: Region; during?: boolean }) {
         const R = REGION_INFO[region];
         const T = (tier: string) => tierName(tier, region);
         const lec = promo.players.filter((p) => p.new_level === "LEC");
@@ -114,9 +129,15 @@ function PromotionSeason({ promo, region }: { promo: Promotion; region: Region }
           <div className="space-y-6">
 
             <section className="rounded-lg border border-border bg-surface p-4">
-              <h3 className="text-sm font-semibold">{T("ERL1")} → {R.top} · {lec.length} joueurs</h3>
+              <h3 className="text-sm font-semibold">
+                {during ? `Montés en ${R.top} pendant la saison ${promo.from}` : `${T("ERL1")} → ${R.top}`} · {lec.length} joueurs
+              </h3>
               <p className="mt-0.5 text-xs text-ink-3">
-                {top10(lec)} sur {lec.length} étaient dans le top 10 % des {T("ERL1")} de leur poste en {promo.from}.
+                {during
+                  ? `Passés de ${R.lower} en ${R.top} en cours de saison ${promo.from} (remplacement, changement d'effectif) : ils ne comptent pas dans le mercato ${promo.to}. `
+                  : ""}
+                {top10(lec)} sur {lec.length} étaient dans le top 10 % des {T("ERL1")} de leur poste en {promo.from}
+                {during ? " (score de leur partie de saison en ERL)" : ""}.
                 {region === "eu" && " Équipes invitées (ex : LEC Versus) exclues."}
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -143,7 +164,6 @@ function PromotionSeason({ promo, region }: { promo: Promotion; region: Region }
                       </div>
                       <Move p={p} top={REGION_INFO[region].top} />
                       <div className="text-xs text-ink-3">
-                        {p.mid_season && <span>monté en cours de saison {promo.from} · </span>}
                         {p.from_season !== undefined && p.from_season < promo.from && (
                           <span>dernière saison en {R.lower} : {p.from_season} · </span>
                         )}
