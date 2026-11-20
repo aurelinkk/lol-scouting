@@ -142,7 +142,7 @@ export default function DataTable({
         // Seulement les joueurs encore libres pour la saison suivante (saison en cours)
         (!onlyFree ||
           r.season !== Math.max(...seasons) ||
-          ((!signed[r.id] || signed[r.id].kind === "contract") && !promoted[`${r.season}:${r.id}`])) &&
+          (!signed[r.id] && !promoted[`${r.season}:${r.id}`])) &&
         // Contrat qui se termine à la fin de la saison : récupérable sans rachat
         (!contractEnding || (r.season === Math.max(...seasons) && !!contracts[r.id] &&
           Number(contracts[r.id].end.slice(0, 4)) <= r.season)) &&
@@ -190,12 +190,11 @@ export default function DataTable({
     const level = sg?.tier === "LEC" ? "top" : sg?.tier === "ERL1" && r.tier === "ERL2" ? "second" : undefined;
     return sg && level ? { level, team: sg.team, season: next, rumor: !sg.official } : undefined;
   };
-  // Déjà un club : annonce officielle ou rumeur. « Sous contrat » sans source ne
-  // compte pas : rien ne dit qu'il reste (voir la colonne Contrat)
-  const signedOf = (r: RankingRow) => {
-    const sg = isCurrent && !promoOf(r) ? signed[r.id] : undefined;
-    return sg && sg.kind !== "contract" ? sg : undefined;
-  };
+  // Déjà un club : annonce officielle, rumeur, ou contrat pour la saison
+  // suivante sans rumeur de départ ni remplaçant (ex : Canna). Un joueur sous
+  // contrat mais remplacé (ex : Poby chez NAVI) n'apparaît pas dans le mercato
+  // de son équipe : il compte comme disponible
+  const signedOf = (r: RankingRow) => (isCurrent && !promoOf(r) ? signed[r.id] : undefined);
   const contractOf = (r: RankingRow) => (isCurrent ? contracts[r.id] : undefined);
   const rowStyle = (r: RankingRow) => {
     const p = promoOf(r);
@@ -373,7 +372,7 @@ export default function DataTable({
                     className="h-2.5 w-2.5 rounded-sm"
                     style={{ background: "color-mix(in srgb, var(--accent) 35%, transparent)" }}
                   />
-                  Déjà un club pour {next}, même niveau ou en dessous (plus clair = rumeur)
+                  Déjà un club pour {next}, même niveau ou en dessous (plus clair = rumeur, ou sous contrat sans rumeur de départ ni remplaçant)
                 </span>
               )}
               <span className="flex items-center gap-1.5">
@@ -517,6 +516,7 @@ export default function DataTable({
                                 >
                                   {sg.stays ? `✓ ${next}` : `→ ${sg.team}`}
                                   {sg.kind === "rumor" && " (rumeur)"}
+                                  {sg.kind === "contract" && " (sous contrat)"}
                                 </span>
                               );
                             })()}

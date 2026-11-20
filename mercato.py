@@ -37,6 +37,7 @@ SLOTS = ROLES  # les coachs sont gérés à part (liste en bas de chaque équipe
 EVENTS_MAX_AGE_HOURS = 1  # rumeurs / transferts retéléchargés au-delà
 NOT_A_TEAM = {"Free Agent", "Retired", "Inactive", "Unknown", "None", ""}
 COACH_ROLES = {"Coach", "Head Coach"}
+EXTRA_PLAYER_DAYS = 14  # 2 arrivées officielles au même poste à moins de 14 jours : les deux restent
 
 
 def _role(r):
@@ -539,6 +540,16 @@ def build_mercato(games, season, refresh=False):
             info = leave_info.get(before, ("départ", "", None))
         board.loc[idx, cols] = [None, *info]
 
+    # Deux joueurs officiels au même poste (ex : Soft et Carim en jungle chez DN
+    # SOOPers Challengers, annoncés le même jour) : le second est gardé à côté
+    extra = {}  # index du poste -> [joueurs en plus]
+    placed_on = {}  # index du poste -> date de l'annonce du titulaire
+
+    def drop_extra(player, scope):
+        for idx in scope:
+            if player in extra.get(idx, []):
+                extra[idx].remove(player)
+
     for date, _, direction, player, team, role, status, source, dest, url in events:
         if dest:
             dest_of[player] = dest
@@ -548,8 +559,12 @@ def build_mercato(games, season, refresh=False):
             info = (f"départ ({status})", source, url)
             leave_info[player] = info
             scope = board.index if direction == "Out" else board.index[board["team"] == team]
+            drop_extra(player, scope)
             # poste qu'il occupe (le sien, ou celui où une rumeur l'avait placé)
             for idx in scope[board.loc[scope, "after"] == player]:
+                if extra.get(idx):  # l'autre joueur du poste reste seul titulaire
+                    board.at[idx, "after"] = extra[idx].pop(0)
+                    continue
                 vacate(idx, player, info)
             # son poste d'origine déjà libéré : on garde l'annonce la plus récente
             # (ex : Naak Nako, tweet du 31/10 puis article Sheep du 17/11)
@@ -564,9 +579,26 @@ def build_mercato(games, season, refresh=False):
             continue
         # un joueur ne peut être qu'à un seul endroit
         leave_info[player] = (f"parti ({status})", source, url)
+        drop_extra(player, board.index[~slot])
         for idx in board.index[(board["after"] == player) & ~slot]:
+            if extra.get(idx):
+                board.at[idx, "after"] = extra[idx].pop(0)
+                continue
             vacate(idx, player, (f"parti ({status})", source, url))
         label = status if direction == "Join" else f"reste ({status})"
+        idx = board.index[slot][0]
+        current, cur_status = board.at[idx, "after"], str(board.at[idx, "status"])
+        # ... seulement pour deux annonces proches (sinon, le nouveau remplace l'ancien)
+        close = (idx in placed_on and abs((pd.Timestamp(date) - pd.Timestamp(placed_on[idx])).days)
+                 <= EXTRA_PLAYER_DAYS)
+        if (direction == "Join" and status == "confirmé" and isinstance(current, str) and current != player
+                and cur_status in ("confirmé", "reste (confirmé)", "manuel") and close):
+            if player not in extra.setdefault(idx, []):
+                extra[idx].append(player)
+            continue
+        drop_extra(player, [idx])
+        extra.pop(idx, None)  # nouveau titulaire : les « en plus » d'avant ne comptent plus
+        placed_on[idx] = date
         board.loc[slot, cols] = [player, label, source, url]
 
     # Piste tranchée depuis (ex : « Vulcan ou Isles », puis Vulcan annoncé) : note retirée
@@ -584,6 +616,8 @@ def build_mercato(games, season, refresh=False):
         dest_of.get(b) if isinstance(b, str) and dest_of.get(b) != t
         and not ((board["team"] == t) & (board["after"] == b)).any() else None
         for b, t in zip(board["before"], board["team"])]
+
+    board["after_extra"] = [" | ".join(extra.get(i, [])) or None for i in board.index]
 
     # Fins de contrat (GCD) : joueurs restés "inchangé" dont le contrat est fini
     board = apply_contract_ends(board, season)

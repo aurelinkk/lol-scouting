@@ -1,11 +1,11 @@
 import RegionMissing from "@/components/RegionMissing";
-import TeamNeeds, { type Candidate } from "@/components/TeamNeeds";
+import TeamNeeds, { type Candidate, MAX_AGE } from "@/components/TeamNeeds";
 import { getMercato, getPlayers, getRankings, hasRegion } from "@/lib/data";
 import { type Region, REGION_INFO, REGIONS } from "@/lib/region";
 
 export const metadata = { title: "Besoins · LoL Scouting" };
 
-const POOL_PER_ROLE = 80;
+const POOL_PER_ROLE = 150;
 
 export default function BesoinsPage({ region }: { region: Region }) {
   if (!hasRegion(region)) return <RegionMissing region={region} />;
@@ -21,7 +21,9 @@ export default function BesoinsPage({ region }: { region: Region }) {
     .filter((x) => x.season === season && x.games >= 8)
     .sort((a, b) => b.final - a.final)) {
     const list = byRole.get(r.role) ?? [];
-    if (list.length >= POOL_PER_ROLE) continue;
+    // les mieux classés, plus tous les joueurs de 1re division (ceux sans club
+    // sont toujours proposés, même un peu plus bas)
+    if (list.length >= POOL_PER_ROLE && r.tier !== "LEC") continue;
     list.push({
       id: r.id, name: r.name, role: r.role, team: r.current_team || r.team, league: r.league_code, tier: r.tier,
       final: r.final, age: r.age, country: r.country, photo: r.photo,
@@ -42,7 +44,8 @@ export default function BesoinsPage({ region }: { region: Region }) {
         <h1 className="text-xl font-semibold">Besoins des équipes · {mercato.season}</h1>
         <p className="text-sm text-ink-2">
           Pour chaque équipe de {R.top}, les postes encore à pourvoir ou pas officialisés pour {mercato.season}, et les
-          5 meilleurs joueurs disponibles à ce poste (classement {season} de l&apos;onglet Données).
+          meilleurs joueurs disponibles à ce poste (classement {season} de l&apos;onglet Données, {MAX_AGE} ans maximum), joueurs
+          de {R.top} sans club compris. Suit le mercato en direct : un transfert dans Rosters change aussitôt les besoins.
         </p>
         <p className="mt-1 text-xs text-ink-3">
           {region === "kr"

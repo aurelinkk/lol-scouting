@@ -241,6 +241,19 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
       for (const t of m.teams) {
         if (e.kind === "Leave" && t.team !== e.team) continue;
         for (const s of t.slots) {
+          if (s.after_extra?.some((x) => same(x.name, e.player))) {
+            s.after_extra = s.after_extra.filter((x) => !same(x.name, e.player));
+            if (!s.after_extra.length) s.after_extra = null;
+            mark(s);
+            continue;
+          }
+          if (s.after && same(s.after.name, e.player) && s.after_extra?.length) {
+            // l'autre joueur du poste reste seul titulaire
+            s.after = s.after_extra.shift()!;
+            if (!s.after_extra.length) s.after_extra = null;
+            mark(s);
+            continue;
+          }
           if (s.after && same(s.after.name, e.player)) {
             vacate(t, s, e, `départ (${st})`);
             applied.push({ date: e.date, text: `${e.player} quitte ${t.team}${e.dest && !NOT_A_TEAM.has(e.dest) ? ` → ${e.dest}` : ""}`, url: e.url, official: e.official });
@@ -263,8 +276,29 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
     if (!slot) continue;
     // un joueur ne peut être qu'à un seul endroit
     for (const ot of m.teams)
-      for (const s of ot.slots)
-        if (s !== slot && s.after && same(s.after.name, e.player)) vacate(ot, s, { ...e, dest: t.team }, `parti (${st})`);
+      for (const s of ot.slots) {
+        if (s === slot) continue;
+        if (s.after_extra?.some((x) => same(x.name, e.player))) {
+          s.after_extra = s.after_extra.filter((x) => !same(x.name, e.player));
+          if (!s.after_extra.length) s.after_extra = null;
+        } else if (s.after && same(s.after.name, e.player)) {
+          if (s.after_extra?.length) {
+            s.after = s.after_extra.shift()!;
+            if (!s.after_extra.length) s.after_extra = null;
+          } else vacate(ot, s, { ...e, dest: t.team }, `parti (${st})`);
+        }
+      }
+    // 2e joueur officiel au même poste (ex : Soft / Carim) : gardé à côté
+    if (
+      e.official && e.kind === "Join" && slot.after && !same(slot.after.name, e.player) &&
+      ["confirmé", "reste (confirmé)", "manuel"].includes(slot.status)
+    ) {
+      if (!slot.after_extra?.some((x) => same(x.name, e.player)))
+        slot.after_extra = [...(slot.after_extra ?? []), lookup(e.player, region)];
+      mark(slot);
+      t.changed = true;
+      continue;
+    }
     const stays = !!slot.before && same(slot.before.name, e.player);
     if (slot.after && same(slot.after.name, e.player) && slot.status.includes(st === "confirmé" ? "confirmé" : "rumeur")) continue;
     const previous = slot.after && !same(slot.after.name, e.player) ? slot.after.name : null;
@@ -301,11 +335,15 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
     const bt = base.teams.find((x) => x.team === t.team && x.league === t.league);
     for (const s of t.slots) {
       const bs = bt?.slots.find((x) => x.role === s.role);
-      const changed = !bs || nameOf(bs.after) !== nameOf(s.after) || bs.status !== s.status;
+      const extras = (x?: MercatoSlot | null) => (x?.after_extra ?? []).map((p) => nameOf(p)).join("/");
+      const changed = !bs || nameOf(bs.after) !== nameOf(s.after) || bs.status !== s.status || extras(bs) !== extras(s);
       (s as { live?: boolean }).live = changed ? true : undefined;
       if (!changed) continue;
       const official = s.status.includes("confirmé");
-      const text = s.after
+      const newExtra = (s.after_extra ?? []).find((p) => !(bs?.after_extra ?? []).some((b) => same(b.name, p.name)));
+      const text = newExtra
+        ? `${nameOf(newExtra)} → ${t.team} (${s.role}), avec ${nameOf(s.after)}`
+        : s.after
         ? s.before && same(s.before.name, s.after.name)
           ? `${nameOf(s.after)} reste chez ${t.team}`
           : `${nameOf(s.after)} → ${t.team} (${s.role})${s.before ? `, à la place de ${nameOf(s.before)}` : ""}`

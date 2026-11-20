@@ -47,6 +47,8 @@ export interface MercatoSlot {
   options?: string;
   /** Où part le joueur de départ (ex : Yukino -> FlyQuest, LCS) */
   to?: { team: string; logo?: string; league?: string; tier?: string; region?: string } | null;
+  /** 2e joueur officiel au même poste (ex : Soft / Carim en jungle) */
+  after_extra?: MercatoPlayer[] | null;
   /** Fin de contrat (GCD) avec ce club, date ISO */
   before_end?: string | null;
   after_end?: string | null;
@@ -128,8 +130,11 @@ function Cell({
   bold,
   note,
   fresh,
+  extra,
 }: {
   p: MercatoPlayer | null;
+  /** Autres joueurs au même poste : « A / B » dans la même case */
+  extra?: MercatoPlayer[] | null;
   state?: CellState | null;
   url?: string | null;
   title: string;
@@ -153,6 +158,12 @@ function Cell({
     >
       <span className="min-w-0 truncate">
         <PlayerLink p={p} className={bold ? "font-semibold" : ""} />
+        {extra?.map((x) => (
+          <span key={x.name}>
+            <span className="opacity-60"> / </span>
+            <PlayerLink p={x} className={bold ? "font-semibold" : ""} />
+          </span>
+        ))}
         {note && <span className="ml-1 text-[10px] opacity-70">{note}</span>}
       </span>
       <SourceLink url={url} title={title} />
@@ -206,7 +217,7 @@ function TeamCard({ t, season }: { t: MercatoTeam; season: number }) {
             <div key={s.role} className="contents">
               <span className="self-center text-[10px] font-medium uppercase tracking-wide text-ink-3">{s.role}</span>
               <Cell p={s.before} state={s.left} title={title} />
-              <Cell p={s.after} state={s.right} url={s.url} title={title} bold={!unchanged} fresh={s.live} />
+              <Cell p={s.after} extra={s.after_extra} state={s.right} url={s.url} title={title} bold={!unchanged} fresh={s.live} />
               {(note || piste) && (
                 <span className="col-span-2 col-start-2 -mt-0.5 truncate text-right text-[10.5px] text-ink-3" title={piste ?? note ?? ""}>
                   {note}

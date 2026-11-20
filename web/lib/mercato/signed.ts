@@ -22,12 +22,13 @@ export function signedFromMercato(teams: MercatoTeam[], region: Region): Record<
   const out: Record<string, Signed> = {};
   for (const t of teams) {
     for (const s of t.slots) {
-      const p = s.after;
-      if (!p?.id || p.region) continue; // fiche d'une autre région : autre espace d'identifiants
       const kind = s.right === "in" ? "official" : s.status === "inchangé" ? "contract" : "rumor";
-      out[p.id] = { team: t.team, league: t.league, official: kind === "official", kind,
-                    stays: !!s.before && s.before.id === p.id,
-                    tier: asTier(t.tier) };
+      for (const p of [s.after, ...(s.after_extra ?? [])]) {
+        if (!p?.id || p.region) continue; // fiche d'une autre région : autre espace d'identifiants
+        out[p.id] = { team: t.team, league: t.league, official: kind === "official", kind,
+                      stays: !!s.before && s.before.id === p.id,
+                      tier: asTier(t.tier) };
+      }
     }
   }
   // Partis vers un club connu, y compris dans une autre région (ex : Naak Nako -> LYON en LCS)

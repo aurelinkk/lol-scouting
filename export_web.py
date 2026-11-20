@@ -297,6 +297,9 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                  "options": r.get("options") or None, "to": destination(r.get("to")),
                  "url": r.get("url") if isinstance(r.get("url"), str) else None,
                  # fin de contrat (GCD) avec ce club : date ISO ou None
+                 # 2e joueur officiel au même poste (ex : Soft / Carim)
+                 "after_extra": [slot(n) for n in str(r.get("after_extra")).split(" | ")]
+                 if isinstance(r.get("after_extra"), str) and r.get("after_extra") else None,
                  "before_end": r.get("before_end") if isinstance(r.get("before_end"), str) else None,
                  "after_end": r.get("after_end") if isinstance(r.get("after_end"), str) else None}
                 for _, r in grp.iterrows()

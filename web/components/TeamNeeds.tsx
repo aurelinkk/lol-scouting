@@ -24,6 +24,10 @@ export interface Candidate {
 }
 
 const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"];
+/** Âge maximum des joueurs proposés (âge inconnu : gardé) */
+export const MAX_AGE = 26.2;
+const SHORT_LIST = 5;
+const LONG_LIST = 10;
 /** Imports autorisés par équipe : 2 en LEC / LCS, aucun en LCK */
 const IMPORT_LIMIT: Record<Region, number> = { eu: 2, na: 2, kr: 0 };
 
@@ -31,7 +35,7 @@ type Need = "open" | "rumor" | "contract" | "official";
 const NEED: Record<Need, { label: string; color: string }> = {
   open: { label: "à pourvoir", color: "var(--critical)" },
   rumor: { label: "rumeur", color: "var(--gold)" },
-  contract: { label: "sous contrat, rien d'officiel", color: "var(--gold)" },
+  contract: { label: "sous contrat, sans rumeur de départ", color: "var(--accent)" },
   official: { label: "officiel", color: "var(--good)" },
 };
 
@@ -94,6 +98,7 @@ export default function TeamNeeds({
 
   const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [more, setMore] = useState<Record<string, boolean>>({});
 
   const openCount = topTeams.reduce((n, t) => n + t.slots.filter((s) => ROLES.includes(s.role) && !s.after).length, 0);
 
@@ -121,7 +126,7 @@ export default function TeamNeeds({
       <div className="grid gap-3 lg:grid-cols-2">
         {topTeams.map((t) => {
           const slots = ROLES.map((role) => t.slots.find((s) => s.role === role)).filter(Boolean) as MercatoSlot[];
-          const roster = slots.filter((s) => s.after).map((s) => s.after!.name);
+          const roster = slots.flatMap((s) => [s.after, ...(s.after_extra ?? [])]).filter(Boolean).map((p) => p!.name);
           const imports = roster.filter((n) => {
             const o = originOfName(n);
             return o && o !== home;
@@ -147,24 +152,28 @@ export default function TeamNeeds({
                   const others = imports.filter((n) => !s.after || n !== s.after.name).length;
                   const importOk = limit > 0 && others < limit;
                   const taken = new Set(roster.map(short));
-                  const candidates = (pool[s.role] ?? [])
-                    .filter((c) => !taken.has(short(c.name)))
-                    .filter((c) => {
-                      const sg = signed[c.id];
-                      return !sg || sg.kind === "contract"; // officiel ou rumeur ailleurs : pris
-                    })
+                  // Disponibles : pas de club pour la saison suivante dans le mercato (officiel,
+                  // rumeur, ou contrat sans rumeur de départ ni remplaçant). Un joueur sous
+                  // contrat mais remplacé (ex : Poby chez NAVI) reste proposé.
+                  const available = (pool[s.role] ?? [])
+                    .filter((c) => !taken.has(short(c.name)) && !signed[c.id])
+                    .filter((c) => c.age === undefined || c.age <= MAX_AGE)
                     .filter((c) => {
                       const o = originOf(c.country, c.name);
                       return !o || o === home || importOk;
-                    })
-                    .slice(0, 5);
+                    });
+                  const n = more[key] ? LONG_LIST : SHORT_LIST;
+                  const top = available.slice(0, n);
+                  // joueurs de 1re division sans club : toujours proposés, même plus bas
+                  const freeTop = available.filter((c) => c.tier === "LEC" && !top.includes(c)).slice(0, 3);
+                  const candidates = [...top, ...freeTop];
                   return (
                     <li key={s.role} className="py-1.5">
                       <div className="flex items-center gap-2 text-sm">
                         <span className="w-14 shrink-0 text-xs uppercase text-ink-3">{s.role}</span>
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: NEED[need].color }} title={NEED[need].label} />
                         <span className={s.after ? "" : "text-ink-3"}>
-                          {s.after ? short(s.after.name) : "?"}
+                          {s.after ? [s.after, ...(s.after_extra ?? [])].map((p) => short(p.name)).join(" / ") : "?"}
                         </span>
                         <span className="text-xs text-ink-3">
                           {need === "contract" && s.after_end ? `contrat → ${s.after_end.slice(0, 4)}` : need !== "official" ? NEED[need].label : ""}
@@ -200,6 +209,11 @@ export default function TeamNeeds({
                                     {o}
                                   </span>
                                 )}
+                                {c.tier === "LEC" && (
+                                  <span className="shrink-0 rounded border border-border px-1 text-[10px] text-ink-2" title={`Joueur de ${R.top} sans club pour ${season}`}>
+                                    {R.top} sans club
+                                  </span>
+                                )}
                                 <span className="truncate text-ink-3">
                                   {c.team} · {c.league}
                                   {c.age !== undefined && ` · ${c.age} ans`}
@@ -218,6 +232,16 @@ export default function TeamNeeds({
                             );
                           })}
                           {!candidates.length && <li className="text-xs text-ink-3">Aucun joueur disponible trouvé.</li>}
+                          {available.length > SHORT_LIST && (
+                            <li>
+                              <button
+                                onClick={() => setMore((m) => ({ ...m, [key]: !m[key] }))}
+                                className="text-[11px] text-accent hover:underline"
+                              >
+                                {more[key] ? "voir moins" : `voir le top ${LONG_LIST}`}
+                              </button>
+                            </li>
+                          )}
                           {limit > 0 && !importOk && (
                             <li className="text-[11px] text-ink-3">Places d&apos;import prises : imports non proposés.</li>
                           )}
