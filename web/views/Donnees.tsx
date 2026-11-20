@@ -1,7 +1,8 @@
-import DataTable from "@/components/DataTable";
+import { Suspense } from "react";
+import DataExplorer from "@/components/data/DataExplorer";
 import RegionMissing from "@/components/RegionMissing";
 import { getMercato, getMeta, getPromotions, hasRegion } from "@/lib/data";
-import type { Promoted } from "@/components/DataTable";
+import type { Promoted } from "@/components/data/DataExplorer";
 import { contractsFromMercato, signedFromMercato } from "@/lib/mercato/signed";
 import { REGION_INFO, type Region } from "@/lib/region";
 
@@ -63,15 +64,17 @@ export default function DonneesPage({ region }: { region: Region }) {
           Tous les joueurs de {REGION_INFO[region].lower} classés. Chaque stat est comparée aux joueurs du même poste dans la même ligue.
         </p>
       </div>
-      <DataTable
-        seasons={meta.seasons}
-        hasOe={meta.has_oe}
-        promoted={promoted}
-        signed={signedFromMercato(getMercato(region)?.teams ?? [], region)}
-        contracts={contractsFromMercato(getMercato(region)?.teams ?? [])}
-        mercatoGenerated={getMercato(region)?.generated}
-        mercatoSeason={mercatoSeason}
-      />
+      <Suspense fallback={<p className="text-sm text-ink-3">Chargement…</p>}>
+        <DataExplorer
+          seasons={meta.seasons}
+          hasOe={meta.has_oe}
+          promoted={promoted}
+          signed={signedFromMercato(getMercato(region)?.teams ?? [], region)}
+          contracts={contractsFromMercato(getMercato(region)?.teams ?? [])}
+          mercatoGenerated={getMercato(region)?.generated}
+          mercatoSeason={mercatoSeason}
+        />
+      </Suspense>
     </div>
   );
 }
