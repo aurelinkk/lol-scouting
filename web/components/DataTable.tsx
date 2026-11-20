@@ -9,6 +9,7 @@ import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { type Signed, signedFromMercato } from "@/lib/mercato/signed";
 import { isStale } from "@/lib/mercato/stale";
+import { HOME_ORIGIN, ORIGINS, originOf } from "@/lib/origin";
 
 type SortKey = "final" | "age" | "games" | "league_score" | "league_bonus" | "em_score" | StatKey;
 
@@ -85,6 +86,7 @@ export default function DataTable({
   const [role, setRole] = useState<string>("");
   const [tier, setTier] = useState<string>("");
   const [league, setLeague] = useState<string>("");
+  const [origin, setOrigin] = useState<string>("");
   const [maxAge, setMaxAge] = useState<string>("");
   const [minGames, setMinGames] = useState<string>("10");
   const [search, setSearch] = useState("");
@@ -126,6 +128,7 @@ export default function DataTable({
         (!role || r.role === role) &&
         (!tier || r.tier === tier) &&
         (!league || r.league_code === league) &&
+        (!origin || (origin === "?" ? !originOf(r.country) : originOf(r.country) === origin)) &&
         (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
         // Seulement les joueurs encore libres pour la saison suivante (saison en cours)
@@ -153,11 +156,11 @@ export default function DataTable({
       return (va - vb) * dir;
     });
     return out;
-  }, [rows, season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted, onlyFree, signed, seasons]);
+  }, [rows, season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted, onlyFree, signed, seasons]);
 
   useEffect(
     () => setLimit(PAGE),
-    [season, role, tier, league, maxAge, minGames, search, includeLec, unknownAge, sort, onlyFree],
+    [season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, sort, onlyFree],
   );
 
   const columns = STAT_COLUMNS.filter((c) => hasOe || !c.oe);
@@ -242,6 +245,18 @@ export default function DataTable({
             {leagues.map((l) => (
               <option key={l}>{l}</option>
             ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-ink-3" title="D'après la nationalité du joueur">
+          Origine
+          <select className={control} value={origin} onChange={(e) => setOrigin(e.target.value)}>
+            <option value="">Toutes</option>
+            {ORIGINS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+            <option value="?">Inconnue</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-3">
@@ -387,6 +402,19 @@ export default function DataTable({
                           <PlayerName name={r.name} />
                         </span>
                         <span className="text-xs text-ink-3">{r.role}</span>
+                        {(() => {
+                          // Import : joueur venu d'une autre grande région (ex : un Coréen en LEC)
+                          const o = originOf(r.country);
+                          return o && o !== HOME_ORIGIN[region] ? (
+                            <span
+                              className="rounded px-1 text-[10px] font-semibold"
+                              style={{ background: `var(--origin-${o.toLowerCase()})`, color: "var(--origin-ink)" }}
+                              title={`Import · ${r.country} (${ORIGINS.find((x) => x.value === o)?.label})`}
+                            >
+                              {o}
+                            </span>
+                          ) : null;
+                        })()}
                         {(r.ex_lec || (r.played_lec && !promoted[`${r.season}:${r.id}`])) && (
                           <span
                             className="rounded border border-border px-1 text-[10px] text-ink-3"
