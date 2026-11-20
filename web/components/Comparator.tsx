@@ -7,6 +7,7 @@ import { Avatar, TeamLogo } from "./Images";
 import { fmtScore, fmtStat, STAT_LABELS, topPercent } from "@/lib/format";
 import { playerLink, publicData, REGION_INFO, type Region, REGIONS, tierName } from "@/lib/region";
 import type { RankingRow, StatKey } from "@/lib/types";
+import { NativeSelect } from "@/components/ui/native-select";
 
 // Comparaison de deux joueurs (Europe ou NA, n'importe quelle saison).
 // Chaque stat est aussi située dans la ligue et le poste du joueur (percentile),
@@ -98,7 +99,7 @@ function Picker({
       .slice(0, 8);
   }, [rows, query]);
 
-  const control = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
+  const control = "h-8 rounded-full border border-border bg-surface px-3 text-[13px] outline-none focus:border-accent";
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-semibold uppercase tracking-wide text-ink-3">{label}</div>
@@ -117,11 +118,11 @@ function Picker({
             </button>
           ))}
         </div>
-        <select className={control} value={season} onChange={(e) => setSeason(Number(e.target.value))}>
+        <NativeSelect value={season} onChange={(e) => setSeason(Number(e.target.value))}>
           {[...seasons[region]].reverse().map((s) => (
             <option key={s}>{s}</option>
           ))}
-        </select>
+        </NativeSelect>
         <div className="relative min-w-40 flex-1">
           <input
             className={`${control} w-full`}

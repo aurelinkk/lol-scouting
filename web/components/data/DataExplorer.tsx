@@ -14,7 +14,12 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { parseAsBoolean, parseAsFloat, parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { Avatar, PlayerName, TeamLogo } from "../Images";
-import { GhostButton, Menu, NumberChip, Segmented, SelectChip, ToggleChip } from "./controls";
+import { Columns3Icon, LinkIcon, PencilLineIcon, RotateCcwIcon, SearchIcon, StarIcon } from "lucide-react";
+import { NumberChip, Segmented, SelectChip, ToggleChip } from "./controls";
+import NoteDialog from "./NoteDialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { fmtScore, fmtStat, topPercent } from "@/lib/format";
 import { ROLES, type RankingRow, type StatKey } from "@/lib/types";
 import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
@@ -133,6 +138,7 @@ export default function DataExplorer({
   }, [region, mercatoGenerated]);
   const signed = liveSigned ?? publishedSigned;
   const watch = useWatchlist(region);
+  const [noteFor, setNoteFor] = useState<{ id: string; name: string; note?: string } | null>(null);
 
   // ---- Données de la saison (un fichier par saison) ----------------------
   const [rows, setRows] = useState<RankingRow[] | null>(null);
@@ -214,12 +220,13 @@ export default function DataExplorer({
       <div className="flex min-w-0 items-center gap-1.5">
         <button
           onClick={() => watch.toggle(r.id, r.name)}
-          className="shrink-0 text-base leading-none transition-transform hover:scale-110"
-          style={{ color: w ? "var(--gold)" : "var(--border)" }}
+          className="shrink-0 rounded-full p-0.5 transition-transform hover:scale-110"
+          style={{ color: w ? "var(--gold)" : "var(--text-3)" }}
           title={w ? "Retirer de la liste de suivi" : "Suivre ce joueur (liste partagée)"}
           aria-label={w ? `Ne plus suivre ${r.name}` : `Suivre ${r.name}`}
+          aria-pressed={!!w}
         >
-          ★
+          <StarIcon className="size-4" fill={w ? "currentColor" : "none"} strokeWidth={w ? 1.5 : 1.75} opacity={w ? 1 : 0.55} />
         </button>
         <Link href={playerLink(region, r.id)} className="group flex min-w-0 items-center gap-2">
           <Avatar name={r.name} src={r.photo} size={28} />
@@ -247,14 +254,12 @@ export default function DataExplorer({
         )}
         {w && (
           <button
-            onClick={() => {
-              const note = window.prompt(`Note sur ${r.name}`, w.note ?? "");
-              if (note !== null) watch.setNote(r.id, r.name, note);
-            }}
-            className="max-w-36 shrink truncate text-left text-xs italic text-ink-3 hover:text-accent"
+            onClick={() => setNoteFor({ id: r.id, name: r.name, note: w.note })}
+            className="inline-flex max-w-40 shrink items-center gap-1 truncate text-left text-xs italic text-ink-3 hover:text-accent"
             title={w.note || "Ajouter une note"}
           >
-            {w.note || "✎ note"}
+            {!w.note && <PencilLineIcon className="size-3 shrink-0" />}
+            <span className="truncate">{w.note || "note"}</span>
           </button>
         )}
       </div>
@@ -498,16 +503,14 @@ export default function DataExplorer({
       >
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1 sm:max-w-sm">
-            <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3">
-              ⌕
-            </span>
+            <SearchIcon aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Joueur ou équipe…"
               aria-label="Rechercher un joueur ou une équipe"
-              className="h-9 w-full rounded-full border border-border bg-surface-2 pl-8 pr-3 text-sm outline-none transition-colors placeholder:text-ink-3 focus:border-accent focus:bg-surface"
+              className="h-9 w-full rounded-full border border-border bg-surface-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-ink-3 focus:border-accent focus:bg-surface"
             />
           </div>
           <Segmented
@@ -561,7 +564,7 @@ export default function DataExplorer({
             </ToggleChip>
           )}
           <ToggleChip checked={f.liste} onChange={(v) => setF({ liste: v || null })} title="Joueurs suivis (liste partagée)">
-            <span style={{ color: "var(--gold)" }}>★</span> Ma liste · {Object.keys(watch.list).length}
+            <StarIcon className="size-3.5" style={{ color: "var(--gold)" }} fill="currentColor" /> Ma liste · {Object.keys(watch.list).length}
           </ToggleChip>
           {R.hasLeagues && (
             <ToggleChip
@@ -593,8 +596,14 @@ export default function DataExplorer({
         <Legend color={PROMO_COLOR.top}>Monte en {R.top}</Legend>
         {R.hasEm && <Legend color={PROMO_COLOR.second}>Monte en {tierName("ERL1", region)}</Legend>}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Menu label={<>Colonnes{hiddenCount ? ` · ${hiddenCount} masquée${hiddenCount > 1 ? "s" : ""}` : ""}</>}>
-            <div className="space-y-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button>
+                <Columns3Icon />
+                Colonnes{hiddenCount ? ` · ${hiddenCount} masquée${hiddenCount > 1 ? "s" : ""}` : ""}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 space-y-2">
               {groups.map((g) => (
                 <div key={g.id}>
                   <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-3">{g.label}</div>
@@ -602,8 +611,8 @@ export default function DataExplorer({
                     {hideable
                       .filter((c) => (c.columnDef.meta as Meta | undefined)?.group === g.id)
                       .map((c) => (
-                        <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-[13px] hover:bg-surface-2">
-                          <input type="checkbox" checked={c.getIsVisible()} onChange={c.getToggleVisibilityHandler()} />
+                        <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 text-[13px] hover:bg-surface-2">
+                          <Checkbox checked={c.getIsVisible()} onCheckedChange={(v) => c.toggleVisibility(v === true)} />
                           {String(c.columnDef.header)}
                         </label>
                       ))}
@@ -611,16 +620,22 @@ export default function DataExplorer({
                 </div>
               ))}
               {hiddenCount > 0 && (
-                <button onClick={() => setVisibility({})} className="w-full rounded-md px-1 py-1 text-left text-[13px] text-accent hover:bg-surface-2">
+                <Button variant="link" size="sm" className="px-1.5" onClick={() => setVisibility({})}>
                   Tout afficher
-                </button>
+                </Button>
               )}
-            </div>
-          </Menu>
-          <GhostButton onClick={copyLink} title="Copier l'adresse de cette vue (filtres et tri compris)">
+            </PopoverContent>
+          </Popover>
+          <Button onClick={copyLink} title="Copier l'adresse de cette vue (filtres et tri compris)">
+            <LinkIcon />
             {copied ? "Lien copié ✓" : "Copier le lien"}
-          </GhostButton>
-          {!isDefault && <GhostButton onClick={reset}>Réinitialiser</GhostButton>}
+          </Button>
+          {!isDefault && (
+            <Button variant="ghost" onClick={reset}>
+              <RotateCcwIcon />
+              Réinitialiser
+            </Button>
+          )}
         </div>
       </div>
 
@@ -732,6 +747,19 @@ export default function DataExplorer({
           </table>
         )}
       </div>
+
+      <NoteDialog
+        player={noteFor}
+        onOpenChange={(open) => !open && setNoteFor(null)}
+        onSave={(note) => {
+          if (noteFor) watch.setNote(noteFor.id, noteFor.name, note);
+          setNoteFor(null);
+        }}
+        onRemove={() => {
+          if (noteFor) watch.toggle(noteFor.id, noteFor.name);
+          setNoteFor(null);
+        }}
+      />
 
       <p className="text-xs text-ink-3">
         Score ={" "}

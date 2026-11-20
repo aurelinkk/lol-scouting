@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Avatar, TeamLogo } from "./Images";
+import { ChevronDownIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { MercatoSlot, MercatoTeam } from "./MercatoBoard";
 import { fmtScore } from "@/lib/format";
 import { contractsFromMercato, signedFromMercato } from "@/lib/mercato/signed";
@@ -109,8 +112,8 @@ export default function TeamNeeds({
           <b className="text-ink">{openCount}</b> poste{openCount > 1 ? "s" : ""} à pourvoir en {R.top}
           {liveTeams && " · mercato à jour en ligne"}
         </span>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+        <label className="flex cursor-pointer items-center gap-2">
+          <Checkbox checked={showAll} onCheckedChange={(v) => setShowAll(v === true)} />
           Proposer aussi des joueurs pour les postes pas encore officialisés
         </label>
         <span className="flex items-center gap-3">
@@ -132,7 +135,7 @@ export default function TeamNeeds({
             return o && o !== home;
           });
           return (
-            <section key={t.team} className="rounded-lg border border-border bg-surface p-3">
+            <section key={t.team} className="rounded-2xl border border-border bg-surface p-3">
               <header className="mb-2 flex items-center gap-2">
                 <TeamLogo team={t.team} src={t.logo} size={20} />
                 <h2 className="font-semibold">{t.team}</h2>
@@ -180,12 +183,16 @@ export default function TeamNeeds({
                         </span>
                         {s.options && <span className="truncate text-xs text-ink-3" title={s.options}>· {s.options}</span>}
                         {need !== "official" && (
-                          <button
+                          <Button
+                            variant="link"
+                            size="sm"
                             onClick={() => setOpen((o) => ({ ...o, [key]: !expanded }))}
-                            className="ml-auto shrink-0 text-xs text-accent hover:underline"
+                            className="ml-auto"
+                            aria-expanded={expanded}
                           >
                             {expanded ? "masquer" : "options"}
-                          </button>
+                            <ChevronDownIcon className={`size-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                          </Button>
                         )}
                       </div>
                       {expanded && (
@@ -234,12 +241,9 @@ export default function TeamNeeds({
                           {!candidates.length && <li className="text-xs text-ink-3">Aucun joueur disponible trouvé.</li>}
                           {available.length > SHORT_LIST && (
                             <li>
-                              <button
-                                onClick={() => setMore((m) => ({ ...m, [key]: !m[key] }))}
-                                className="text-[11px] text-accent hover:underline"
-                              >
+                              <Button variant="link" size="sm" className="text-[11px]" onClick={() => setMore((m) => ({ ...m, [key]: !m[key] }))}>
                                 {more[key] ? "voir moins" : `voir le top ${LONG_LIST}`}
-                              </button>
+                              </Button>
                             </li>
                           )}
                           {limit > 0 && !importOk && (

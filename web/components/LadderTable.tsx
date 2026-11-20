@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DeepButton from "./DeepButton";
 import { ROLES } from "@/lib/types";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface LadderRow {
   rank: number;
@@ -95,7 +97,7 @@ export default function LadderTable() {
     );
   if (!data) return <p className="text-sm text-ink-3">Chargement…</p>;
 
-  const control = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
+  const control = "h-8 rounded-full border border-border bg-surface px-3 text-[13px] outline-none focus:border-accent";
   const header = (key: SortKey, label: string, title?: string) => (
     <th
       className="cursor-pointer select-none whitespace-nowrap px-2 py-2 text-right font-medium hover:text-ink"
@@ -113,21 +115,21 @@ export default function LadderTable() {
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-3">
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Joueurs
-          <select className={control} value={who} onChange={(e) => setWho(e.target.value as typeof who)}>
+          <NativeSelect value={who} onChange={(e) => setWho(e.target.value as typeof who)}>
             <option value="nonpro">Non-pros (à scouter)</option>
             <option value="pro">Pros reconnus</option>
             <option value="all">Tous</option>
-          </select>
+          </NativeSelect>
         </label>
         {hasProfiles && (
           <label className="flex flex-col gap-1 text-xs text-ink-3">
             Poste principal
-            <select className={control} value={role} onChange={(e) => setRole(e.target.value)}>
+            <NativeSelect value={role} onChange={(e) => setRole(e.target.value)}>
               <option value="">Tous</option>
               {ROLES.map((r) => (
                 <option key={r}>{r}</option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
         )}
         <label className="flex flex-col gap-1 text-xs text-ink-3">
@@ -142,7 +144,7 @@ export default function LadderTable() {
         </label>
         {hasProfiles && (
           <label className="flex items-center gap-2 pb-2 text-sm text-ink-2" title="Top 5 % de son poste au score soloQ">
-            <input type="checkbox" checked={onlyStandout} onChange={(e) => setOnlyStandout(e.target.checked)} />
+            <Checkbox checked={onlyStandout} onCheckedChange={(v) => setOnlyStandout(v === true)} />
             ⭐ Seulement ceux qui se démarquent
           </label>
         )}

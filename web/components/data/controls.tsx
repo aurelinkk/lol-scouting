@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 /** Petits contrôles de la barre de filtres de l'onglet Données */
 
@@ -150,64 +150,5 @@ export function NumberChip({
       />
       {suffix && <span className="text-ink-3">{suffix}</span>}
     </label>
-  );
-}
-
-/** Menu déroulant simple (bouton + panneau), fermé au clic extérieur ou Échap */
-export function Menu({
-  label,
-  children,
-  align = "right",
-}: {
-  label: React.ReactNode;
-  children: React.ReactNode;
-  align?: "left" | "right";
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`${base} ${open ? on : off}`}>
-        {label}
-      </button>
-      {open && (
-        <div
-          className={`absolute z-30 mt-1.5 w-64 rounded-xl border border-border bg-surface p-2 shadow-lg ${
-            align === "right" ? "right-0" : "left-0"
-          }`}
-        >
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Bouton discret (actions : copier le lien, réinitialiser) */
-export function GhostButton({
-  onClick,
-  children,
-  title,
-}: {
-  onClick: () => void;
-  children: React.ReactNode;
-  title?: string;
-}) {
-  return (
-    <button type="button" title={title} onClick={onClick} className={`${base} ${off}`}>
-      {children}
-    </button>
   );
 }

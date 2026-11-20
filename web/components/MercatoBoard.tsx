@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { isStale } from "@/lib/mercato/stale";
 import { useWatchlist } from "@/lib/useWatchlist";
+import { RefreshCwIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mentions } from "@/lib/watch";
 import { playerLink, REGION_INFO, type Region } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
@@ -390,43 +394,27 @@ export default function MercatoBoard({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {leagues.map((l) => (
-          <button
-            key={l}
-            onClick={() => setLeague(l)}
-            className={`rounded-md border px-2.5 py-1 text-xs ${
-              league === l ? "border-accent bg-accent-soft font-medium text-ink" : "border-border text-ink-2 hover:bg-surface-2"
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-        <label className="ml-auto flex items-center gap-2 text-xs text-ink-2">
-          <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs value={league} onValueChange={setLeague}>
+          <TabsList aria-label="Ligue">
+            {leagues.map((l) => (
+              <TabsTrigger key={l} value={l}>
+                {l}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-ink-2">
+          <Checkbox checked={onlyChanged} onCheckedChange={(v) => setOnlyChanged(v === true)} />
           Seulement les équipes qui bougent
         </label>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
-        <button
-          onClick={refresh}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-md border border-accent bg-accent-soft px-3 py-1.5 text-sm font-medium text-ink hover:brightness-95 disabled:opacity-70"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden
-          >
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" strokeLinecap="round" />
-            <path d="M21 3v6h-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-2 text-xs">
+        <Button variant="soft" size="lg" onClick={refresh} disabled={loading}>
+          <RefreshCwIcon className={loading ? "animate-spin" : ""} />
           {loading ? (auto ? "Mise à jour automatique…" : "Recherche des nouveautés…") : "Actualiser le mercato"}
-        </button>
+        </Button>
         <span className="text-ink-3">
           {loading
             ? "Scoops Sheep Esports (Google News), rumeurs et transferts officiels sur Leaguepedia"

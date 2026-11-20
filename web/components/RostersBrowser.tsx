@@ -6,6 +6,7 @@ import { Avatar, PlayerName, TeamLogo } from "./Images";
 import { TIER_COLOR } from "@/lib/tiers";
 import { playerLink, publicData, REGION_INFO } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
+import { NativeSelect } from "@/components/ui/native-select";
 
 
 interface RosterPlayer {
@@ -134,34 +135,34 @@ export default function RostersBrowser() {
   if (!events || season === null) return <p className="text-sm text-ink-3">Chargement…</p>;
 
   const current = tournaments.find((t) => t.tournament === tournament);
-  const control = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
+  const control = "h-8 rounded-full border border-border bg-surface px-3 text-[13px] outline-none focus:border-accent";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-3">
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Saison
-          <select className={control} value={season} onChange={(e) => setSeason(Number(e.target.value))}>
+          <NativeSelect value={season} onChange={(e) => setSeason(Number(e.target.value))}>
             {seasons.map((s) => (
               <option key={s}>{s}</option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-3">
           Ligue
-          <select className={control} value={league} onChange={(e) => setLeague(e.target.value)}>
+          <NativeSelect value={league} onChange={(e) => setLeague(e.target.value)}>
             {leagues.map((l) => (
               <option key={l}>{l}</option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label className="flex min-w-60 flex-col gap-1 text-xs text-ink-3">
           Tournoi
-          <select className={control} value={tournament} onChange={(e) => setTournament(e.target.value)}>
+          <NativeSelect value={tournament} onChange={(e) => setTournament(e.target.value)}>
             {tournaments.map((t) => (
               <option key={t.tournament}>{t.tournament}</option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
       </div>
 
