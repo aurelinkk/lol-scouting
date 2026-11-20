@@ -48,3 +48,18 @@ export function signedFromMercato(teams: MercatoTeam[], region: Region): Record<
   }
   return out;
 }
+
+/** Fin de contrat (GCD) de chaque joueur avec son club de la saison passée */
+export interface ContractEnd {
+  team: string;
+  /** date ISO, ex « 2027-11-15 » : sous contrat pour la saison 2027 */
+  end: string;
+}
+
+export function contractsFromMercato(teams: MercatoTeam[]): Record<string, ContractEnd> {
+  const out: Record<string, ContractEnd> = {};
+  for (const t of teams)
+    for (const s of t.slots)
+      if (s.before?.id && !s.before.region && s.before_end) out[s.before.id] = { team: t.team, end: s.before_end };
+  return out;
+}

@@ -7,7 +7,7 @@ import { fmtScore, fmtStat, topPercent } from "@/lib/format";
 import { ROLES, type RankingRow, type StatKey } from "@/lib/types";
 import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
-import { type Signed, signedFromMercato } from "@/lib/mercato/signed";
+import { type ContractEnd, type Signed, signedFromMercato } from "@/lib/mercato/signed";
 import { isStale } from "@/lib/mercato/stale";
 import { HOME_ORIGIN, ORIGINS, originOf } from "@/lib/origin";
 
@@ -45,6 +45,7 @@ export default function DataTable({
   hasOe,
   promoted = {},
   signed: publishedSigned = {},
+  contracts = {},
   mercatoGenerated,
   mercatoSeason,
 }: {
@@ -53,6 +54,8 @@ export default function DataTable({
   promoted?: Record<string, Promoted>;
   /** Joueurs qui ont déjà un club pour la saison suivante (mercato publié) */
   signed?: Record<string, Signed>;
+  /** Fin de contrat (GCD) avec le club de la saison passée */
+  contracts?: Record<string, ContractEnd>;
   mercatoGenerated?: string;
   mercatoSeason?: number;
 }) {
@@ -79,6 +82,7 @@ export default function DataTable({
   }, [region, mercatoGenerated]);
   const signed = liveSigned ?? publishedSigned;
   const [onlyFree, setOnlyFree] = useState(false);
+  const [contractEnding, setContractEnding] = useState(false);
   const [rows, setRows] = useState<RankingRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,13 +132,16 @@ export default function DataTable({
         (!role || r.role === role) &&
         (!tier || r.tier === tier) &&
         (!league || r.league_code === league) &&
-        (!origin || (origin === "?" ? !originOf(r.country) : originOf(r.country) === origin)) &&
+        (!origin || (origin === "?" ? !originOf(r.country, r.name) : originOf(r.country, r.name) === origin)) &&
         (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
         // Seulement les joueurs encore libres pour la saison suivante (saison en cours)
         (!onlyFree ||
           r.season !== Math.max(...seasons) ||
-          (!signed[r.id] && !promoted[`${r.season}:${r.id}`])) &&
+          ((!signed[r.id] || signed[r.id].kind === "contract") && !promoted[`${r.season}:${r.id}`])) &&
+        // Contrat qui se termine à la fin de la saison : récupérable sans rachat
+        (!contractEnding || (r.season === Math.max(...seasons) && !!contracts[r.id] &&
+          Number(contracts[r.id].end.slice(0, 4)) <= r.season)) &&
         // Les joueurs montés en cours de saison (ex : SamD 2025) restent visibles
         (includeLec || (!r.played_lec && !r.ex_lec) || (!r.ex_lec && !!promoted[`${r.season}:${r.id}`])) &&
         (!q ||
@@ -156,11 +163,11 @@ export default function DataTable({
       return (va - vb) * dir;
     });
     return out;
-  }, [rows, season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted, onlyFree, signed, seasons]);
+  }, [rows, season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted, onlyFree, signed, seasons, contractEnding, contracts]);
 
   useEffect(
     () => setLimit(PAGE),
-    [season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, sort, onlyFree],
+    [season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, sort, onlyFree, contractEnding],
   );
 
   const columns = STAT_COLUMNS.filter((c) => hasOe || !c.oe);
@@ -177,7 +184,13 @@ export default function DataTable({
     const level = sg?.tier === "LEC" ? "top" : sg?.tier === "ERL1" && r.tier === "ERL2" ? "second" : undefined;
     return sg && level ? { level, team: sg.team, season: next, rumor: !sg.official } : undefined;
   };
-  const signedOf = (r: RankingRow) => (isCurrent && !promoOf(r) ? signed[r.id] : undefined);
+  // Déjà un club : annonce officielle ou rumeur. « Sous contrat » sans source ne
+  // compte pas : rien ne dit qu'il reste (voir la colonne Contrat)
+  const signedOf = (r: RankingRow) => {
+    const sg = isCurrent && !promoOf(r) ? signed[r.id] : undefined;
+    return sg && sg.kind !== "contract" ? sg : undefined;
+  };
+  const contractOf = (r: RankingRow) => (isCurrent ? contracts[r.id] : undefined);
   const rowStyle = (r: RankingRow) => {
     const p = promoOf(r);
     if (p) return { background: `color-mix(in srgb, ${PROMO_COLOR[p.level]} 13%, transparent)` };
@@ -305,6 +318,12 @@ export default function DataTable({
               Seulement les joueurs encore libres pour {next}
             </label>
           )}
+          {isCurrent && Object.keys(contracts).length > 0 && (
+            <label className="flex items-center gap-2" title="Contrat (base GCD de Riot) qui se termine à la fin de la saison : joueur récupérable sans rachat. Connu surtout pour les 1res divisions.">
+              <input type="checkbox" checked={contractEnding} onChange={(e) => setContractEnding(e.target.checked)} />
+              Contrat qui se termine fin {season} (sans rachat)
+            </label>
+          )}
           {R.hasLeagues && (
           <label
             className="flex items-center gap-2"
@@ -342,7 +361,7 @@ export default function DataTable({
                     className="h-2.5 w-2.5 rounded-sm"
                     style={{ background: "color-mix(in srgb, var(--accent) 35%, transparent)" }}
                   />
-                  Déjà un club pour {next}, même niveau ou en dessous (plus clair = rumeur ou sous contrat)
+                  Déjà un club pour {next}, même niveau ou en dessous (plus clair = rumeur)
                 </span>
               )}
               <span className="flex items-center gap-1.5">
@@ -373,6 +392,11 @@ export default function DataTable({
                   <th className="px-2 py-2 text-left font-medium" title="Ligue sur laquelle la saison est évaluée">
                     Ligue (saison)
                   </th>
+                  {isCurrent && Object.keys(contracts).length > 0 && (
+                    <th className="px-2 py-2 text-left font-medium" title="Fin de contrat avec le club (base GCD de Riot, via Leaguepedia)">
+                      Contrat
+                    </th>
+                  )}
                   {header("age", "Âge")}
                   {header("games", "Parties")}
                   {header("final", "Score", "Score final")}
@@ -404,7 +428,7 @@ export default function DataTable({
                         <span className="text-xs text-ink-3">{r.role}</span>
                         {(() => {
                           // Import : joueur venu d'une autre grande région (ex : un Coréen en LEC)
-                          const o = originOf(r.country);
+                          const o = originOf(r.country, r.name);
                           return o && o !== HOME_ORIGIN[region] ? (
                             <span
                               className="rounded px-1 text-[10px] font-semibold"
@@ -457,7 +481,6 @@ export default function DataTable({
                                 >
                                   {sg.stays ? `✓ ${next}` : `→ ${sg.team}`}
                                   {sg.kind === "rumor" && " (rumeur)"}
-                                  {sg.kind === "contract" && " (sous contrat)"}
                                 </span>
                               );
                             })()}
@@ -485,6 +508,25 @@ export default function DataTable({
                       {r.league_code}{" "}
                       {r.league_code !== tierName(r.tier, region) && <span className="text-xs text-ink-3">{tierName(r.tier, region)}</span>}
                     </td>
+                    {isCurrent && Object.keys(contracts).length > 0 && (
+                      <td className="whitespace-nowrap px-2 py-1.5 text-xs">
+                        {(() => {
+                          const c = contractOf(r);
+                          if (!c) return <span className="text-ink-3">–</span>;
+                          const year = Number(c.end.slice(0, 4));
+                          const ending = year <= r.season;
+                          return (
+                            <span
+                              className={ending ? "font-medium" : "text-ink-2"}
+                              style={ending ? { color: "var(--good)" } : undefined}
+                              title={`Contrat avec ${c.team} jusqu'au ${c.end.split("-").reverse().join("/")}${ending ? " : récupérable sans rachat" : ""}`}
+                            >
+                              {ending ? `fin ${year}` : year}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    )}
                     <td className="px-2 py-1.5 text-right" title={r.age_approx ? "Âge approximatif (année de naissance seule)" : undefined}>
                       {r.age !== undefined ? `${r.age_approx ? "~" : ""}${r.age}` : "–"}
                     </td>

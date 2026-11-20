@@ -294,7 +294,10 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                  "left": states(r)[0], "right": states(r)[1],
                  "status": r["status"], "source": r["source"] or None,
                  "options": r.get("options") or None, "to": destination(r.get("to")),
-                 "url": r.get("url") if isinstance(r.get("url"), str) else None}
+                 "url": r.get("url") if isinstance(r.get("url"), str) else None,
+                 # fin de contrat (GCD) avec ce club : date ISO ou None
+                 "before_end": r.get("before_end") if isinstance(r.get("before_end"), str) else None,
+                 "after_end": r.get("after_end") if isinstance(r.get("after_end"), str) else None}
                 for _, r in grp.iterrows()
                 if r["role"] != "Coach" or isinstance(r["before"], str) or isinstance(r["after"], str)]})
         board_teams = set(board["team"])

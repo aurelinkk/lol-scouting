@@ -1,3 +1,4 @@
+import residency from "@/data/residency.json";
 import type { Region } from "@/lib/region";
 
 /**
@@ -29,7 +30,13 @@ const LCP = new Set([
   "Thailand", "Malaysia", "Singapore", "Indonesia", "Cambodia", "Laos", "Myanmar",
 ]);
 
-export function originOf(country?: string | null): Origin | null {
+// Exceptions saisies à la main (web/data/residency.json) : ex. Busio, Américain
+// mais aussi Polonais, compte comme joueur EMEA (pas d'import en LEC)
+const RESIDENCY = residency as Record<string, string>;
+
+export function originOf(country?: string | null, name?: string): Origin | null {
+  const forced = name ? RESIDENCY[name] ?? RESIDENCY[name.replace(/\s*\(.*\)$/, "")] : undefined;
+  if (forced && forced !== "_info") return forced as Origin;
   if (!country) return null;
   if (country === "South Korea") return "KR";
   if (country === "China") return "LPL";

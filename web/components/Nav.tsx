@@ -12,6 +12,7 @@ const NAV: { path: string; label: string; eu_only?: boolean; global?: boolean }[
   { path: "/montees", label: "Montées" },
   { path: "/ligues", label: "Ligues", eu_only: true },
   { path: "/rosters", label: "Rosters" },
+  { path: "/besoins", label: "Besoins" },
   { path: "/comparer", label: "Comparer", global: true },
   { path: "/ladder", label: "Ladder", eu_only: true },
   { path: "/analyses", label: "Analyses", eu_only: true },

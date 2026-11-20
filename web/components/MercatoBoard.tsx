@@ -45,6 +45,9 @@ export interface MercatoSlot {
   options?: string;
   /** Où part le joueur de départ (ex : Yukino -> FlyQuest, LCS) */
   to?: { team: string; logo?: string; league?: string; tier?: string; region?: string } | null;
+  /** Fin de contrat (GCD) avec ce club, date ISO */
+  before_end?: string | null;
+  after_end?: string | null;
 }
 export interface MercatoTeam {
   league: string;
