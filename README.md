@@ -70,11 +70,20 @@ scoops Sheep Esports lus dans les titres Google News (`sheep.py` /
 `web/lib/mercato/sheep.ts`), souvent quelques minutes après leur publication,
 avant leur saisie sur Leaguepedia. Le site de Sheep n'est jamais contacté.
 
+Réglages facultatifs du site :
+
+| Où | Quoi | Pour |
+|---|---|---|
+| Vercel > Settings > Environment Variables | `DISCORD_WEBHOOK_URL` | Alertes Discord des news des joueurs suivis (⭐) |
+| GitHub > Settings > Secrets and variables > Actions > Variables | `SITE_URL` | Mise à jour du mercato toutes les heures, même sans visite |
+| `web/data/residency.json` | `"Busio": "EMEA"` | Résidence d'un joueur quand la nationalité trompe (imports, page Besoins) |
+
 Corrections à la main (prioritaires sur les données automatiques) :
 
 | Fichier | Pour |
 |---|---|
 | `birthdates.csv` | Âges manquants (`joueur,2004-06-28,source` ; une année seule = âge approximatif « ~22 ans ») — `python missing_ages.py` liste les prioritaires |
+| `web/data/residency.json` | Résidence forcée (double nationalité, résidence acquise) : `EMEA`, `AMER`, `KR`, `LPL`, `LCP` |
 | `rosters_2027.csv` | Corriger un poste du mercato (`LEC,Karmine Corp,Jungle,Yike,SkewMond,rumeur,lien-sheep` ; statut `rumeur` ou `officiel`) |
 | `team_changes.csv` | Équipe remplacée ou renommée au mercato (`2027,Dignitas,OpTic Gaming,lien`) |
 | `soloq_accounts.csv` | Lier un pro à son compte soloQ (`joueur,Pseudo#TAG`) |
