@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStore } from "@/lib/deep/store";
+import { sendWatchAlerts } from "@/lib/mercato/alerts";
 import { type LiveMercato, refreshMercato } from "@/lib/mercato/live";
 import { type Region, REGIONS } from "@/lib/region";
 
@@ -31,7 +32,10 @@ export async function POST(req: Request) {
   }
   try {
     const live = await refreshMercato(region);
-    if (live) await store.set(key(region), live);
+    if (live) {
+      await store.set(key(region), live);
+      await sendWatchAlerts(store, live).catch(() => {});
+    }
     return NextResponse.json({ live });
   } catch (e) {
     await store.unlock(`mercato:cooldown:${region}`);

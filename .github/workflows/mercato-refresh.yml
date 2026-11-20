@@ -1,0 +1,24 @@
+# Mise à jour du mercato en ligne toutes les heures, même sans visite du site :
+# rumeurs Leaguepedia + scoops Sheep Esports, et alertes Discord des joueurs suivis.
+# À activer : GitHub > Settings > Secrets and variables > Actions > Variables,
+# ajouter SITE_URL = l'adresse du site Vercel (ex : https://mon-site.vercel.app).
+name: Mercato en ligne
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    if: ${{ vars.SITE_URL != '' }}
+    steps:
+      - name: Actualiser les 3 régions
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          for region in eu na kr; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SITE_URL/api/mercato?region=$region" --max-time 90)
+            echo "$region : HTTP $code"
+          done

@@ -10,6 +10,7 @@ import { useRegion } from "@/lib/useRegion";
 import { type ContractEnd, type Signed, signedFromMercato } from "@/lib/mercato/signed";
 import { isStale } from "@/lib/mercato/stale";
 import { HOME_ORIGIN, ORIGINS, originOf } from "@/lib/origin";
+import { useWatchlist } from "@/lib/useWatchlist";
 
 type SortKey = "final" | "age" | "games" | "league_score" | "league_bonus" | "em_score" | StatKey;
 
@@ -83,6 +84,8 @@ export default function DataTable({
   const signed = liveSigned ?? publishedSigned;
   const [onlyFree, setOnlyFree] = useState(false);
   const [contractEnding, setContractEnding] = useState(false);
+  const watch = useWatchlist(region);
+  const [onlyWatched, setOnlyWatched] = useState(false);
   const [rows, setRows] = useState<RankingRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,6 +135,7 @@ export default function DataTable({
         (!role || r.role === role) &&
         (!tier || r.tier === tier) &&
         (!league || r.league_code === league) &&
+        (!onlyWatched || !!watch.list[r.id]) &&
         (!origin || (origin === "?" ? !originOf(r.country, r.name) : originOf(r.country, r.name) === origin)) &&
         (age === null || (r.age === undefined ? unknownAge : r.age <= age)) &&
         r.games >= games &&
@@ -143,7 +147,7 @@ export default function DataTable({
         (!contractEnding || (r.season === Math.max(...seasons) && !!contracts[r.id] &&
           Number(contracts[r.id].end.slice(0, 4)) <= r.season)) &&
         // Les joueurs montés en cours de saison (ex : SamD 2025) restent visibles
-        (includeLec || (!r.played_lec && !r.ex_lec) || (!r.ex_lec && !!promoted[`${r.season}:${r.id}`])) &&
+        (includeLec || onlyWatched || (!r.played_lec && !r.ex_lec) || (!r.ex_lec && !!promoted[`${r.season}:${r.id}`])) &&
         (!q ||
           r.name.toLowerCase().includes(q) ||
           r.team.toLowerCase().includes(q) ||
@@ -163,11 +167,11 @@ export default function DataTable({
       return (va - vb) * dir;
     });
     return out;
-  }, [rows, season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted, onlyFree, signed, seasons, contractEnding, contracts]);
+  }, [rows, season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, noLeague, sort, promoted, onlyFree, signed, seasons, contractEnding, contracts, onlyWatched, watch.list]);
 
   useEffect(
     () => setLimit(PAGE),
-    [season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, sort, onlyFree, contractEnding],
+    [season, role, tier, league, origin, maxAge, minGames, search, includeLec, unknownAge, sort, onlyFree, contractEnding, onlyWatched],
   );
 
   const columns = STAT_COLUMNS.filter((c) => hasOe || !c.oe);
@@ -318,6 +322,12 @@ export default function DataTable({
               Seulement les joueurs encore libres pour {next}
             </label>
           )}
+          <label className="flex items-center gap-2" title="Joueurs marqués d'une étoile (liste partagée par tous les visiteurs)">
+            <input type="checkbox" checked={onlyWatched} onChange={(e) => setOnlyWatched(e.target.checked)} />
+            <span>
+              Ma liste <span style={{ color: "var(--gold)" }}>★</span> ({Object.keys(watch.list).length})
+            </span>
+          </label>
           {isCurrent && Object.keys(contracts).length > 0 && (
             <label className="flex items-center gap-2" title="Contrat (base GCD de Riot) qui se termine à la fin de la saison : joueur récupérable sans rachat. Connu surtout pour les 1res divisions.">
               <input type="checkbox" checked={contractEnding} onChange={(e) => setContractEnding(e.target.checked)} />
@@ -420,6 +430,16 @@ export default function DataTable({
                       {i + 1}
                     </td>
                     <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => watch.toggle(r.id, r.name)}
+                        className="shrink-0 text-base leading-none"
+                        style={{ color: watch.list[r.id] ? "var(--gold)" : "var(--border)" }}
+                        title={watch.list[r.id] ? "Retirer de la liste de suivi" : "Suivre ce joueur (liste partagée)"}
+                        aria-label="Suivre"
+                      >
+                        ★
+                      </button>
                       <Link href={playerLink(region, r.id)} className="flex items-center gap-2 hover:underline">
                         <Avatar name={r.name} src={r.photo} size={28} />
                         <span className="whitespace-nowrap">
@@ -452,6 +472,19 @@ export default function DataTable({
                           </span>
                         )}
                       </Link>
+                      {watch.list[r.id] && (
+                        <button
+                          onClick={() => {
+                            const note = window.prompt(`Note sur ${r.name}`, watch.list[r.id]?.note ?? "");
+                            if (note !== null) watch.setNote(r.id, r.name, note);
+                          }}
+                          className="max-w-40 truncate text-left text-xs italic text-ink-3 hover:text-accent"
+                          title={watch.list[r.id]?.note || "Ajouter une note"}
+                        >
+                          {watch.list[r.id]?.note || "✎ note"}
+                        </button>
+                      )}
+                      </div>
                     </td>
                     <td className="px-2 py-1.5">
                       {(() => {

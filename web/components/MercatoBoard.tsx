@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { isStale } from "@/lib/mercato/stale";
+import { useWatchlist } from "@/lib/useWatchlist";
+import { mentions } from "@/lib/watch";
 import { playerLink, REGION_INFO, type Region } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { TeamLogo } from "./Images";
@@ -358,6 +360,23 @@ export default function MercatoBoard({
       .sort((a, b) => b.date.localeCompare(a.date) || +b.fresh - +a.fresh);
   }, [usable, baseNews, league, teams]);
 
+  // News des joueurs suivis (⭐), toutes ligues, en tête du panneau
+  const watch = useWatchlist(region);
+  const watchedNews = useMemo(() => {
+    const names = Object.values(watch.list).map((w) => w.name);
+    if (!names.length) return [];
+    const seen = new Set<string>();
+    return [...(usable?.changes ?? []).map((c) => ({ ...c, fresh: true })), ...baseNews.map((c) => ({ ...c, fresh: false }))]
+      .filter((c) => names.some((n) => mentions(c.text, n)))
+      .filter((c) => {
+        const key = `${c.date}|${c.text}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || +b.fresh - +a.fresh);
+  }, [watch.list, usable, baseNews]);
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -419,6 +438,29 @@ export default function MercatoBoard({
         </div>
 
         <aside className="shrink-0 space-y-3 lg:sticky lg:top-20 lg:w-60">
+          {watchedNews.length > 0 && (
+            <div className="rounded-lg border bg-surface p-3" style={{ borderColor: "var(--gold)" }}>
+              <div className="mb-1.5 flex items-baseline justify-between text-xs font-semibold uppercase tracking-wide text-ink-3">
+                <span>
+                  <span style={{ color: "var(--gold)" }}>★</span> Joueurs suivis
+                </span>
+                <span className="font-normal normal-case">{watchedNews.length}</span>
+              </div>
+              <ul className="max-h-48 space-y-1.5 overflow-y-auto pr-1 text-xs">
+                {watchedNews.map((c, i) => (
+                  <li key={i} className={c.fresh ? "font-medium text-ink" : ""}>
+                    <span className="text-ink-3">{c.date.slice(5).split("-").reverse().join("/")} · </span>
+                    {c.text}
+                    {c.url && (
+                      <a href={c.url} target="_blank" rel="noreferrer" className="ml-1 text-ink-3 hover:text-accent">
+                        ↗
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {leagueNews.length > 0 && (
             <div className="rounded-lg border border-accent bg-surface p-3">
               <div className="mb-1.5 flex items-baseline justify-between text-xs font-semibold uppercase tracking-wide text-ink-3">
