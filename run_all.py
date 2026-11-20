@@ -36,7 +36,9 @@ def log(msg):
 
 def run(cmd, region=None, check=False):
     """Lance une commande, recopie sa sortie dans le journal. Renvoie True si OK."""
-    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    # PYTHONUNBUFFERED : afficher la progression au fil de l'eau (sinon Python
+    # garde sa sortie en mémoire et tout arrive d'un coup à la fin)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
     if region:
         env["SCOUT_REGION"] = region
     log(("[" + region + "] " if region else "") + " ".join(cmd))
