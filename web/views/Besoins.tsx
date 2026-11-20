@@ -1,11 +1,14 @@
 import RegionMissing from "@/components/RegionMissing";
-import TeamNeeds, { type Candidate, MAX_AGE } from "@/components/TeamNeeds";
+import TeamNeeds, { type Candidate } from "@/components/TeamNeeds";
+import { MAX_AGE } from "@/lib/needs";
 import { getMercato, getPlayers, getRankings, hasRegion } from "@/lib/data";
+import { signedFromMercato } from "@/lib/mercato/signed";
 import { type Region, REGION_INFO, REGIONS } from "@/lib/region";
 
 export const metadata = { title: "Besoins · LoL Scouting" };
 
 const POOL_PER_ROLE = 150;
+const FOREIGN_PER_ROLE = 10;
 
 export default function BesoinsPage({ region }: { region: Region }) {
   if (!hasRegion(region)) return <RegionMissing region={region} />;
@@ -30,6 +33,29 @@ export default function BesoinsPage({ region }: { region: Region }) {
     });
     byRole.set(r.role, list);
   }
+
+  // Imports possibles : les meilleurs joueurs disponibles des autres régions
+  // suivies (sans club pour la saison suivante d'après leur mercato), par poste.
+  // Score de leur propre région : pas directement comparable d'une région à l'autre
+  const foreign = R.top === "LCK"
+    ? []
+    : REGIONS.filter((r2) => r2 !== region && hasRegion(r2)).map((r2) => {
+        const taken = new Set(Object.keys(signedFromMercato(getMercato(r2)?.teams ?? [], r2)));
+        const rows = getRankings(r2);
+        const last = Math.max(...rows.map((x) => x.season));
+        const byRole: Record<string, Candidate[]> = {};
+        for (const r of rows
+          .filter((x) => x.season === last && x.games >= 8 && !taken.has(x.id) && (x.age === undefined || x.age <= MAX_AGE))
+          .sort((a, b) => b.final - a.final)) {
+          const list = (byRole[r.role] ??= []);
+          if (list.length >= FOREIGN_PER_ROLE) continue;
+          list.push({
+            id: r.id, name: r.name, role: r.role, team: r.current_team || r.team, league: r.league_code, tier: r.tier,
+            final: r.final, age: r.age, country: r.country, photo: r.photo, region: r2,
+          });
+        }
+        return { region: r2, label: REGION_INFO[r2].short, byRole };
+      });
 
   // Nationalité des joueurs des effectifs (y compris ceux venus d'une autre région)
   const countries: Record<string, string> = {};
@@ -62,6 +88,7 @@ export default function BesoinsPage({ region }: { region: Region }) {
         teams={mercato.teams}
         pool={Object.fromEntries(byRole)}
         countries={countries}
+        foreign={foreign}
       />
     </div>
   );

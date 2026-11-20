@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Avatar, TeamLogo } from "./Images";
+import { MAX_AGE } from "@/lib/needs";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,11 +25,11 @@ export interface Candidate {
   age?: number;
   country?: string;
   photo?: string;
+  /** Joueur d'une autre région (imports possibles) */
+  region?: Region;
 }
 
 const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"];
-/** Âge maximum des joueurs proposés (âge inconnu : gardé) */
-export const MAX_AGE = 26.2;
 const SHORT_LIST = 5;
 const LONG_LIST = 10;
 /** Imports autorisés par équipe : 2 en LEC / LCS, aucun en LCK */
@@ -58,6 +59,7 @@ export default function TeamNeeds({
   teams: baseTeams,
   pool,
   countries,
+  foreign = [],
 }: {
   region: Region;
   season: number;
@@ -65,6 +67,8 @@ export default function TeamNeeds({
   teams: MercatoTeam[];
   pool: Record<string, Candidate[]>;
   countries: Record<string, string>;
+  /** Meilleurs joueurs disponibles des autres régions, par poste */
+  foreign?: { region: Region; label: string; byRole: Record<string, Candidate[]> }[];
 }) {
   const R = REGION_INFO[region];
   const home = HOME_ORIGIN[region];
@@ -248,6 +252,51 @@ export default function TeamNeeds({
                           )}
                           {limit > 0 && !importOk && (
                             <li className="text-[11px] text-ink-3">Places d&apos;import prises : imports non proposés.</li>
+                          )}
+                          {importOk && foreign.some((f) => f.byRole[s.role]?.length) && (
+                            <li className="pt-1.5">
+                              <div className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-3">
+                                Imports possibles · {limit - others} place{limit - others > 1 ? "s" : ""}
+                              </div>
+                              {foreign.map((f) => {
+                                const list = (f.byRole[s.role] ?? []).filter((c) => !taken.has(short(c.name))).slice(0, more[key] ? 5 : 3);
+                                return list.map((c) => {
+                                  const o = originOf(c.country, c.name);
+                                  return (
+                                    <div key={`${f.region}-${c.id}`} className="flex items-center gap-2 py-0.5 text-xs">
+                                      <span className="w-6 shrink-0 rounded bg-surface-2 text-center text-[10px] font-semibold text-ink-2" title={`Joueur classé en ${f.label}`}>
+                                        {f.label}
+                                      </span>
+                                      <Avatar name={c.name} src={c.photo} size={18} />
+                                      <Link href={playerLink(f.region, c.id)} className="font-medium text-ink hover:underline">
+                                        {short(c.name)}
+                                      </Link>
+                                      {o && o !== home ? (
+                                        <span
+                                          className="rounded px-1 text-[10px] font-semibold"
+                                          style={{ background: `var(--origin-${o.toLowerCase()})`, color: "var(--origin-ink)" }}
+                                          title={`Import · ${c.country}`}
+                                        >
+                                          {o}
+                                        </span>
+                                      ) : (
+                                        <span className="rounded border border-border px-1 text-[10px] text-ink-3" title={`Nationalité ${c.country ?? "?"} : ne prend pas de place d'import`}>
+                                          pas un import
+                                        </span>
+                                      )}
+                                      <span className="truncate text-ink-3">
+                                        {c.team} · {c.league}
+                                        {c.age !== undefined && ` · ${c.age} ans`}
+                                      </span>
+                                      <span className="ml-auto shrink-0 font-semibold tabular-nums" title={`Score dans le classement ${f.label} (pas directement comparable aux scores ${R.top})`}>
+                                        {fmtScore(c.final)}
+                                      </span>
+                                    </div>
+                                  );
+                                });
+                              })}
+                              <div className="text-[10px] text-ink-3">Score de leur région : pas directement comparable aux joueurs ci-dessus.</div>
+                            </li>
                           )}
                         </ol>
                       )}
