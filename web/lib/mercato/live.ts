@@ -119,7 +119,7 @@ export interface LiveMercato {
   since: string;
   mercato: Mercato;
   /** Nouveautés appliquées, la plus récente en premier */
-  changes: { date: string; text: string; url: string | null; official: boolean }[];
+  changes: { date: string; text: string; url: string | null; official: boolean; league?: string; team?: string }[];
 }
 
 export async function refreshMercato(region: Region): Promise<LiveMercato | null> {
@@ -310,7 +310,7 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
           ? `${nameOf(s.after)} reste chez ${t.team}`
           : `${nameOf(s.after)} → ${t.team} (${s.role})${s.before ? `, à la place de ${nameOf(s.before)}` : ""}`
         : `${nameOf(s.before)} quitte ${t.team}${s.to?.team ? ` → ${s.to.team}` : ""}`;
-      out.push({ date: dateOf.get(s) ?? since, text, url: s.url ?? null, official });
+      out.push({ date: dateOf.get(s) ?? since, text, url: s.url ?? null, official, league: t.league, team: t.team });
     }
     for (const c of t.coaches ?? []) {
       const bc = bt?.coaches?.find((x) => same(x.name, c.name));
@@ -318,7 +318,7 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
       (c as { live?: boolean }).live = changed ? true : undefined;
       if (!changed) continue;
       const verb = c.change === "leave" ? `quitte ${t.team}` : c.change === "new" ? `→ ${t.team}` : `reste chez ${t.team}`;
-      out.push({ date: dateOf.get(c) ?? since, text: `Coach ${nameOf(c)} ${verb}`, url: c.url ?? null, official: c.state === "in" || c.state === "out" });
+      out.push({ date: dateOf.get(c) ?? since, text: `Coach ${nameOf(c)} ${verb}`, url: c.url ?? null, official: c.state === "in" || c.state === "out", league: t.league, team: t.team });
     }
   }
   void applied;

@@ -35,8 +35,19 @@ export const getRankings = (region: Region = "eu"): RankingRow[] => {
 export const getPlayer = (id: string, region: Region = "eu"): Player | undefined => getPlayers(region)[id];
 
 import type { MercatoTeam } from "@/components/MercatoBoard";
+/** Ligne du fil « Nouveautés » (export Python : dernières semaines, par ligue) */
+export interface MercatoNews {
+  date: string;
+  league: string;
+  team: string;
+  text: string;
+  url: string | null;
+  official: boolean;
+}
+
 export interface Mercato {
   season: number;
+  news?: MercatoNews[];
   teams: MercatoTeam[];
   undecided?: { player: string; id?: string; options: string[] }[];
   /** Date de l'export (« 2026-11-18 08:10 ») : le rafraîchissement en ligne part de là */

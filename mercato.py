@@ -134,6 +134,89 @@ def add_sheep_rumors(rumors, changes, board, season, refresh=False):
     return pd.concat([rumors, sheep], ignore_index=True) if len(sheep) else rumors
 
 
+NEWS_DAYS = 45      # fil « Nouveautés » de l'onglet Rosters : dernières semaines
+NEWS_PER_LEAGUE = 40
+
+
+def build_news(events, changes, rumors, board):
+    """Fil d'actualité du mercato, par ligue : une ligne par annonce (rumeur ou
+    officielle) touchant une équipe suivie. Un départ + une arrivée le même jour
+    dans la même équipe = prolongation (« reste chez »)."""
+    league_of = dict(zip(board["team"], board["league"]))
+    origin = {p: t for p, t in zip(board["before"], board["team"]) if isinstance(p, str)}
+    name = lambda p: re.sub(r"\s*\(.*\)$", "", str(p))
+    rows = []  # (date, officiel, joueur, équipe, sens, poste, destination, lien)
+    for date, _, kind, player, team, role, status, _src, dest, url in events:
+        official = status == "confirmé"
+        if kind == "Out":
+            team = origin.get(player)
+            if not team:
+                continue
+        if team not in league_of:
+            continue
+        rows.append((date, official, player, team, kind, role, dest, url))
+    for _, c in changes[changes["role"].map(is_coach_role)].iterrows():
+        if c["team"] in league_of:
+            rows.append((str(c["date"])[:10], True, c["player"], c["team"], c["direction"], "Coach", None,
+                         _url(c.get("link"))))
+    for _, r in rumors[rumors["role"].map(is_coach_role)].iterrows():
+        official = r["status"] == "Confirmed"
+        if r["team_start"] != r["team_end"] and r["team_start"] in league_of:
+            rows.append((str(r["day"]), official, r["player"], r["team_start"], "Leave", "Coach", r["team_end"],
+                         _url(r.get("link"))))
+        if r["team_end"] in league_of:
+            rows.append((str(r["day"]), official, r["player"], r["team_end"],
+                         "Stay" if r["team_start"] == r["team_end"] else "Join", "Coach", None, _url(r.get("link"))))
+    kinds = {}
+    for date, official, player, team, kind, *_ in rows:
+        kinds.setdefault((date, official, player, team), set()).add("Leave" if kind == "Out" else kind)
+    # Transfert entre deux équipes d'une même ligue (ex : Rooster, Shifters -> G2) :
+    # une seule ligne « Rooster (Shifters) → G2 Esports », sans la ligne de départ
+    joins = {(d, o, p, t) for d, o, p, t, k, *_ in rows if k == "Join"}
+    from_team = {}
+    keep = []
+    for row in rows:
+        date, official, player, team, kind, role, dest, url = row
+        if (kind in ("Leave", "Out") and isinstance(dest, str) and (date, official, player, dest) in joins
+                and league_of.get(dest) == league_of[team] and "Join" not in kinds[(date, official, player, team)]):
+            from_team[(date, official, player, dest)] = team
+            continue
+        keep.append(row)
+    rows = keep
+    news, seen = [], set()
+    for date, official, player, team, kind, role, dest, url in rows:
+        k = kinds[(date, official, player, team)]
+        if {"Leave", "Join"} <= k:
+            kind = "Stay"
+        coach = "Coach " if role == "Coach" else ""
+        if kind == "Stay":
+            text = f"{coach}{name(player)} reste chez {name(team)}"
+        elif kind == "Join":
+            origin_team = from_team.get((date, official, player, team))
+            text = (f"{coach}{name(player)}" + (f" ({name(origin_team)})" if origin_team else "")
+                    + f" → {name(team)}" + ("" if coach else f" ({role})"))
+        else:
+            to = f" → {name(dest)}" if isinstance(dest, str) and dest not in NOT_A_TEAM and dest != team else ""
+            text = f"{coach}{name(player)} quitte {name(team)}{to}"
+        key = (date, official, text)
+        if key in seen:
+            continue
+        seen.add(key)
+        news.append({"date": date, "league": league_of[team], "team": team, "text": text,
+                     "url": url if isinstance(url, str) else None, "official": bool(official)})
+    if not news:
+        return []
+    last = max(n["date"] for n in news)
+    cutoff = (pd.Timestamp(last) - pd.Timedelta(days=NEWS_DAYS)).strftime("%Y-%m-%d")
+    news = sorted((n for n in news if n["date"] >= cutoff), key=lambda n: n["date"], reverse=True)
+    out, count = [], {}
+    for n in news:
+        count[n["league"]] = count.get(n["league"], 0) + 1
+        if count[n["league"]] <= NEWS_PER_LEAGUE:
+            out.append(n)
+    return out
+
+
 def base_rosters(games, season):
     """Titulaires de chaque équipe LEC / ERL1 lors de son dernier split de `season`."""
     rc = build_rosters(games[games["season"] == season])
@@ -425,6 +508,7 @@ def build_mercato(games, season, refresh=False):
     # départ avant l'arrivée (un départ + une arrivée le même jour = prolongation)
     order = {"Leave": 0, "Out": 0, "Stay": 1, "Join": 1}
     events.sort(key=lambda e: (e[0], e[1], order.get(e[2], 1)))
+    news = build_news(events, changes, rumors, board)
     dest_of = {}     # dernière destination connue de chaque joueur
     leave_info = {}  # dernier départ annoncé de chaque joueur : (statut, source, lien)
     board["url"] = None  # lien vers l'article / le post qui annonce le mouvement
@@ -522,6 +606,7 @@ def build_mercato(games, season, refresh=False):
             board.loc[slot, ["after", "status", "source", "url"]] = [player, status, site, url]
     board.attrs["undecided"] = options
     board.attrs["coaches"] = coaches
+    board.attrs["news"] = news
     return board
 
 

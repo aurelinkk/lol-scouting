@@ -302,6 +302,7 @@ def export_mercato(games, ids, logos, next_season, refresh=False):
                      for p, o in board.attrs.get("undecided", {}).items()
                      if any(t in board_teams for t in o)]
         write("mercato.json", {"season": next_season, "teams": teams, "undecided": undecided,
+                               "news": board.attrs.get("news", []),
                                "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")})
     elif os.path.exists(os.path.join(OUT_DIR, "mercato.json")):
         os.remove(os.path.join(OUT_DIR, "mercato.json"))

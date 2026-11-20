@@ -253,6 +253,8 @@ interface LiveChange {
   text: string;
   url: string | null;
   official: boolean;
+  league?: string;
+  team?: string;
 }
 interface Live {
   updatedAt: number;
@@ -273,11 +275,14 @@ export default function MercatoBoard({
   season,
   teams: baseTeams,
   undecided: baseUndecided = [],
+  news: baseNews = [],
   generated,
 }: {
   season: number;
   teams: MercatoTeam[];
   undecided?: { player: string; id?: string; options: string[] }[];
+  /** Fil d'actualité de l'export (dernières semaines, toutes ligues) */
+  news?: LiveChange[];
   /** Date de l'export du mercato publié */
   generated?: string;
 }) {
@@ -328,6 +333,23 @@ export default function MercatoBoard({
   const [league, setLeague] = useState(top);
   const [onlyChanged, setOnlyChanged] = useState(false);
   const shown = teams.filter((t) => t.league === league && (!onlyChanged || t.changed));
+  // Fil « Nouveautés » de la ligue affichée : nouveautés en ligne (depuis l'export)
+  // puis fil de l'export, sans doublon, la plus récente en premier
+  const leagueNews = useMemo(() => {
+    const leagueOf = (c: LiveChange) =>
+      c.league ?? teams.find((t) => c.text.includes(t.team))?.league;
+    const fresh = (usable?.changes ?? []).map((c) => ({ ...c, fresh: true }));
+    const seen = new Set<string>();
+    return [...fresh, ...baseNews.map((c) => ({ ...c, fresh: false }))]
+      .filter((c) => leagueOf(c) === league)
+      .filter((c) => {
+        const key = `${c.date}|${c.text}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || +b.fresh - +a.fresh);
+  }, [usable, baseNews, league, teams]);
 
   return (
     <div className="space-y-3">
@@ -390,14 +412,16 @@ export default function MercatoBoard({
         </div>
 
         <aside className="shrink-0 space-y-3 lg:sticky lg:top-20 lg:w-60">
-          {usable && usable.changes.length > 0 && (
+          {leagueNews.length > 0 && (
             <div className="rounded-lg border border-accent bg-surface p-3">
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-3">
-                Nouveautés ({usable.changes.length})
+              <div className="mb-1.5 flex items-baseline justify-between text-xs font-semibold uppercase tracking-wide text-ink-3">
+                <span>Nouveautés {league}</span>
+                <span className="font-normal normal-case">{leagueNews.length}</span>
               </div>
-              <ul className="max-h-72 space-y-1.5 overflow-y-auto text-xs">
-                {usable.changes.map((c, i) => (
-                  <li key={i} className="flex gap-1.5">
+              {/* ~10 lignes visibles, le reste en défilant */}
+              <ul className="max-h-[22rem] space-y-1.5 overflow-y-auto pr-1 text-xs">
+                {leagueNews.map((c, i) => (
+                  <li key={i} className={`flex gap-1.5 ${c.fresh ? "font-medium text-ink" : ""}`}>
                     <span
                       className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
                       style={
@@ -419,7 +443,10 @@ export default function MercatoBoard({
                   </li>
                 ))}
               </ul>
-              <p className="mt-1.5 text-[11px] text-ink-3">Cases entourées = nouveautés depuis l&apos;export.</p>
+              <p className="mt-1.5 text-[11px] text-ink-3">
+                ● officiel · ○ rumeur
+                {leagueNews.some((c) => c.fresh) && " · en gras et cases entourées : depuis l'export"}
+              </p>
             </div>
           )}
           <div className="rounded-lg border border-border bg-surface p-3">
