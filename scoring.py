@@ -231,3 +231,8 @@ SOLOQ_STANDOUT = 0.95         # « se démarque » = top 5 % de son poste
 # RECENCY_HALF_LIFE_DAYS jours avant la dernière partie du joueur dans la ligue
 # (None = toutes les parties de la saison au même poids). Voir le backtest.
 RECENCY_HALF_LIFE_DAYS = None
+
+# Bonus de forme : apport du dernier split joué (dans la ligue principale) au
+# score final = FORM_WEIGHT x score du split (z-score pondéré, réduit selon les
+# parties). Voir le backtest dans l'historique du dépôt.
+FORM_WEIGHT = 0.2

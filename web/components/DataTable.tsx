@@ -175,7 +175,7 @@ export default function DataTable({
   );
 
   const columns = STAT_COLUMNS.filter((c) => hasOe || !c.oe);
-  // Progression split à split : présente après un export récent (export_web.py)
+  // Progression d'une saison à l'autre : présente après un export récent (export_web.py)
   const hasTrend = useMemo(() => (rows ?? []).some((r) => r.season === season && r.trend !== undefined), [rows, season]);
   const isCurrent = season === Math.max(...seasons);
   const next = mercatoSeason ?? season + 1;
@@ -412,7 +412,7 @@ export default function DataTable({
                   {header("age", "Âge")}
                   {header("games", "Parties")}
                   {header("final", "Score", "Score final")}
-                  {hasTrend && header("trend", "Prog.", "Progression : score du dernier split moins celui du split précédent dans la même ligue")}
+                  {hasTrend && header("trend", "Prog.", "Progression : score final de la saison moins celui de la saison précédente")}
                   {header("league_score", "Ligue", "Performance dans sa ligue (z-score pondéré)")}
                   {(R.hasLeagues || includeLec) && header("league_bonus", "Bonus", "Bonus de niveau de ligue")}
                   {R.hasEm && header("em_score", "EM", "Performance à l'EMEA Masters")}
@@ -573,7 +573,7 @@ export default function DataTable({
                     {hasTrend && (
                       <td
                         className="whitespace-nowrap px-2 py-1.5 text-right text-xs tabular-nums"
-                        title={r.trend !== undefined ? `${r.trend_prev} → ${r.trend_split}` : "Pas deux splits comparables"}
+                        title={r.trend !== undefined ? `${r.trend_prev} → ${r.trend_split}` : "Pas classé la saison précédente"}
                       >
                         {r.trend === undefined ? (
                           <span className="text-ink-3">–</span>

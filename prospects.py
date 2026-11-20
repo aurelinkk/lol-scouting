@@ -202,45 +202,36 @@ def blend_international(league_rows, season):
     return league_rows
 
 
-SPLIT_MIN_GAMES = 5  # parties minimum dans un split pour la progression
+SPLIT_MIN_GAMES = 5  # parties minimum dans un split (bonus de forme)
 _NOT_A_SPLIT = r"Promotion|Relegation|Qualifier|Play-In|LCQ|Cup|Invitational|Versus|Showmatch|All-Star"
 _PLAYOFFS = re.compile(r"\s+(Playoffs|Finals|Season Finals|Grand Finals|Knockouts?|Play-?Ins?|Last Chance.*)$", re.I)
 
 
-def split_trend(games, season):
-    """Progression de chaque joueur d'un split à l'autre (flèche ↑/↓ de l'onglet Données).
+def split_scores(games):
+    """Score de chaque joueur dans chaque split (games : parties avec add_game_metrics).
 
-    Score d'un split = même calcul que le classement (z-scores pondérés parmi les
-    joueurs du même poste, dans la même ligue et le même split, playoffs compris).
-    Progression = score du dernier split de la saison - score du split précédent
-    (même saison ou fin de la précédente), dans la même ligue : un changement
-    de ligue n'est pas comparable. Promotions, qualifications et coupes exclues.
-    Renvoie {joueur: {"trend", "trend_split", "trend_prev"}}.
+    Même calcul que le classement : z-scores pondérés parmi les joueurs du même
+    poste, dans la même ligue et le même split (playoffs compris). Promotions,
+    qualifications et coupes exclues. Colonnes : player, split, league_code,
+    tier, role, games, score, last_game.
     """
-    g = games[games["season"].isin([season - 1, season]) & games["tier"].isin(["ERL1", "ERL2", "LEC"])
-              & ~games["tournament"].astype(str).str.contains(_NOT_A_SPLIT, case=False, na=False)]
+    g = games[games["tier"].isin(["ERL1", "ERL2", "LEC"])
+              & ~games["tournament"].astype(str).str.contains(_NOT_A_SPLIT, case=False, na=False)].copy()
     if g.empty:
-        return {}
-    g = add_game_metrics(g).copy()
-    g["split"] = g["tournament"].astype(str).str.replace(_PLAYOFFS, "", regex=True)
-    split_season = dict(zip(g["split"], g["season"]))
-    g["season"] = g["split"]  # aggregate() regroupe par « saison » : ici, par split
-    stats = aggregate(g)
+        return pd.DataFrame(columns=["player", "split", "league_code", "tier", "role", "games", "score", "last_game"])
+    g["season"] = g["tournament"].astype(str).str.replace(_PLAYOFFS, "", regex=True)
+    stats = aggregate(g)  # aggregate() regroupe par « saison » : ici, par split
     stats = stats[stats["games"] >= SPLIT_MIN_GAMES]
-    stats = weighted_zscores(stats, ["season", "league_code", "role"])
-    stats = stats.dropna(subset=["score"]).sort_values("last_game")
-    out = {}
-    for player, grp in stats.groupby("player"):
-        if len(grp) < 2:
-            continue
-        last = grp.iloc[-1]
-        same = grp[grp["league_code"] == last["league_code"]]  # même ligue seulement
-        if len(same) < 2 or split_season.get(last["season"]) != season:
-            continue
-        prev = same.iloc[-2]
-        out[player] = {"trend": round(float(last["score"] - prev["score"]), 3),
-                       "trend_split": last["season"], "trend_prev": prev["season"]}
-    return out
+    stats = weighted_zscores(stats, ["season", "league_code", "role"]).rename(columns={"season": "split"})
+    return stats.dropna(subset=["score"])
+
+
+def last_split_form(games):
+    """Dernier split joué par chaque joueur dans la saison : {joueur: (ligue, split, score, parties)}."""
+    sp = split_scores(games).sort_values("last_game")
+    last = sp.drop_duplicates("player", keep="last")
+    return {p: (lg, s, float(sc), int(n)) for p, lg, s, sc, n in
+            zip(last["player"], last["league_code"], last["split"], last["score"], last["games"])}
 
 
 def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=None):
@@ -350,13 +341,24 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
             ranking["soloq_bonus"] = (SOLOQ_WEIGHT * (1 - (ranking["soloq_rank"] - 1)
                                                       / ranking["soloq_ladder_size"])).fillna(0)
 
+    # Forme : apport du dernier split joué dans la ligue principale du joueur
+    # (scoring.FORM_WEIGHT x score du split, réduit selon ses parties)
+    form = last_split_form(games)
+    hit = [form.get(p) for p in ranking["player"]]
+    same = [h is not None and h[0] == lg for h, lg in zip(hit, ranking["league_code"])]
+    ranking["form_split"] = [h[1] if ok else None for h, ok in zip(hit, same)]
+    ranking["form_score"] = [h[2] if ok else float("nan") for h, ok in zip(hit, same)]
+    ranking["form_games"] = [h[3] if ok else 0 for h, ok in zip(hit, same)]
+    ranking["form_bonus"] = (scoring.FORM_WEIGHT * ranking["form_score"]
+                             * ranking["form_games"] / (ranking["form_games"] + SAMPLE_SHRINK_GAMES)).fillna(0.0)
+
     ranking["intl_bonus"] = ranking.get("intl_bonus", pd.Series(0.0, index=ranking.index)).fillna(0.0)
     # Un joueur classé en LEC n'a pas de bonus EMEA Masters (ex : Stend 2026,
     # EM avec Vitality.Bee puis LEC avec Shifters) : il est jugé au niveau LEC
     ranking.loc[ranking["tier"] == "LEC", "em_score"] = float("nan")
     ranking["final"] = (ranking["league_score"] + ranking["league_bonus"] + ranking["intl_bonus"]
                         + EM_WEIGHT * ranking["em_score"].fillna(0) + ranking["soloq_bonus"]
-                        + ranking["ex_lec_malus"])
+                        + ranking["ex_lec_malus"] + ranking["form_bonus"])
 
     # Rang (percentile) dans son rôle parmi tous les joueurs d'ERL
     # Percentile parmi les joueurs d'ERL ; un joueur de LEC est situé par rapport

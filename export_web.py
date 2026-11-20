@@ -28,8 +28,9 @@ from leagues import LEAGUES, leagues_by_region
 from mercato import CONTRACT_CUTOFF
 from region import RAW_DIR, REGION, WEB_DATA_DIR, WEB_PUBLIC_DIR
 from promotions import compute_promotions, hit_rates
-from prospects import add_game_metrics, aggregate, build_ranking, split_trend
+from prospects import add_game_metrics, aggregate, build_ranking
 from league_talent import league_talent, season_coefficients
+import scoring
 from scoring import EM_WEIGHT, LEAGUE_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
 OUT_DIR = WEB_DATA_DIR             # lu par le serveur au build (jamais envoyé tel quel)
@@ -399,15 +400,21 @@ def main():
                    "league_bonus", "league_coef", "league_coef_base", "team_adjust", "team_mates", "intl_games", "intl_score", "intl_bonus", "em_score", "em_score_raw", "em_games",
                    "ex_lec", "ex_lec_malus", "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
                    "soloq_games", "soloq_winrate", "soloq_lp_7d", "soloq_games_7d",
+                   "form_bonus", "form_score", "form_split", "form_games",
                    "role_percentile", "played_lec"] + STATS
     rankings = []
     scores = {}  # (season, player) -> détail du score
     for season in seasons:
         ranking = build_ranking(games, season, coef_window(season))
-        trends = split_trend(games, season)  # progression d'un split à l'autre
         for _, r in ranking.iterrows():
             rec = record(r, rank_fields)
-            rec.update(trends.get(r["player"], {}))
+            # Progression : score final de la saison - celui de la saison précédente
+            # (score final : comparable d'une ligue à l'autre)
+            prev = scores.get((season - 1, r["player"]))
+            if prev is not None and prev.get("final") is not None and rec.get("final") is not None:
+                rec.update(trend=round(rec["final"] - prev["final"], 3),
+                           trend_prev=f"{season - 1} ({prev['league_code']})",
+                           trend_split=f"{season} ({rec['league_code']})")
             rec.update(id=ids[r["player"]], name=r["player"], played_lec=bool(r["played_lec"]))
             cur = current_team.get(r["player"], r["team"])
             for key, value in (("photo", photos.get(r["player"])), ("logo", logos.get(r["team"])),
@@ -604,6 +611,7 @@ def main():
         "players": len(players),
         "leagues": int(games["league_code"].nunique()),
         "weights": ROLE_WEIGHTS, "league_weight": LEAGUE_WEIGHT, "em_weight": EM_WEIGHT,
+        "form_weight": scoring.FORM_WEIGHT,
         "stat_labels": STAT_LABELS,
         "has_oe": bool((stats["oe_games"] > 0).any()),
         "has_soloq": ladder is not None,

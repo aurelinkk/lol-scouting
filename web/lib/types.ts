@@ -49,7 +49,12 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   soloq_lp_7d?: number;
   soloq_games_7d?: number;
   em_games: number;
-  /** Progression : score du dernier split - score du split précédent (même ligue) */
+  /** Bonus de forme : apport du dernier split joué dans la ligue principale */
+  form_bonus?: number;
+  form_score?: number;
+  form_split?: string;
+  form_games?: number;
+  /** Progression : score final de la saison - celui de la saison précédente */
   trend?: number;
   trend_split?: string;
   trend_prev?: string;
@@ -246,6 +251,8 @@ export interface Meta {
   weights: Record<Role, Partial<Record<StatKey, number>>>;
   league_weight: number;
   em_weight: number;
+  /** Poids du bonus de forme (dernier split) */
+  form_weight?: number;
   stat_labels: Record<StatKey, string>;
   has_oe: boolean;
 }

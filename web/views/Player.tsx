@@ -249,6 +249,17 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                     </tr>
                       </>
                     )}
+                    {s.form_bonus ? (
+                      <tr>
+                        <td className="py-0.5 text-ink-2">
+                          Forme{" "}
+                          <span className="text-ink-3">
+                            ({s.form_split} : {fmtScore(s.form_score)} sur {s.form_games} parties, × {meta.form_weight ?? 0.2})
+                          </span>
+                        </td>
+                        <td className="text-right">{fmtScore(s.form_bonus)}</td>
+                      </tr>
+                    ) : null}
                     {s.ex_lec_malus ? (
                       <tr>
                         <td className="py-0.5 text-ink-2">
