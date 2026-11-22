@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import DataExplorer from "@/components/data/DataExplorer";
 import RegionMissing from "@/components/RegionMissing";
-import { getMercato, getMeta, getPromotions, hasRegion } from "@/lib/data";
+import { getMercato, getMeta, getPromotions, hasRegion, getPromotionModel } from "@/lib/data";
 import type { Promoted } from "@/components/data/DataExplorer";
 import { contractsFromMercato, signedFromMercato } from "@/lib/mercato/signed";
 import { REGION_INFO, type Region } from "@/lib/region";
@@ -73,6 +73,9 @@ export default function DonneesPage({ region }: { region: Region }) {
           contracts={contractsFromMercato(getMercato(region)?.teams ?? [])}
           mercatoGenerated={getMercato(region)?.generated}
           mercatoSeason={mercatoSeason}
+          promotionChance={Object.fromEntries(
+            Object.entries(getPromotionModel()?.players[region] ?? {}).map(([id, v]) => [id, v.p]),
+          )}
         />
       </Suspense>
     </div>

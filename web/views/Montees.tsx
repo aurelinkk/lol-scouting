@@ -1,3 +1,4 @@
+import PromotionModelView from "@/components/PromotionModelView";
 import Link from "next/link";
 import { Avatar, PlayerName, TeamLogo } from "@/components/Images";
 import SeasonTabs from "@/components/SeasonTabs";
@@ -92,6 +93,8 @@ export default function MonteesPage({ region }: { region: Region }) {
           est-ce que le score les avait repérés ?
         </p>
       </div>
+
+      <PromotionModelView region={region} />
 
       <SeasonTabs
         items={promotions.flatMap((promo) => {

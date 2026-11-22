@@ -80,6 +80,34 @@ export const getTeamMatches = (region: Region = "eu"): TeamMatch[] | null => {
   return fs.existsSync(file) ? read<TeamMatch[]>(...dir(region), "matches.json") : null;
 };
 
+/** Modèle de montée (python promotion_model.py), toutes régions */
+export interface PromotionModel {
+  generated: string;
+  season: number;
+  target: number;
+  trained_on: number[];
+  validation: { n: number; promoted: number; auc: number; logloss: number; brier: number; top3_share: number; top1_share: number };
+  forward: PromotionModel["validation"];
+  baseline: PromotionModel["validation"];
+  calibration: { from: number; to: number; n: number; predicted: number; observed: number }[];
+  coefficients: { name: string; key: string; coef: number }[];
+  role_rates: Record<string, Record<string, { eligible: number; promoted: number; rate: number | null; top3_rate: number | null; per_season: number }>>;
+  role_profiles: Record<string, { promoted: number; others: number; age_up: number; age_stay: number; diffs: [string, number][] }>;
+  live: { known: number; median_p: number | null; in_top3: number; players: { region: Region; id: string; p: number; rank_role: number; team?: string }[] };
+  players: Partial<Record<Region, Record<string, PromotionChance>>>;
+}
+export interface PromotionChance {
+  p: number;
+  rank_role: number;
+  score_rank: number;
+  factors: [string, number][];
+  official?: { team?: string; mid?: boolean };
+}
+export const getPromotionModel = (): PromotionModel | null => {
+  const file = path.join(process.cwd(), "data", "promotion_model.json");
+  return fs.existsSync(file) ? read<PromotionModel>("data", "promotion_model.json") : null;
+};
+
 export const getPlayer = (id: string, region: Region = "eu"): Player | undefined => getPlayers(region)[id];
 
 import type { MercatoTeam } from "@/components/MercatoBoard";

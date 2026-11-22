@@ -8,7 +8,7 @@ import { link, REGION_INFO, type Region, REGIONS, teamLink, tierName } from "@/l
 import { hasTeam } from "@/views/Team";
 import DeepButton from "@/components/DeepButton";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
-import { getMeta, getPlayer, getRankings, hasRegion } from "@/lib/data";
+import { getMeta, getPlayer, getPromotionModel, getRankings, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
 import { similarPlayers } from "@/lib/similar";
 import { WORLD, worldOffset, worldScore } from "@/lib/world";
@@ -189,6 +189,51 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
           <Trophies career={career} />
         </Section>
       )}
+
+      {(() => {
+        const model = getPromotionModel();
+        const c = model?.players[region]?.[id];
+        if (!model || !c) return null;
+        const pctv = Math.round(c.p * 100);
+        return (
+          <Section title={`Chance de jouer en ${R.top} en ${model.target}`}>
+            <div className="flex flex-wrap items-start gap-5">
+              <div>
+                <div className="text-4xl font-bold tabular-nums" style={{ color: "var(--gold)" }}>
+                  {c.p < 0.01 ? "<1" : pctv} %
+                </div>
+                <div className="text-xs text-ink-3">
+                  {c.rank_role === 1 ? "1re" : `${c.rank_role}e`} chance de son poste en {R.short}
+                </div>
+                {c.official && (
+                  <div className="mt-1 text-xs font-semibold" style={{ color: "var(--good-text)" }}>
+                    ✓ déjà annoncé{c.official.team ? ` : ${c.official.team}` : ""}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-60 flex-1">
+                <div className="mb-1 text-[11px] uppercase tracking-wide text-ink-3">Ce qui pèse le plus</div>
+                <ul className="space-y-0.5 text-sm">
+                  {c.factors.map(([name, v]) => (
+                    <li key={name} className="flex items-center gap-2">
+                      <span style={{ color: v >= 0 ? "var(--good-text)" : "var(--critical)" }}>{v >= 0 ? "▲" : "▼"}</span>
+                      <span>{name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="w-full text-xs text-ink-3">
+                Modèle appris sur les montées réelles {model.trained_on.join(", ")} des six régions (rang dans le poste, score, forme,
+                progression, âge, expérience, stats clés, académie, poste). Détail et fiabilité dans l&apos;onglet{" "}
+                <Link href={link(region, "/montees")} className="text-accent hover:underline">
+                  Montées
+                </Link>
+                .
+              </p>
+            </div>
+          </Section>
+        );
+      })()}
 
       {scores.length > 0 && (
         <Section title="Score de prospect">
