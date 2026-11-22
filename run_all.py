@@ -118,6 +118,8 @@ def main():
 
     # 5 bis. Score mondial (toutes les régions exportées sur l'échelle LEC)
     status["score mondial"] = run([py, "world_scale.py", "--check"])
+    # Modèle de montée (appris sur les montées des saisons passées, toutes régions)
+    status["modèle de montée"] = run([py, "promotion_model.py"])
 
     # 6. Calibrage (informatif)
     for region in args.regions:

@@ -69,6 +69,7 @@ export default function DataExplorer({
   contracts = {},
   mercatoGenerated,
   mercatoSeason,
+  promotionChance = {},
 }: {
   seasons: number[];
   hasOe: boolean;
@@ -79,6 +80,8 @@ export default function DataExplorer({
   contracts?: Record<string, ContractEnd>;
   mercatoGenerated?: string;
   mercatoSeason?: number;
+  /** Modèle de montée (saison en cours) : probabilité de jouer en 1re division la saison suivante */
+  promotionChance?: Record<string, number>;
 }) {
   const region = useRegion();
   const R = REGION_INFO[region];
@@ -399,6 +402,35 @@ export default function DataExplorer({
         ),
       },
     );
+    if (isCurrent && Object.keys(promotionChance).length)
+      cols.push({
+        id: "promo",
+        header: "Montée",
+        accessorFn: (r) => promotionChance[r.id],
+        sortUndefined: "last",
+        sortDescFirst: true,
+        meta: {
+          align: "right",
+          group: "score",
+          title: `Probabilité de jouer en ${R.top} en ${season + 1} (modèle appris sur les montées 2023-2026, voir l'onglet Montées)`,
+        } satisfies Meta,
+        cell: ({ getValue }) => {
+          const v = getValue() as number | undefined;
+          if (v === undefined) return <span className="text-ink-3">–</span>;
+          const pct = Math.round(v * 100);
+          return (
+            <span
+              className="inline-block min-w-10 rounded px-1 text-xs font-semibold tabular-nums"
+              style={{
+                background: `color-mix(in srgb, var(--gold) ${Math.min(60, Math.round(v * 80))}%, transparent)`,
+                color: v >= 0.3 ? "var(--text)" : "var(--text-2)",
+              }}
+            >
+              {pct < 1 ? "<1" : pct} %
+            </span>
+          );
+        },
+      });
     if (hasTrend)
       cols.push(
         num("trend", "Prog.", { group: "score", title: "Progression : score final de la saison moins celui de la saison précédente" }, (r) =>
@@ -428,7 +460,7 @@ export default function DataExplorer({
     return cols;
     // renderPlayer / renderClub lisent watch, promoOf... : recréées avec eux
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCurrent, season, region, hasContracts, contracts, f.sansniveau, f.lec, hasTrend, R, hasOe, watch.list, promoOf, signedOf]);
+  }, [isCurrent, season, region, hasContracts, contracts, f.sansniveau, f.lec, hasTrend, R, hasOe, watch.list, promoOf, signedOf, promotionChance]);
 
   // Colonnes affichées : choix mémorisé dans ce navigateur
   const [visibility, setVisibility] = useState<VisibilityState>({});
