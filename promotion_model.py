@@ -3,7 +3,9 @@
 
 Appris sur les montées réelles 2023 -> 2024, 2024 -> 2025 et 2025 -> 2026 des six
 régions (promotions.json), à partir des classements exportés (rankings_*.json).
-Régression logistique régularisée écrite avec numpy (pas de dépendance) :
+Mélange de deux modèles (moyenne des probabilités) : une régression logistique
+régularisée écrite avec numpy (explications lisibles) et LightGBM (boosting
+d'arbres, effets non linéaires ; si installé : pip install lightgbm). Variables :
 - performance : score, rang dans son poste parmi les joueurs pas encore en
   1re division (le plus important : il n'y a que quelques places par poste),
   forme du dernier split, progression sur un an, stats clés du poste ;
@@ -25,6 +27,13 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+
+try:  # boosting d'arbres (pip install lightgbm) ; sans lui : régression logistique seule
+    import lightgbm as lgb
+except ImportError:
+    lgb = None
+
+LGBM_SEEDS = 5  # moyenne de 5 modèles (graines différentes) : prédictions plus stables
 
 REGIONS = ["eu", "na", "kr", "cn", "lcp", "br"]
 ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"]
@@ -213,6 +222,19 @@ class Logit:
         return self.z(X) * self.w[1:]
 
 
+def lgbm_fit_predict(Xtr, ytr, Xte):
+    """LightGBM : 300 arbres de 7 feuilles au plus, pas de 0.03, sous-échantillonnage
+    (lignes et variables) et pénalité L2 ; moyenne sur plusieurs graines."""
+    ps = []
+    for seed in range(LGBM_SEEDS):
+        m = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.03, num_leaves=7, min_child_samples=30,
+                               subsample=0.8, subsample_freq=1, colsample_bytree=0.8, reg_lambda=5,
+                               random_state=seed, verbose=-1)
+        m.fit(Xtr, ytr)
+        ps.append(m.predict_proba(Xte)[:, 1])
+    return np.mean(ps, axis=0)
+
+
 def auc(y, p):
     order = np.argsort(p)
     ranks = np.empty(len(p))
@@ -352,7 +374,27 @@ def build(verbose=False):
     fwd_test = (d["season"] == seasons[-1]).to_numpy()
     fwd_train = train_mask & ~fwd_test
     m_fwd = Logit(lam).fit(Xn[fwd_train], yv[fwd_train])
-    forward = metrics(yv[fwd_test], m_fwd.predict(Xn[fwd_test]), d[fwd_test])
+    p_fwd = m_fwd.predict(Xn[fwd_test])
+    logit_cv, logit_forward = cv, metrics(yv[fwd_test], p_fwd, d[fwd_test])
+
+    # Mélange avec LightGBM : moyenne des deux probabilités (même validation par saison)
+    mix = lgb is not None
+    if mix:
+        Xt, yt_, dt = Xn[train_mask], yv[train_mask], d[train_mask]
+        boost_p = np.zeros(len(yt_))
+        for s_ in seasons:
+            te = (dt["season"] == s_).to_numpy()
+            boost_p[te] = lgbm_fit_predict(Xt[~te], yt_[~te], Xt[te])
+        boost_cv = metrics(yt_, boost_p, dt)
+        cv_p = (cv_p + boost_p) / 2
+        cv = metrics(yt_, cv_p, dt)
+        p_fwd = (p_fwd + lgbm_fit_predict(Xn[fwd_train], yv[fwd_train], Xn[fwd_test])) / 2
+        if verbose:
+            print(f"  LightGBM seul : AUC {boost_cv['auc']:.3f} logloss {boost_cv['logloss']:.4f} ; "
+                  f"mélange : AUC {cv['auc']:.3f} logloss {cv['logloss']:.4f}")
+    else:
+        print("  (LightGBM absent : régression logistique seule. Pour le mélange : pip install lightgbm)")
+    forward = metrics(yv[fwd_test], p_fwd, d[fwd_test])
 
     # Calibration (validation par saison) : prédit vs observé par tranche
     bins = [0, 0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 1.01]
@@ -413,6 +455,8 @@ def build(verbose=False):
     # Prédictions de la dernière saison, avec les 3 facteurs les plus forts
     cur = ~train_mask
     p_cur = model.predict(Xn[cur])
+    if mix:
+        p_cur = (p_cur + lgbm_fit_predict(Xn[train_mask], yv[train_mask], Xn[cur])) / 2
     contrib = model.contributions(Xn[cur])
     players = {}
     dc = d[cur].assign(p=p_cur)
@@ -456,6 +500,8 @@ def build(verbose=False):
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "season": last, "target": last + 1,
         "trained_on": [int(s) for s in seasons],
+        "model": "Régression logistique + LightGBM (moyenne)" if mix else "Régression logistique",
+        "logit_validation": logit_cv, "logit_forward": logit_forward,
         "with_stats": with_stats, "lambda": lam,
         "validation": cv, "forward": forward, "baseline": baseline,
         "calibration": calib,

@@ -86,6 +86,9 @@ export interface PromotionModel {
   season: number;
   target: number;
   trained_on: number[];
+  model?: string;
+  logit_validation?: PromotionModel["validation"];
+  logit_forward?: PromotionModel["validation"];
   validation: { n: number; promoted: number; auc: number; logloss: number; brier: number; top3_share: number; top1_share: number };
   forward: PromotionModel["validation"];
   baseline: PromotionModel["validation"];

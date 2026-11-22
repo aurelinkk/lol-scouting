@@ -223,8 +223,9 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                 </ul>
               </div>
               <p className="w-full text-xs text-ink-3">
-                Modèle appris sur les montées réelles {model.trained_on.join(", ")} des six régions (rang dans le poste, score, forme,
-                progression, âge, expérience, stats clés, académie, poste). Détail et fiabilité dans l&apos;onglet{" "}
+                {model.model ?? "Modèle"} appris sur les montées réelles {model.trained_on.join(", ")} des six régions (rang dans le
+                poste, score, forme, progression, âge, expérience, stats clés, académie, poste). Les facteurs viennent de la partie
+                logistique. Détail et fiabilité dans l&apos;onglet{" "}
                 <Link href={link(region, "/montees")} className="text-accent hover:underline">
                   Montées
                 </Link>

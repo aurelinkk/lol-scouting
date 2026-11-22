@@ -5,3 +5,4 @@ python-dotenv==1.2.3
 requests==2.34.2
 urllib3==2.7.0
 pandas>=2.2
+lightgbm>=4.0  # modèle de montée (facultatif : sans lui, régression logistique seule)

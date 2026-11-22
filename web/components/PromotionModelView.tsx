@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Avatar, TeamLogo } from "@/components/Images";
-import { getPromotionModel, getRankings, type PromotionModel } from "@/lib/data";
+import { getMercato, getPromotionModel, getRankings, type PromotionModel } from "@/lib/data";
 import { playerLink, REGION_INFO, type Region } from "@/lib/region";
 import type { RankingRow } from "@/lib/types";
 
@@ -41,12 +41,25 @@ export default function PromotionModelView({ region }: { region: Region }) {
   const all = model.role_rates.all;
   const maxRate = Math.max(...ROLES.map((r) => rates[r]?.rate ?? 0));
   const live = model.live.players.filter((p) => p.region === region);
+  // Places à pourvoir en 1re division pour la saison visée, par poste (mercato en cours)
+  const mercato = getMercato(region);
+  const openSlots: Record<string, { open: number; teams: string[] }> = {};
+  if (mercato && mercato.season === model.target)
+    for (const t of mercato.teams.filter((t) => t.tier === "LEC" && t.league === R.top))
+      for (const sl of t.slots)
+        if (ROLES.includes(sl.role) && !sl.after) {
+          const o = (openSlots[sl.role] ??= { open: 0, teams: [] });
+          o.open += 1;
+          o.teams.push(t.team);
+        }
   const v = model.validation;
 
   return (
     <section className="card space-y-6 p-5">
       <div>
-        <div className="eyebrow mb-1">Modèle de montée · appris sur {model.trained_on.join(", ")} → saison suivante</div>
+        <div className="eyebrow mb-1">
+          Modèle de montée · {model.model ?? "Régression logistique"} · appris sur {model.trained_on.join(", ")} → saison suivante
+        </div>
         <h2 className="text-lg font-semibold tracking-tight">
           Qui va jouer en {R.top} en {model.target} ?
         </h2>
@@ -66,10 +79,14 @@ export default function PromotionModelView({ region }: { region: Region }) {
           value={pct(v.top3_share)}
           hint={`des montés étaient dans le top 3 prédit de leur poste (score seul : ${pct(model.baseline.top3_share)})`}
         />
-        <Quality label="Classement (AUC)" value={v.auc.toFixed(2)} hint={`1 = parfait, 0.5 = hasard ; score seul ${model.baseline.auc.toFixed(2)}`} />
+        <Quality
+          label="Classement (AUC)"
+          value={v.auc.toFixed(3)}
+          hint={`1 = parfait, 0.5 = hasard ; score seul ${model.baseline.auc.toFixed(2)}${model.logit_validation ? `, logistique seule ${model.logit_validation.auc.toFixed(3)}` : ""}`}
+        />
         <Quality
           label={`Test sur ${model.trained_on.at(-1)}`}
-          value={model.forward.auc.toFixed(2)}
+          value={model.forward.auc.toFixed(3)}
           hint={`appris seulement sur les saisons d'avant : top 3 ${pct(model.forward.top3_share)}`}
         />
         <Quality
@@ -85,12 +102,21 @@ export default function PromotionModelView({ region }: { region: Region }) {
         <div className="grid gap-4 md:grid-cols-5">
           {ROLES.map((role) => (
             <div key={role}>
-              <div className="eyebrow mb-2 flex items-center justify-between">
+              <div className="eyebrow mb-0.5 flex items-center justify-between">
                 {role}
                 <span className="normal-case tracking-normal text-ink-3" title={`Montées par saison à ce poste dans la région (${model.trained_on.join(", ")})`}>
                   ~{rates[role]?.per_season ?? "?"} / saison
                 </span>
               </div>
+              {mercato?.season === model.target && (
+                <div
+                  className="mb-2 text-[11px]"
+                  style={{ color: openSlots[role]?.open ? "var(--good-text)" : "var(--text-3)" }}
+                  title={openSlots[role]?.teams.length ? `À pourvoir : ${openSlots[role].teams.join(", ")}` : "Aucun poste vide pour l'instant (rumeurs comprises)"}
+                >
+                  {openSlots[role]?.open ?? 0} place{(openSlots[role]?.open ?? 0) > 1 ? "s" : ""} à pourvoir en {R.top} {model.target}
+                </div>
+              )}
               <ol className="space-y-1">
                 {list
                   .filter((x) => x.row!.role === role)
@@ -241,7 +267,10 @@ export default function PromotionModelView({ region }: { region: Region }) {
             </table>
             <p className="mt-2 text-[11px] text-ink-3">
               Quand le modèle annonce 26 %, environ un joueur sur quatre monte vraiment : les pourcentages se lisent tels quels.
-              Régression logistique régularisée, validée en prédisant chaque saison avec un modèle qui ne l&apos;a pas vue.
+              Moyenne de deux modèles : une régression logistique régularisée (dont viennent les explications) et LightGBM (boosting
+              d&apos;arbres, effets non linéaires). Validés en prédisant chaque saison avec un modèle qui ne l&apos;a pas vue. Les places
+              libres par poste ont été testées comme variable : pas de gain mesurable (1 à 2 montées par poste et par an), elles
+              sont donc affichées à côté, d&apos;après le mercato en cours.
             </p>
           </div>
         </div>
