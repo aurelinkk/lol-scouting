@@ -412,7 +412,7 @@ export default function DataExplorer({
         meta: {
           align: "right",
           group: "score",
-          title: `Probabilité de jouer en ${R.top} en ${season + 1} (modèle appris sur les montées 2023-2026, voir l'onglet Montées)`,
+          title: `Probabilité de jouer en 1re division en ${season + 1} (${R.top} ou une autre région ; modèle appris sur les montées 2023-2026, voir l'onglet Montées)`,
         } satisfies Meta,
         cell: ({ getValue }) => {
           const v = getValue() as number | undefined;

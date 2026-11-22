@@ -87,6 +87,7 @@ export interface PromotionModel {
   target: number;
   trained_on: number[];
   model?: string;
+  lambda?: number;
   logit_validation?: PromotionModel["validation"];
   logit_forward?: PromotionModel["validation"];
   validation: { n: number; promoted: number; auc: number; logloss: number; brier: number; top3_share: number; top1_share: number };
@@ -104,7 +105,8 @@ export interface PromotionChance {
   rank_role: number;
   score_rank: number;
   factors: [string, number][];
-  official?: { team?: string; mid?: boolean };
+  /** Montée déjà annoncée (officielle ou rumeur), éventuellement dans une autre région */
+  official?: { team?: string; mid?: boolean; league?: string; rumor?: boolean };
 }
 export const getPromotionModel = (): PromotionModel | null => {
   const file = path.join(process.cwd(), "data", "promotion_model.json");

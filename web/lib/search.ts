@@ -32,6 +32,7 @@ const PAGES: { path: string; label: string; hint: string; eu_only?: boolean; glo
   { path: "/comparer", label: "Comparer", hint: "comparateur, radar, score mondial, niveau des régions", global: true },
   { path: "/ladder", label: "Ladder", hint: "soloQ EUW, challenger, grandmaster", eu_only: true },
   { path: "/analyses", label: "Analyses", hint: "analyse soloQ approfondie", eu_only: true },
+  { path: "/technique", label: "Technique", hint: "mode développeur : formules du score, modèle de montée, stats, stack technique", global: true },
 ];
 
 export function buildSearchIndex(): SearchEntry[] {

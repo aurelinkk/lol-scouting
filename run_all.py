@@ -120,6 +120,7 @@ def main():
     status["score mondial"] = run([py, "world_scale.py", "--check"])
     # Modèle de montée (appris sur les montées des saisons passées, toutes régions)
     status["modèle de montée"] = run([py, "promotion_model.py"])
+    run([py, "export_config.py"])  # réglages du score pour la page Technique
 
     # 6. Calibrage (informatif)
     for region in args.regions:

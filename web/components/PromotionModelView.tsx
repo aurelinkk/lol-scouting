@@ -61,11 +61,11 @@ export default function PromotionModelView({ region }: { region: Region }) {
           Modèle de montée · {model.model ?? "Régression logistique"} · appris sur {model.trained_on.join(", ")} → saison suivante
         </div>
         <h2 className="text-lg font-semibold tracking-tight">
-          Qui va jouer en {R.top} en {model.target} ?
+          Qui va jouer en 1re division en {model.target} ?
         </h2>
         <p className="mt-1 max-w-4xl text-sm text-ink-2">
-          Probabilité, pour chaque joueur de {R.lower}, de jouer en {R.top} la saison prochaine (au début ou en cours de
-          saison). Le modèle a appris sur les {v.promoted} montées réelles des six régions depuis 2023. Il regarde le rang du joueur
+          Probabilité, pour chaque joueur de {R.lower}, de jouer en 1re division la saison prochaine (au début ou en cours de
+          saison) : en {R.top}, ou dans la 1re division d&apos;une autre région (ex : Yukino, de la LFL à FlyQuest en LCS). Le modèle a appris sur les {v.promoted} montées réelles des six régions depuis 2023. Il regarde le rang du joueur
           dans son poste, son score, sa forme, sa progression, son âge, son expérience, ses stats clés, l&apos;académie d&apos;un
           club de 1re division, et le poste : certains postes montent plus facilement que d&apos;autres. Ce n&apos;est pas une
           vérité : un mercato dépend aussi des places libres, des contrats et des relations entre clubs.
@@ -140,8 +140,14 @@ export default function PromotionModelView({ region }: { region: Region }) {
                             </span>
                           </div>
                           {x.official && (
-                            <div className="truncate text-[10px] font-semibold" style={{ color: "var(--good-text)" }}>
-                              ✓ {x.official.team ?? R.top}
+                            <div
+                              className="truncate text-[10px] font-semibold"
+                              style={{ color: x.official.rumor ? "var(--gold)" : "var(--good-text)" }}
+                              title={x.official.rumor ? "Rumeur" : "Annoncé"}
+                            >
+                              {x.official.rumor ? "→" : "✓"} {x.official.team ?? R.top}
+                              {x.official.league && ` (${x.official.league})`}
+                              {x.official.rumor && " · rumeur"}
                             </div>
                           )}
                         </div>
@@ -160,7 +166,8 @@ export default function PromotionModelView({ region }: { region: Region }) {
         <div>
           <h3 className="text-sm font-semibold">Monter selon le poste</h3>
           <p className="mb-2 text-xs text-ink-3">
-            Sur {model.trained_on.join(", ")} : part des joueurs de {R.lower} qui jouent en {R.top} la saison suivante, et part
+            Sur {model.trained_on.join(", ")} : part des joueurs de {R.lower} qui jouent en 1re division (sa région ou une autre) la
+            saison suivante, et part
             des 3 meilleurs du poste (au score) qui y arrivent. Toutes régions entre parenthèses.
           </p>
           <table className="w-full text-sm">

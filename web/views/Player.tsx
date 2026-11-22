@@ -196,18 +196,21 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
         if (!model || !c) return null;
         const pctv = Math.round(c.p * 100);
         return (
-          <Section title={`Chance de jouer en ${R.top} en ${model.target}`}>
+          <Section title={`Chance de jouer en 1re division en ${model.target}`}>
             <div className="flex flex-wrap items-start gap-5">
               <div>
                 <div className="text-4xl font-bold tabular-nums" style={{ color: "var(--gold)" }}>
                   {c.p < 0.01 ? "<1" : pctv} %
                 </div>
                 <div className="text-xs text-ink-3">
-                  {c.rank_role === 1 ? "1re" : `${c.rank_role}e`} chance de son poste en {R.short}
+                  {c.rank_role === 1 ? "1re" : `${c.rank_role}e`} chance de son poste en {R.short} · {R.top} ou 1re division
+                  d&apos;une autre région
                 </div>
                 {c.official && (
-                  <div className="mt-1 text-xs font-semibold" style={{ color: "var(--good-text)" }}>
-                    ✓ déjà annoncé{c.official.team ? ` : ${c.official.team}` : ""}
+                  <div className="mt-1 text-xs font-semibold" style={{ color: c.official.rumor ? "var(--gold)" : "var(--good-text)" }}>
+                    {c.official.rumor ? "→ rumeur" : "✓ déjà annoncé"}
+                    {c.official.team ? ` : ${c.official.team}` : ""}
+                    {c.official.league ? ` (${c.official.league})` : ""}
                   </div>
                 )}
               </div>

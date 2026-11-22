@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
-import { CrosshairIcon } from "lucide-react";
+import { CodeXmlIcon, CrosshairIcon } from "lucide-react";
 import "./globals.css";
 import DeepRunner from "@/components/DeepRunner";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -40,6 +40,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Nav />
             <div className="ml-auto" />
             <GlobalSearch />
+            <Link
+              href="/technique"
+              className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-surface-2/60 text-ink-3 transition-colors hover:border-ink-3 hover:text-ink"
+              title="Technique : calcul du score, modèle de montée, stats, stack (mode développeur)"
+              aria-label="Technique"
+            >
+              <CodeXmlIcon className="size-4" />
+            </Link>
             <span className="hidden text-[11px] text-ink-3 2xl:block">
               {meta.seasons[0]}–{meta.seasons.at(-1)} · MAJ {meta.generated}
             </span>

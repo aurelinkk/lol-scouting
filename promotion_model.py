@@ -102,7 +102,54 @@ def load():
                 if block["to"] == max(seasons) + 1:
                     official[(region, p["id"])] = {"team": p.get("new_team"), "mid": p["mid_season"]}
     df = pd.DataFrame(rows)
+    cross_region_labels(df, labels, official)
     return df, labels, official
+
+
+def norm_name(n):
+    return str(n).strip().lower()
+
+
+def cross_region_labels(df, labels, official):
+    """Montées dans la 1re division d'une AUTRE région (ex : Yukino, LFL -> FlyQuest
+    en LCS). Passé : le joueur figure dans un effectif de 1re division d'une autre
+    région la saison suivante (même pseudo, même poste). Saison à venir : mercato
+    des autres régions (joueur venu d'ailleurs dans une équipe de 1re division)."""
+    top = {}  # (saison, pseudo, poste) -> (région, équipe)
+    for region in REGIONS:
+        path = pub(region, "rosters.json")
+        if not os.path.exists(path):
+            continue
+        for block in json.load(open(path, encoding="utf-8")):
+            if block["tier"] != "LEC":
+                continue
+            for t in block["teams"]:
+                for p in t["players"]:
+                    if p.get("games", 0) >= 3:
+                        top.setdefault((block["season"], norm_name(p["name"]), p["role"]), (region, t["team"]))
+    low = df[df["tier"] != "LEC"]
+    added = 0
+    for _, r in low.iterrows():
+        hit = top.get((r["season"] + 1, norm_name(r["name"]), r["role"]))
+        if hit and hit[0] != r["region"] and (r["region"], r["id"], r["season"]) not in labels:
+            labels[(r["region"], r["id"], r["season"])] = f"{hit[1]} ({hit[0]})"
+            added += 1
+    # Saison à venir : mercato des autres régions
+    for region in REGIONS:
+        path = web(region, "mercato.json")
+        if not os.path.exists(path):
+            continue
+        for t in json.load(open(path, encoding="utf-8"))["teams"]:
+            if t.get("tier") != "LEC":
+                continue
+            for sl in t["slots"]:
+                for p in [sl.get("after")] + (sl.get("after_extra") or []):
+                    if p and p.get("region") and p["region"] != region and p.get("id"):
+                        key = (p["region"], p["id"])
+                        if key not in official:
+                            official[key] = {"team": t["team"], "league": t["league"], "mid": False,
+                                             "rumor": sl.get("right") != "in"}
+    print(f"  Montées vers la 1re division d'une autre région ajoutées : {added}")
 
 
 def eligible(df):
