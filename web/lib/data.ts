@@ -2,6 +2,7 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import type { Region } from "./region";
+import { ageFrom, withCurrentAge } from "./age";
 import type { League, Meta, Player, Promotion, RankingRow } from "./types";
 
 // Fichiers générés par `python export_web.py` à la racine du dépôt
@@ -24,12 +25,34 @@ export const hasRegion = (region: Region) =>
 export const getMeta = (region: Region = "eu") => read<Meta>(...dir(region), "meta.json");
 export const getLeagues = (region: Region = "eu") => read<League[]>(...dir(region), "leagues.json");
 export const getPromotions = (region: Region = "eu") => read<Promotion[]>(...dir(region), "promotions.json");
-export const getPlayers = (region: Region = "eu") => read<Record<string, Player>>(...dir(region), "players.json");
+const agesDone = new Set<string>();
+export const getPlayers = (region: Region = "eu") => {
+  const players = read<Record<string, Player>>(...dir(region), "players.json");
+  // Âge actuel (l'export donne l'âge le jour de l'export)
+  if (!agesDone.has(`p-${region}`)) {
+    agesDone.add(`p-${region}`);
+    for (const p of Object.values(players)) {
+      const a = ageFrom(p.birthdate);
+      if (a !== undefined && !p.age_approx) p.age = a;
+    }
+  }
+  return players;
+};
 export const getRankings = (region: Region = "eu"): RankingRow[] => {
   // Un fichier par saison ; ancien format (un seul rankings.json) accepté aussi
   const legacy = path.join(process.cwd(), ...pub(region), "rankings.json");
-  if (fs.existsSync(legacy)) return read<RankingRow[]>(...pub(region), "rankings.json");
-  return getMeta(region).seasons.flatMap((season) => read<RankingRow[]>(...pub(region), `rankings_${season}.json`));
+  const rows = fs.existsSync(legacy)
+    ? read<RankingRow[]>(...pub(region), "rankings.json")
+    : getMeta(region).seasons.flatMap((season) => read<RankingRow[]>(...pub(region), `rankings_${season}.json`));
+  // Saison en cours : âge actuel (date de naissance de la ligne, sinon de la fiche joueur)
+  if (!agesDone.has(`r-${region}`)) {
+    agesDone.add(`r-${region}`);
+    const needsPlayers = rows.some((r) => !r.birthdate && !r.age_approx);
+    const births: Record<string, string | undefined> = {};
+    if (needsPlayers) for (const p of Object.values(getPlayers(region))) if (!p.age_approx) births[p.id] = p.birthdate;
+    withCurrentAge(rows, births, (r) => r.id);
+  }
+  return rows;
 };
 
 /** Effectifs par saison et par tournoi (fichier public, lu aussi côté serveur) */

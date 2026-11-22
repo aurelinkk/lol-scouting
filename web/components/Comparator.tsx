@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Avatar, TeamLogo } from "./Images";
 import { fmtScore, fmtStat, STAT_LABELS, topPercent } from "@/lib/format";
 import { worldScore } from "@/lib/world";
+import { withCurrentAge } from "@/lib/age";
 import { playerLink, publicData, REGION_INFO, type Region, REGIONS, tierName } from "@/lib/region";
 import type { RankingRow, StatKey } from "@/lib/types";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -39,6 +40,8 @@ function loadRankings(region: Region, season: number): Promise<RankingRow[]> {
       key,
       fetch(publicData(region, `rankings_${season}.json`))
         .then((r) => (r.ok ? r.json() : []))
+        // âge actuel pour la saison en cours (les lignes portent la date de naissance)
+        .then((rows: RankingRow[]) => (season === new Date().getFullYear() ? withCurrentAge(rows) : rows))
         .catch(() => []),
     );
   }

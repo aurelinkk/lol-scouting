@@ -88,6 +88,29 @@ const LEGEND_RIGHT: { state: CellState; label: string }[] = [
 
 const bg = (state?: CellState | null) => (state ? `var(--m-${state})` : "transparent");
 
+/** Rôle de coach en abrégé : Head Coach -> HC, Assistant Coach -> AC... (« Coach » seul : rien) */
+export function coachAbbr(role?: string | null): string | undefined {
+  if (!role || /^coach$/i.test(role.trim())) return undefined;
+  const parts: string[] = [];
+  if (/head/i.test(role)) parts.push("HC");
+  if (/assistant/i.test(role)) parts.push("AC");
+  if (/position/i.test(role)) parts.push("PC");
+  if (/strateg/i.test(role)) parts.push("SC");
+  if (/performance/i.test(role)) parts.push("Perf.");
+  if (/remote/i.test(role)) parts.push("Remote");
+  if (/analyst/i.test(role)) parts.push("Analyste");
+  return parts.length ? parts.join("/") : role.replace(/\s*Coach$/i, "");
+}
+const COACH_ORDER = ["HC", "AC", "PC", "SC"];
+function sortCoaches<T extends { role: string }>(list: T[]): T[] {
+  const rank = (r: string) => {
+    const a = coachAbbr(r) ?? "";
+    const i = COACH_ORDER.findIndex((x) => a.startsWith(x));
+    return i === -1 ? COACH_ORDER.length : i;
+  };
+  return [...list].sort((a, b) => rank(a.role) - rank(b.role));
+}
+
 function short(name: string) {
   return name.replace(/\s*\(.*\)$/, "");
 }
@@ -177,10 +200,9 @@ function Cell({
 
 export function TeamCard({ t, season, linkTeam = true }: { t: MercatoTeam; season: number; linkTeam?: boolean }) {
   const region = useRegion();
-  const coachesBefore = (t.coaches ?? []).filter((c) => c.change !== "new");
-  const coachesAfter = (t.coaches ?? []).filter((c) => c.change !== "leave");
-  const coachNote = (role: string) =>
-    role === "Coach" ? undefined : role.replace("Head Coach", "HC").replace(" Coach", "");
+  const coachesBefore = sortCoaches((t.coaches ?? []).filter((c) => c.change !== "new"));
+  const coachesAfter = sortCoaches((t.coaches ?? []).filter((c) => c.change !== "leave"));
+  const coachNote = (role: string) => coachAbbr(role);
   return (
     <div className="overflow-hidden card">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">

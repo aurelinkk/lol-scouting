@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Avatar, TeamLogo } from "@/components/Images";
 import RegionMissing from "@/components/RegionMissing";
 import TeamMercato from "@/components/TeamMercato";
@@ -9,7 +9,7 @@ import { getMercato, getRankings, getRosters, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
 import { IMPORT_LIMIT } from "@/lib/needs";
 import { isResident, originLabel, originOf } from "@/lib/origin";
-import { playerLink, REGION_INFO, type Region, REGIONS, teamSlug, tierName } from "@/lib/region";
+import { link, playerLink, REGION_INFO, type Region, REGIONS, teamSlug, tierName } from "@/lib/region";
 import type { RankingRow } from "@/lib/types";
 import { convertScore, worldScore } from "@/lib/world";
 import { needsData } from "@/views/Besoins";
@@ -94,7 +94,11 @@ export default function TeamView({ slug, region }: { slug: string; region: Regio
   if (!hasRegion(region)) return <RegionMissing region={region} />;
   const R = REGION_INFO[region];
   const teamName = allTeams(region).get(slug);
-  if (!teamName) notFound();
+  if (!teamName) {
+    // Équipe d'une autre région (ex : club actuel d'un joueur parti à l'étranger)
+    for (const r of REGIONS) if (r !== region && hasRegion(r) && allTeams(r).has(slug)) redirect(link(r, `/equipes/${slug}`));
+    notFound();
+  }
 
   const mercato = getMercato(region);
   const mt: MercatoTeam | undefined = mercato?.teams.find((t) => t.team === teamName);

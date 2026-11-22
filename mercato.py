@@ -289,6 +289,42 @@ def fetch_staff(tournaments, season, refresh=False):
     return df
 
 
+def fetch_coach_roles(teams, season, refresh=False):
+    """Rôle précis des coachs (Head Coach, Assistant Coach, Positional Coach,
+    Strategic Coach...) d'après les périodes en club de Leaguepedia (onglet
+    staff des pages d'équipe). Renvoie {(équipe, coach en minuscules): rôle}."""
+    path = CACHE.format(season=season, kind="coach_roles")
+    if os.path.exists(path) and not refresh:
+        df = pd.read_csv(path).fillna("")
+    else:
+        rows = []
+        todo = sorted(set(teams))
+        for i in range(0, len(todo), 15):
+            quoted = ",".join("'" + t.replace("'", "\\'") + "'" for t in todo[i:i + 15])
+            rows += cargo_query(
+                tables="TenuresUnbroken=TU,RosterChanges=RC", join_on="TU.RosterChangeIdJoin=RC.RosterChangeId",
+                fields="TU.Player=player,TU.Team=team,TU.DateJoin=joined,TU.DateLeave=left,RC.Role=role",
+                where=f"TU.Team IN ({quoted}) AND RC.Role LIKE '%Coach%' "
+                      f"AND (TU.IsCurrent='1' OR TU.DateLeave >= '{season - 1}-01-01')")
+        df = pd.DataFrame(rows, columns=["player", "team", "joined", "left", "role"]).fillna("")
+        os.makedirs(RAW_DIR, exist_ok=True)
+        df.to_csv(path, index=False)
+    out = {}
+    for _, r in df.sort_values("joined").iterrows():
+        roles = [x.strip() for x in re.split(r"[;/]", str(r["role"])) if "coach" in x.lower()]
+        if roles:
+            out[(r["team"], str(r["player"]).lower())] = roles[0]
+    return out
+
+
+def coach_label(roles, team, name, fallback="Coach"):
+    """Rôle le plus précis connu ; « Coach » seul si Leaguepedia ne précise pas."""
+    role = roles.get((team, name.lower()))
+    if role and role != "Coach":
+        return role
+    return fallback if fallback and fallback != "Coach" else (role or "Coach")
+
+
 def build_coaches(board, changes, rumors, season, refresh=False):
     """Coachs de chaque équipe : staff de fin de saison, puis arrivées / départs
     (officiels ou rumeurs) dans l'ordre chronologique.
@@ -300,14 +336,23 @@ def build_coaches(board, changes, rumors, season, refresh=False):
         print(f"  (coachs indisponibles : {e})")
         staff = pd.DataFrame(columns=["tournament", "team", "coach", "role"])
     known = set(board["team"])
+    try:
+        roles = fetch_coach_roles(list(known) + teams["former_team"].dropna().tolist(), season, refresh)
+    except Exception as e:
+        print(f"  (rôles des coachs indisponibles : {e})")
+        roles = {}
+    # Clé en minuscules : « CvMax » (staff du tournoi) et « cvMax » (transfert) sont
+    # le même coach (sinon il apparaît deux fois et revient chaque jour dans les Nouveautés)
     coaches = {t: {} for t in known}
     for _, r in staff.iterrows():
         # l'équipe peut avoir été renommée depuis (ex : Dignitas -> OpTic Gaming)
         team = teams.loc[(teams["base_tournament"] == r["tournament"])
                          & ((teams["team"] == r["team"]) | (teams["former_team"] == r["team"])), "team"]
         if len(team):
-            coaches[team.iloc[0]][r["coach"]] = {"name": r["coach"], "role": "Coach", "before": True,
-                                                 "after": True, "status": "inchangé", "source": "", "url": None}
+            role = coach_label(roles, team.iloc[0], r["coach"]) if (team.iloc[0], r["coach"].lower()) in roles \
+                else coach_label(roles, r["team"], r["coach"], r.get("role") or "Coach")
+            coaches[team.iloc[0]][r["coach"].lower()] = {"name": r["coach"], "role": role, "before": True,
+                                                         "after": True, "status": "inchangé", "source": "", "url": None}
     events = []
     for _, c in changes[changes["role"].map(is_coach_role)].iterrows():
         events.append((str(c["date"])[:10], 1, c["direction"], c["player"], c["team"], c["role"],
@@ -321,23 +366,25 @@ def build_coaches(board, changes, rumors, season, refresh=False):
                        r["player"], r["team_end"], r["role"], status, r["source"], _url(r.get("link"))))
     events.sort(key=lambda e: (e[0], e[1], 0 if e[2] == "Leave" else 1))
     for date, _, direction, name, team, role, status, source, url in events:
+        key = str(name).lower()
         if direction == "Leave":
-            entry = coaches.get(team, {}).get(name)
+            entry = coaches.get(team, {}).get(key)
             if entry and entry["after"]:
                 entry.update(after=False, status=f"départ ({status})", source=source, url=url)
             continue
         if team not in coaches:
             # parti dans une équipe que l'on ne suit pas : il quitte la sienne
             for other in coaches.values():
-                if name in other and other[name]["after"] and other[name]["before"]:
-                    other[name].update(after=False, status=f"départ ({status})", source=source, url=url)
+                if key in other and other[key]["after"] and other[key]["before"]:
+                    other[key].update(after=False, status=f"départ ({status})", source=source, url=url)
             continue
         for t, other in coaches.items():  # un coach n'est que dans une équipe
-            if t != team and name in other and other[name]["after"]:
-                other[name].update(after=False, status=f"départ ({status})", source=source, url=url)
-        entry = coaches[team].setdefault(name, {"name": name, "role": role, "before": False})
+            if t != team and key in other and other[key]["after"]:
+                other[key].update(after=False, status=f"départ ({status})", source=source, url=url)
+        entry = coaches[team].setdefault(key, {"name": name, "role": role, "before": False})
         label = status if direction == "Join" and not entry["before"] else f"reste ({status})"
-        entry.update(after=True, role=role or entry.get("role"), status=label, source=source, url=url)
+        best = coach_label(roles, team, name, role if role and role != "Coach" else entry.get("role"))
+        entry.update(after=True, role=best, status=label, source=source, url=url)
     return {t: list(c.values()) for t, c in coaches.items()}
 
 

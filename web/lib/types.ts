@@ -18,6 +18,8 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   league_code: string;
   tier: string;
   age?: number;
+  /** Date de naissance (ISO) : âge actuel calculé à l'affichage (lib/age.ts) */
+  birthdate?: string;
   /** Âge déduit d'une année seule (birthdates.csv) : afficher « ~ » */
   age_approx?: boolean;
   games: number;

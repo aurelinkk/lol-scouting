@@ -22,7 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { fmtScore, fmtStat, topPercent } from "@/lib/format";
 import { ROLES, type RankingRow, type StatKey } from "@/lib/types";
-import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
+import { playerLink, publicData, REGION_INFO, teamLink, tierName } from "@/lib/region";
+import { withCurrentAge } from "@/lib/age";
 import { useRegion } from "@/lib/useRegion";
 import { type ContractEnd, type Signed, signedFromMercato } from "@/lib/mercato/signed";
 import { isStale } from "@/lib/mercato/stale";
@@ -152,9 +153,9 @@ export default function DataExplorer({
           .then((r) => r.json())
           .then((all: RankingRow[]) => all.filter((x) => x.season === season)),
       )
-      .then(setRows)
+      .then((rs: RankingRow[]) => setRows(season === lastSeason ? withCurrentAge(rs) : rs))
       .catch(() => setError("Impossible de charger les données."));
-  }, [season, region]);
+  }, [season, region, lastSeason]);
 
   const leagues = useMemo(
     () => [...new Set((rows ?? []).map((r) => r.league_code))].sort(),
@@ -278,13 +279,29 @@ export default function DataExplorer({
         title={moved ? (isCurrent ? `Club actuel. Saison évaluée avec ${r.team}` : `Aujourd'hui : ${r.current_team}`) : undefined}
       >
         <TeamLogo team={team} src={logo} size={18} />
-        <span className="max-w-40 truncate">{team}</span>
+        <Link
+          href={teamLink(region, team)}
+          onClick={(e) => e.stopPropagation()}
+          className="max-w-40 truncate hover:text-ink hover:underline"
+          title={`Page de l'équipe ${team}`}
+        >
+          {team}
+        </Link>
         {sg && (
           <span
             className="text-xs text-ink-3"
             title={`${next} : ${sg.team} (${sg.kind === "official" ? "officiel" : sg.kind === "contract" ? "sous contrat" : "rumeur"})`}
           >
-            {sg.stays ? `✓ ${next}` : `→ ${sg.team}`}
+            {sg.stays ? (
+              `✓ ${next}`
+            ) : (
+              <>
+                →{" "}
+                <Link href={teamLink(region, sg.team)} onClick={(e) => e.stopPropagation()} className="hover:text-ink hover:underline">
+                  {sg.team}
+                </Link>
+              </>
+            )}
             {sg.kind === "rumor" && " (rumeur)"}
             {sg.kind === "contract" && " (sous contrat)"}
           </span>
@@ -295,7 +312,9 @@ export default function DataExplorer({
             title={`${p.rumor ? "Rumeur" : p.level === "move" ? "Transfert" : "Montée"} ${p.season === r.season ? `en cours de saison ${p.season}` : p.season} : ${p.team}`}
           >
             <span style={{ color: PROMO_COLOR[p.level] }}>→</span>
-            <span className="max-w-32 truncate">{p.team}</span>
+            <Link href={teamLink(region, p.team)} onClick={(e) => e.stopPropagation()} className="max-w-32 truncate hover:underline">
+              {p.team}
+            </Link>
             {p.rumor && <span className="text-ink-3">(rumeur)</span>}
           </span>
         )}

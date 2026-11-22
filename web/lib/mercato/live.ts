@@ -92,6 +92,8 @@ interface Event {
   source: string;
   url: string | null;
   dest?: string;
+  /** Rôle exact de Leaguepedia (Head Coach, Positional Coach...) */
+  rawRole?: string;
 }
 
 /** Index nom -> fiche (région, id) pour les nouveaux venus */
@@ -169,7 +171,7 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
     if (!role || !teamOf(c.team) || (c.dir !== "Join" && c.dir !== "Leave")) continue;
     const url = c.link || urlOf(c.ref);
     events.push({ date: c.date.slice(0, 10), official: true, kind: c.dir as "Join" | "Leave", player: c.player,
-      team: teamOf(c.team)!.team, role, source: siteOf(url, "Leaguepedia"), url });
+      team: teamOf(c.team)!.team, role, source: siteOf(url, "Leaguepedia"), url, rawRole: c.role });
   }
 
   // Pistes : plusieurs joueurs pour un poste dans un même article, ou plusieurs
@@ -199,7 +201,7 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
       if (t) notes.push({ team: t.team, role, text });
       continue;
     }
-    const base = { date: r.date.slice(0, 10), official, player: r.player, role, source: r.src || "Leaguepedia", url };
+    const base = { date: r.date.slice(0, 10), official, player: r.player, role, source: r.src || "Leaguepedia", url, rawRole: r.role };
     if (r.ts !== r.te && teamOf(r.ts)) events.push({ ...base, kind: "Leave", team: teamOf(r.ts)!.team, dest: r.te });
     if (teamOf(r.te)) events.push({ ...base, kind: r.ts === r.te ? "Stay" : "Join", team: teamOf(r.te)!.team });
     else if (r.ts !== r.te) events.push({ ...base, kind: "Out", team: r.te, dest: r.te });
@@ -351,7 +353,8 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
       out.push({ date: dateOf.get(s) ?? since, text, url: s.url ?? null, official, league: t.league, team: t.team });
     }
     for (const c of t.coaches ?? []) {
-      const bc = bt?.coaches?.find((x) => same(x.name, c.name));
+      // nom exact d'abord : « CvMax » et « cvMax » peuvent coexister dans un ancien export
+      const bc = bt?.coaches?.find((x) => x.name === c.name) ?? bt?.coaches?.find((x) => same(x.name, c.name));
       const changed = !bc || bc.change !== c.change || bc.state !== c.state;
       (c as { live?: boolean }).live = changed ? true : undefined;
       if (!changed) continue;
@@ -395,14 +398,16 @@ function applyCoach(
     return;
   }
   for (const other of m.teams) if (other !== t) leave(other);
-  const c = t.coaches.find((x) => same(x.name, e.player));
+  const c = t.coaches.find((x) => x.name === e.player) ?? t.coaches.find((x) => same(x.name, e.player));
   const state = (e.official ? "in" : "rumor_in") as CellState;
+  const precise = e.rawRole && !/^coach$/i.test(e.rawRole.trim()) ? e.rawRole : undefined;
   if (c) {
     Object.assign(c, { change: c.change === "leave" ? "stay" : c.change, state, status: st, url: e.url, rumor: !e.official });
+    if (precise) c.role = precise;
     dateOf.set(c, e.date);
   }
   else {
-    const added = { ...lookup(e.player, region), role: "Coach", change: "new", state, status: st, url: e.url, rumor: !e.official, source: e.source } as MercatoCoach;
+    const added = { ...lookup(e.player, region), role: precise ?? "Coach", change: "new", state, status: st, url: e.url, rumor: !e.official, source: e.source } as MercatoCoach;
     t.coaches.push(added);
     dateOf.set(added, e.date);
   }

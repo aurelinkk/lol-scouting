@@ -1,6 +1,12 @@
 import SheetView, { sheetMetadata } from "@/views/Sheet";
 
-// Générée à la demande (pas au build : une fiche par joueur doublerait le temps de build)
+// Générée à la première visite puis gardée en cache (pas au build : une fiche par
+// joueur doublerait le temps de build)
+export const dynamicParams = true;
+export function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   return sheetMetadata((await params).id, "lcp");
 }

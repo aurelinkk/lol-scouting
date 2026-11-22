@@ -61,7 +61,12 @@ export default function SheetView({ id, region }: { id: string; region: Region }
   const stints = [...(player.career?.stints ?? [])].sort((a, b) => b.start.localeCompare(a.start)).slice(0, 8);
   const titles = player.career?.titles ?? [];
   const awards = player.career?.awards ?? [];
-  const sim = similarPlayers(region, id, 4);
+  let sim: ReturnType<typeof similarPlayers> = null;
+  try {
+    sim = similarPlayers(region, id, 4);
+  } catch {
+    sim = null; // classements absents : la fiche reste affichée sans profils similaires
+  }
   const soloq = scores.find((s) => s.soloq_riot_id);
   const today = new Date().toLocaleDateString("fr-FR");
 

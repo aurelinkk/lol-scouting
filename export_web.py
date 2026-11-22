@@ -404,7 +404,7 @@ def main():
     current_league = club_games.groupby("player")["league_code"].last().to_dict()
 
     # --- Classements par saison --------------------------------------------
-    rank_fields = ["season", "role", "team", "league_code", "tier", "age", "age_approx", "games",
+    rank_fields = ["season", "role", "team", "league_code", "tier", "age", "age_approx", "birthdate", "games",
                    "final", "league_score", "league_score_raw", "sample_factor",
                    "league_bonus", "league_coef", "league_coef_base", "team_adjust", "team_mates", "intl_games", "intl_score", "intl_bonus", "em_score", "em_score_raw", "em_games",
                    "ex_lec", "ex_lec_malus", "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
