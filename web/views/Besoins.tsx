@@ -76,7 +76,7 @@ export default function BesoinsPage({ region }: { region: Region }) {
         <p className="mt-1 text-xs text-ink-3">
           {region === "kr"
             ? "La LCK ne prend aucun import : seuls les joueurs coréens sont proposés."
-            : `Maximum 2 imports par équipe (joueurs hors ${region === "eu" ? "EMEA" : "Amériques"}) : quand les places sont prises, les imports ne sont plus proposés.`}{" "}
+            : `Maximum 2 imports par équipe (joueurs hors ${{ eu: "EMEA", na: "Amériques", cn: "Chine", lcp: "zone Pacifique", br: "Amériques" }[region as "eu" | "na" | "cn" | "lcp" | "br"]}) : quand les places sont prises, les imports ne sont plus proposés.`}{" "}
           Origine d&apos;après la nationalité ; exceptions (double nationalité, résidence acquise) dans{" "}
           <code>web/data/residency.json</code>.
         </p>

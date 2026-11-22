@@ -17,7 +17,7 @@ const NAV: { path: string; label: string; eu_only?: boolean; global?: boolean }[
   { path: "/ladder", label: "Ladder", eu_only: true },
   { path: "/analyses", label: "Analyses", eu_only: true },
 ];
-const SHARED = ["/", "/donnees", "/montees", "/rosters"];
+const SHARED = ["/", "/donnees", "/montees", "/rosters", "/besoins"];
 
 /** Même page dans l'autre région (fiche joueur -> Données : les fiches sont propres à chaque région). */
 function switchTo(pathname: string, target: Region): string {

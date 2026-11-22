@@ -102,7 +102,7 @@ export function StatsVsRole({
 }
 
 /* Évolution par tournoi */
-const EVO_METRICS: { key: keyof EvolutionPoint & StatKey; label: string }[] = [
+const EVO_METRICS: { key: keyof EvolutionPoint & StatKey; label: string; oe?: boolean }[] = [
   { key: "kda", label: "KDA" },
   { key: "dpm", label: "DMG/min" },
   { key: "cs_min", label: "CS/min" },
@@ -110,6 +110,19 @@ const EVO_METRICS: { key: keyof EvolutionPoint & StatKey; label: string }[] = [
   { key: "kp", label: "Kill participation" },
   { key: "dmg_share", label: "DMG %" },
   { key: "winrate", label: "Win rate" },
+  { key: "vision_min", label: "Vision/min" },
+  { key: "deaths_pg", label: "Morts" },
+  // Oracle's Elixir : lane à 15 min et début de partie
+  { key: "csd15", label: "CSD@15", oe: true },
+  { key: "gd15", label: "GD@15", oe: true },
+  { key: "xpd15", label: "XPD@15", oe: true },
+  { key: "ka15", label: "K+A@15", oe: true },
+  { key: "fb_part", label: "First blood", oe: true },
+  { key: "cw_min", label: "Control wards", oe: true },
+];
+/** Colonnes du tableau split par split */
+const SPLIT_TABLE: (keyof EvolutionPoint & StatKey)[] = [
+  "winrate", "kda", "csd15", "gd15", "xpd15", "ka15", "dpm", "dmg_share", "kp", "vision_min", "fb_part",
 ];
 
 export function Evolution({ points }: { points: EvolutionPoint[] }) {
@@ -140,7 +153,7 @@ export function Evolution({ points }: { points: EvolutionPoint[] }) {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        {EVO_METRICS.map((m) => (
+        {EVO_METRICS.filter((m) => !m.oe || points.some((p) => p[m.key] !== undefined)).map((m) => (
           <button
             key={m.key}
             onClick={() => setMetric(m.key)}
@@ -164,6 +177,58 @@ export function Evolution({ points }: { points: EvolutionPoint[] }) {
       </div>
       <LineChart points={data} format={(v) => fmtStat(metric, v)} />
       <p className="mt-1 text-xs text-ink-3">Un point par tournoi (split, playoffs, EMEA Masters…), dans l&apos;ordre chronologique.</p>
+      <SplitTable points={points.filter((p) => p.games >= minGames)} />
+    </div>
+  );
+}
+
+/** Tableau split par split (le plus récent en haut) : lane à 15 min et stats clés */
+function SplitTable({ points }: { points: EvolutionPoint[] }) {
+  const [open, setOpen] = useState(false);
+  const cols = SPLIT_TABLE.filter((k) => points.some((p) => p[k] !== undefined));
+  if (!points.length) return null;
+  const rows = [...points].sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <div className="mt-4">
+      <button onClick={() => setOpen((o) => !o)} className="text-xs text-accent hover:underline" aria-expanded={open}>
+        {open ? "Masquer le tableau split par split" : "Voir le tableau split par split (lane @15, dégâts, vision…)"}
+      </button>
+      {open && (
+        <div className="mt-2 overflow-x-auto rounded-xl border border-border">
+          <table className="tabular w-full whitespace-nowrap text-xs">
+            <thead className="bg-surface-2 text-ink-3">
+              <tr>
+                <th className="px-2 py-1.5 text-left font-medium">Tournoi</th>
+                <th className="px-2 py-1.5 text-right font-medium">Parties</th>
+                {cols.map((k) => (
+                  <th key={k} className="px-2 py-1.5 text-right font-medium">
+                    {STAT_LABELS[k] ?? k}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((p) => (
+                <tr key={`${p.tournament}-${p.role}`} className="border-t border-border">
+                  <td className="px-2 py-1.5">
+                    <span className="font-medium">{p.tournament}</span>{" "}
+                    <span className="text-ink-3">
+                      {p.role}
+                      {p.oe_games !== undefined && p.oe_games > 0 && p.oe_games < p.games ? ` · @15 sur ${p.oe_games} p.` : ""}
+                    </span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right">{p.games}</td>
+                  {cols.map((k) => (
+                    <td key={k} className="px-2 py-1.5 text-right">
+                      {p[k] === undefined ? <span className="text-ink-3">–</span> : fmtStat(k, p[k] as number)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

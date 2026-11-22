@@ -25,7 +25,7 @@ export default function ComparerPage() {
       <div>
         <h1 className="text-xl font-semibold">Comparer</h1>
         <p className="text-sm text-ink-2">
-          Deux joueurs côte à côte, Europe ou Amérique du Nord, n&apos;importe quelle saison : score, niveau de leur
+          Deux joueurs côte à côte, de n&apos;importe quelle région suivie et n&apos;importe quelle saison : score, niveau de leur
           ligue et chaque stat située dans sa propre ligue.
         </p>
       </div>

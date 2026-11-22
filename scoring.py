@@ -142,7 +142,9 @@ TALENT_USE_NEXT_SEASON = True
 # Recalibré le 18/11 avec les poids actuels (winrate, supports) : Europe 1.50
 # (39 montés), NA 0.93 (17), Corée 0.32 (23 : les meilleurs de LCK CL sont
 # déjà au niveau d'un titulaire moyen de LCK).
-TOP_LEAGUE_BONUS = {"eu": 1.5, "na": 0.9, "kr": 0.3}
+TOP_LEAGUE_BONUS = {"eu": 1.5, "na": 0.9, "kr": 0.3,
+                    # premières valeurs, à recalibrer (prospects.py --calibrate-top, étape 6 de run_all)
+                    "cn": 0.4, "lcp": 1.0, "br": 1.0}
 # Régions sans EMEA Masters mais avec une 3e division (Corée : LCK Academy Series) :
 # malus fixe des joueurs de 3e division par rapport à la 2e (calibré comme le
 # bonus de 1re division : python prospects.py --calibrate-top)
@@ -236,3 +238,18 @@ RECENCY_HALF_LIFE_DAYS = None
 # score final = FORM_WEIGHT x score du split (z-score pondéré, réduit selon les
 # parties). Voir le backtest dans l'historique du dépôt.
 FORM_WEIGHT = 0.2
+
+# Hors Europe (pas d'EMEA Masters), coefficient des ligues de 2e division :
+# classements aux tournois internationaux de 2e division (Asia Star Challengers
+# Invitational 2023-2024, Asia Masters 2025-2026, World Star Challengers
+# Invitational 2026), ramenés vers cette valeur de départ (0 = la plus faible,
+# 0.5 = moyenne, 1 = la plus forte) quand une ligue a peu de résultats.
+# Valeurs de départ d'après les résultats internationaux connus (LDL et LCK CL
+# au-dessus, puis VCS, PCS, CD ; LJL et Ligas Regionales en dessous).
+TIER2_INTL_LEAGUES = ("Asia Star Challengers Invitational", "Asia Masters", "World Star Challengers Invitational")
+LEAGUE_PRIOR = {
+    "LCKCL": 0.75, "LDL": 0.75, "AME": 0.65, "CHC": 0.5,
+    "VCS": 0.55, "PCS": 0.5, "LJL": 0.35, "LCO": 0.3,
+    "CD": 0.45, "CBLA": 0.45, "LRS": 0.3, "LRN": 0.3,
+    "NACL": 0.45,
+}

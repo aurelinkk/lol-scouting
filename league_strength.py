@@ -26,7 +26,7 @@ import pandas as pd
 
 from leaguepedia import cargo_query
 from leagues import leagues_for
-from region import DATA_DIR, HAS_EM, RAW_DIR
+from region import DATA_DIR, HAS_EM, RAW_DIR, SHARED_RAW_DIR
 import scoring
 from scoring import ERL2_DISCOUNT, ERL2_PARENT, EXCLUDED_EM_TEAMS, SHRINK_APPEARANCES
 
@@ -86,9 +86,63 @@ def team_leagues(games):
     return counts[["season", "team", "league_code"]]
 
 
+TIER2_GAMES = f"{SHARED_RAW_DIR}/tier2_intl_games.csv"
+TIER2_SHRINK_GAMES = 10
+
+
+def fetch_tier2_games(refresh=False):
+    """Parties des tournois internationaux de 2e division (ASCI, Asia Masters,
+    WSCI), qualifications exclues : une ligne par équipe et par partie."""
+    if os.path.exists(TIER2_GAMES) and not refresh:
+        return pd.read_csv(TIER2_GAMES)
+    leagues = ",".join(f"'{l}'" for l in scoring.TIER2_INTL_LEAGUES)
+    rows = cargo_query(
+        tables="ScoreboardGames=SG,Tournaments=T", join_on="SG.OverviewPage=T.OverviewPage",
+        fields="T.Name=tournament,T.Year=season,SG.GameId=game_id,SG.Team1=team1,SG.Team2=team2,SG.WinTeam=winner",
+        where=f"T.League IN ({leagues}) AND T.Region='International'")
+    df = pd.DataFrame(rows, columns=["tournament", "season", "game_id", "team1", "team2", "winner"])
+    df = df[~df["tournament"].str.contains("Qualifier", case=False, na=False)]
+    out = pd.concat([
+        pd.DataFrame({"season": df["season"], "tournament": df["tournament"], "team": df["team1"],
+                      "opponent": df["team2"], "win": df["winner"] == df["team1"]}),
+        pd.DataFrame({"season": df["season"], "tournament": df["tournament"], "team": df["team2"],
+                      "opponent": df["team1"], "win": df["winner"] == df["team2"]}),
+    ])
+    out["season"] = pd.to_numeric(out["season"], errors="coerce")
+    os.makedirs(SHARED_RAW_DIR, exist_ok=True)
+    out.to_csv(TIER2_GAMES, index=False)
+    return out
+
+
+def tier2_coefficients(games, seasons):
+    """Coefficient des 2e divisions hors Europe : taux de victoire des équipes de
+    la ligue aux tournois internationaux de 2e division, ramené vers la valeur de
+    départ de la ligue (scoring.LEAGUE_PRIOR) selon le nombre de parties."""
+    codes = sorted(games.loc[games["tier"].isin(["ERL1", "ERL2"]), "league_code"].dropna().unique())
+    out = pd.DataFrame(index=pd.Index(codes, name="league_code"))
+    out["em_teams"], out["raw_mean"] = 0.0, float("nan")
+    try:
+        t2 = fetch_tier2_games()
+    except Exception as e:  # pas de réseau ni de cache : valeurs de départ seules
+        print(f"  (tournois internationaux de 2e division indisponibles : {e})")
+        t2 = pd.DataFrame(columns=["season", "team", "win"])
+    t2 = t2[t2["season"].isin(seasons)].merge(team_leagues(games), on=["season", "team"])
+    by = t2.groupby("league_code")["win"].agg(["sum", "count"])
+    k = TIER2_SHRINK_GAMES
+    prior = pd.Series({c: float(scoring.LEAGUE_PRIOR.get(c, 0.5)) for c in codes}, dtype=float)
+    wins = by["sum"].reindex(codes).fillna(0).astype(float)
+    n = by["count"].reindex(codes).fillna(0).astype(float)
+    out["em_teams"] = n
+    out["raw_mean"] = (wins / n).where(n > 0)
+    out["coef"] = (wins + prior * k) / (n + k)
+    return out.sort_values("coef", ascending=False)
+
+
 def league_coefficients(games, seasons, verbose=False):
+    if not HAS_EM:  # hors Europe : tournois internationaux de 2e division
+        return tier2_coefficients(games, seasons)
     em = fetch_em_results(seasons)
-    if em.empty:  # pas d'EMEA Masters (NA) : pas de coefficient de ligue
+    if em.empty:
         return pd.DataFrame(columns=["em_teams", "raw_mean", "coef"], dtype=float)
     results = edition_percentiles(em[~em["team"].isin(EXCLUDED_EM_TEAMS)])
     results = results.merge(team_leagues(games), on=["season", "team"], how="left")

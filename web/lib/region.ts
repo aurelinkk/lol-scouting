@@ -3,8 +3,8 @@
 // (web/data/na, web/public/data/na). Même code de niveaux qu'en Europe :
 // "LEC" = 1re division (LCS en NA), "ERL1" = 2e division (NACL).
 
-export type Region = "eu" | "na" | "kr";
-export const REGIONS: Region[] = ["eu", "na", "kr"];
+export type Region = "eu" | "na" | "kr" | "cn" | "lcp" | "br";
+export const REGIONS: Region[] = ["eu", "na", "kr", "cn", "lcp", "br"];
 
 export interface RegionInfo {
   name: string;
@@ -60,17 +60,53 @@ export const REGION_INFO: Record<Region, RegionInfo> = {
     hasErl2: true,
     prospectMaxAge: 21,
   },
+  cn: {
+    name: "Chine",
+    short: "CN",
+    tiers: { LEC: "LPL", ERL1: "LDL / AME", ERL2: "Div. 3", EM: "Tournoi international", OTHER: "Autre région" },
+    top: "LPL",
+    lower: "2e division (LDL, AME, CHC)",
+    hasEm: false,
+    hasLeagues: false,
+    hasSoloq: false,
+    hasErl2: false,
+    prospectMaxAge: 21,
+  },
+  lcp: {
+    name: "Pacifique",
+    short: "LCP",
+    tiers: { LEC: "LCP", ERL1: "PCS / VCS / LJL", ERL2: "Div. 3", EM: "Tournoi international", OTHER: "Autre région" },
+    top: "LCP",
+    lower: "PCS, VCS et LJL",
+    hasEm: false,
+    hasLeagues: false,
+    hasSoloq: false,
+    hasErl2: false,
+    prospectMaxAge: 22,
+  },
+  br: {
+    name: "Brésil et Amérique latine",
+    short: "BR",
+    tiers: { LEC: "CBLOL", ERL1: "CD / Ligas Regionales", ERL2: "Div. 3", EM: "Tournoi international", OTHER: "Autre région" },
+    top: "CBLOL",
+    lower: "Circuito Desafiante et Ligas Regionales",
+    hasEm: false,
+    hasLeagues: false,
+    hasSoloq: false,
+    hasErl2: false,
+    prospectMaxAge: 22,
+  }
 };
 
 export const tierName = (tier: string, region: Region = "eu") => REGION_INFO[region].tiers[tier] ?? tier;
 
 export function regionFromPath(pathname: string): Region {
-  for (const r of ["na", "kr"] as const) if (pathname === `/${r}` || pathname.startsWith(`/${r}/`)) return r;
+  for (const r of REGIONS) if (r !== "eu" && (pathname === `/${r}` || pathname.startsWith(`/${r}/`))) return r;
   return "eu";
 }
 
 /** Chemin sans le préfixe de région : "/kr/donnees" -> "/donnees" */
-export const stripRegion = (pathname: string) => pathname.replace(/^\/(na|kr)(?=\/|$)/, "") || "/";
+export const stripRegion = (pathname: string) => pathname.replace(/^\/(na|kr|cn|lcp|br)(?=\/|$)/, "") || "/";
 
 /** Lien interne dans la région : link("na", "/donnees") -> "/na/donnees" */
 export function link(region: Region, path: string): string {

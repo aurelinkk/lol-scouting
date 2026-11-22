@@ -11,6 +11,29 @@ import { ArrowRightIcon, type LucideIcon, SwordsIcon, TrendingUpIcon, TrophyIcon
 
 const MIN_GAMES = 15;
 
+const PROSPECTS_TEXT: Record<Region, string> = {
+  eu: "Prospects européens : ERL1, ERL2, EMEA Masters et montées en LEC.",
+  na: "Prospects nord-américains : NACL et montées en LCS.",
+  kr: "Prospects coréens : LCK CL, LCK Academy Series et montées en LCK.",
+  cn: "Prospects chinois : LDL (puis AME et CHC en 2026) et montées en LPL.",
+  lcp: "Prospects de la zone Pacifique : PCS, VCS, LJL et montées en LCP.",
+  br: "Prospects brésiliens et latino-américains : Circuito Desafiante, Ligas Regionales et montées en CBLOL.",
+};
+const LEAGUES_TEXT: Record<Region, string> = {
+  eu: "LEC, EM, ERL1, ERL2", na: "LCS, NACL", kr: "LCK, LCK CL, Academy",
+  cn: "LPL, LDL, AME, CHC", lcp: "LCP, PCS, VCS, LJL", br: "CBLOL, CD, LRN, LRS",
+};
+
+/** Fond de l'étiquette de région (EU, NA, KR, CN, LCP, BR) */
+const REGION_CHIP: Record<Region, string> = {
+  eu: "var(--accent-soft)",
+  na: "color-mix(in srgb, var(--series-2) 22%, transparent)",
+  kr: "color-mix(in srgb, var(--series-3) 22%, transparent)",
+  cn: "color-mix(in srgb, var(--critical) 22%, transparent)",
+  lcp: "color-mix(in srgb, var(--gold) 22%, transparent)",
+  br: "color-mix(in srgb, #8b5cf6 26%, transparent)",
+};
+
 function Kpi({ label, value, hint, icon: Icon, tone = "accent" }: { label: string; value: string; hint?: string; icon: LucideIcon; tone?: "accent" | "gold" }) {
   const color = tone === "gold" ? "var(--gold)" : "var(--accent)";
   return (
@@ -189,11 +212,7 @@ export default function Dashboard({ region }: { region: Region }) {
             Repérer les talents <span className="bg-gradient-to-r from-accent to-gold bg-clip-text text-transparent">avant tout le monde</span>
           </h1>
           <p className="mt-3 text-sm text-ink-2 sm:text-base">
-            {region === "eu"
-              ? "Prospects européens : ERL1, ERL2, EMEA Masters et montées en LEC."
-              : region === "na"
-                ? "Prospects nord-américains : NACL et montées en LCS."
-                : "Prospects coréens : LCK CL, LCK Academy Series et montées en LCK."}{" "}
+            {PROSPECTS_TEXT[region]}{" "}
             Classement par poste, niveau des ligues, mercato en direct.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
@@ -216,7 +235,7 @@ export default function Dashboard({ region }: { region: Region }) {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi icon={UsersIcon} label="Joueurs suivis" value={meta.players.toLocaleString("fr-FR")} />
         <Kpi icon={SwordsIcon} label="Parties analysées" value={meta.games.toLocaleString("fr-FR")} hint={`Saisons ${meta.seasons.join(", ")}`} />
-        <Kpi icon={TrophyIcon} label="Ligues" value={String(meta.leagues)} hint={region === "eu" ? "LEC, EM, ERL1, ERL2" : region === "na" ? "LCS, NACL" : "LCK, LCK CL, Academy"} />
+        <Kpi icon={TrophyIcon} label="Ligues" value={String(meta.leagues)} hint={LEAGUES_TEXT[region]} />
         <Kpi
           icon={TrendingUpIcon}
           tone="gold"
@@ -255,14 +274,7 @@ export default function Dashboard({ region }: { region: Region }) {
                             <div className="flex items-center gap-1 text-xs text-ink-3">
                               <span
                                 className="rounded px-1 text-[10px] font-semibold"
-                                style={{
-                                  background:
-                                    p.region === "eu"
-                                      ? "var(--accent-soft)"
-                                      : p.region === "na"
-                                        ? "color-mix(in srgb, var(--series-2) 22%, transparent)"
-                                        : "color-mix(in srgb, var(--series-3) 22%, transparent)",
-                                }}
+                                style={{ background: REGION_CHIP[p.region] }}
                               >
                                 {REGION_INFO[p.region].short}
                               </span>

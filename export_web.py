@@ -31,6 +31,8 @@ from promotions import compute_promotions, hit_rates
 from prospects import add_game_metrics, aggregate, build_ranking
 from league_talent import league_talent, season_coefficients
 import scoring
+# Stats d'Oracle's Elixir gardées split par split (fiche joueur, courbe « Évolution »)
+EVO_OE_STATS = ["csd15", "gd15", "xpd15", "ka15", "fb_part", "cw_min"]
 from scoring import EM_WEIGHT, LEAGUE_WEIGHT, ROLE_WEIGHTS, STAT_LABELS
 
 OUT_DIR = WEB_DATA_DIR             # lu par le serveur au build (jamais envoyé tel quel)
@@ -470,7 +472,11 @@ def main():
                       kills=("kills", "sum"), deaths=("deaths", "sum"),
                       assists=("assists", "sum"), cs=("cs", "sum"), gold=("gold", "sum"),
                       damage=("damage", "sum"), minutes=("duration_min", "sum"),
-                      kp=("kp", "mean"), dmg_share=("dmg_share", "mean"))
+                      kp=("kp", "mean"), dmg_share=("dmg_share", "mean"),
+                      vision=("vision_score", "sum"),
+                      # Oracle's Elixir : moyenne sur les parties retrouvées
+                      **{k: (k, "mean") for k in EVO_OE_STATS if k in games.columns},
+                      oe_games=("oe_match", "sum"))
                  .reset_index())
 
     # Carrière : périodes en club, titres, récompenses individuelles
@@ -559,7 +565,12 @@ def main():
                  "cs_min": clean(e["cs"] / e["minutes"]),
                  "gold_min": clean(e["gold"] / e["minutes"]),
                  "dpm": clean(e["damage"] / e["minutes"]),
-                 "kp": clean(e["kp"]), "dmg_share": clean(e["dmg_share"])}
+                 "kp": clean(e["kp"]), "dmg_share": clean(e["dmg_share"]),
+                 "vision_min": clean(e["vision"] / e["minutes"]),
+                 "deaths_pg": clean(e["deaths"] / e["games"]),
+                 # stats @15 (Oracle's Elixir) : seulement si assez de parties retrouvées
+                 **({k: clean(e[k]) for k in EVO_OE_STATS if k in e} if e.get("oe_games", 0) >= 2 else {}),
+                 "oe_games": int(e.get("oe_games", 0) or 0)}
                 for _, e in evo.iterrows()
             ],
         }

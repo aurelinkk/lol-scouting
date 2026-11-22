@@ -46,7 +46,7 @@ function loadRankings(region: Region, season: number): Promise<RankingRow[]> {
 
 const encode = (p: Pick | null) => (p ? `${p.region}-${p.season}-${p.id}` : "");
 function decode(v: string | null): Pick | null {
-  const m = v?.match(/^(eu|na|kr)-(\d{4})-(.+)$/);
+  const m = v?.match(/^(eu|na|kr|cn|lcp|br)-(\d{4})-(.+)$/);
   return m ? { region: m[1] as Region, season: Number(m[2]), id: m[3] } : null;
 }
 
@@ -105,7 +105,7 @@ function Picker({
       <div className="text-xs font-semibold uppercase tracking-wide text-ink-3">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         <div className="flex rounded-md border border-border p-0.5 text-xs">
-          {REGIONS.map((r) => (
+          {REGIONS.filter((r) => seasons[r]?.length).map((r) => (
             <button
               key={r}
               onClick={() => {

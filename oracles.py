@@ -43,6 +43,13 @@ OE_LEAGUE_MAP = {
     "LCS": "LCS", "NACL": "NACL", "LTA N": "LCS", "LTA": "LCS",
     # Corée (SCOUT_REGION=kr)
     "LCK": "LCK", "LCKC": "LCKCL", "LCK CL": "LCKCL", "LAS": "LCKAS",
+    # Chine (SCOUT_REGION=cn)
+    "LPL": "LPL", "LDL": "LDL", "AME": "AME", "CHC": "CHC",
+    # Pacifique (SCOUT_REGION=lcp)
+    "LCP": "LCP", "PCS": "PCS", "VCS": "VCS", "LJL": "LJL", "LCO": "LCO",
+    # Brésil / Amérique latine (SCOUT_REGION=br) ; « LTA » (finales communes) reste à la LCS
+    "CBLOL": "CBLOL", "CBLOLA": "CBLA", "CBLOL A": "CBLA", "LTA S": "CBLOL", "LLA": "LLA",
+    "CD": "CD", "LRN": "LRN", "LRS": "LRS",
 }
 
 # Différences par saison (None = ligue qui n'est pas dans nos ligues cette saison)

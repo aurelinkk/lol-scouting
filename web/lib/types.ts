@@ -103,6 +103,16 @@ export interface EvolutionPoint {
   dpm: number;
   kp?: number;
   dmg_share?: number;
+  vision_min?: number;
+  deaths_pg?: number;
+  /** Oracle's Elixir (au moins 2 parties retrouvées dans le tournoi) */
+  csd15?: number;
+  gd15?: number;
+  xpd15?: number;
+  ka15?: number;
+  fb_part?: number;
+  cw_min?: number;
+  oe_games?: number;
 }
 
 export interface CareerStint {

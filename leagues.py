@@ -127,14 +127,60 @@ _KR = {
 }
 LEAGUES_KR = {2023: _KR, 2024: _KR, 2025: _KR, 2026: _KR}
 
-_BY_REGION = {"eu": LEAGUES_EU, "na": LEAGUES_NA, "kr": LEAGUES_KR}
+# Chine (SCOUT_REGION=cn) : LPL = 1re division. 2e division : LDL jusqu'en 2025 ;
+# en 2026 la LDL disparaît, remplacée par l'Asia Masters Elite (AME) et le City
+# Heroes Championship (CHC), les deux qualificatifs chinois du WSCI 2026.
+_CN = {"Tencent LoL Pro League": ("LPL", "LEC"), "LoL Development League": ("LDL", "ERL1")}
+LEAGUES_CN = {
+    2023: _CN, 2024: _CN, 2025: _CN,
+    2026: {
+        "Tencent LoL Pro League": ("LPL", "LEC"),
+        "Asia Masters Elite Invitational Tournament": ("AME", "ERL1"),
+        "City Heroes Championship": ("CHC", "ERL1"),
+    },
+}
+
+# Pacifique (SCOUT_REGION=lcp) : la LCP naît en 2025 au-dessus de la PCS (Taïwan /
+# Asie du Sud-Est), du VCS (Vietnam) et de la LJL (Japon). En 2023-2024 ces
+# ligues (et la LCO, Océanie) sont les ligues majeures de la zone : on les classe
+# en 2e division, sans 1re division au-dessus, pour suivre les mêmes ligues sur 4 ans.
+_PACIFIC_ERL = {
+    "Pacific Championship Series": ("PCS", "ERL1"),
+    "Vietnam Championship Series": ("VCS", "ERL1"),
+    "LoL Japan League": ("LJL", "ERL1"),
+}
+LEAGUES_LCP = {
+    2023: {**_PACIFIC_ERL, "LoL Circuit Oceania": ("LCO", "ERL1")},
+    2024: {**_PACIFIC_ERL, "LoL Circuit Oceania": ("LCO", "ERL1")},
+    2025: {"League of Legends Championship Pacific": ("LCP", "LEC"), **_PACIFIC_ERL},
+    2026: {"League of Legends Championship Pacific": ("LCP", "LEC"), **_PACIFIC_ERL},
+}
+
+# Brésil et Amérique latine (SCOUT_REGION=br) : CBLOL = 1re division (LTA South
+# en 2025, qui réunit Brésil et Amérique latine ; LLA = ligue latino-américaine
+# en 2023-2024). 2e division : CBLOL Academy (2023-2024), Circuito Desafiante
+# (2025-2026), Liga Regional Norte / Sur (en 2026, la LRN alimente la LCS).
+_LR = {"Liga Regional Norte": ("LRN", "ERL1"), "Liga Regional Sur": ("LRS", "ERL1")}
+LEAGUES_BR = {
+    2023: {"Circuit Brazilian League of Legends": ("CBLOL", "LEC"), "Liga Latinoamerica": ("LLA", "LEC"),
+           "Circuit Brazilian League of Legends Academy": ("CBLA", "ERL1"), **_LR},
+    2024: {"Circuit Brazilian League of Legends": ("CBLOL", "LEC"), "Liga Latinoamerica": ("LLA", "LEC"),
+           "Circuit Brazilian League of Legends Academy": ("CBLA", "ERL1"), **_LR},
+    2025: {"League of Legends Championship of The Americas South": ("CBLOL", "LEC"),
+           "Circuito Desafiante": ("CD", "ERL1"), **_LR},
+    2026: {"Circuit Brazilian League of Legends": ("CBLOL", "LEC"),
+           "Circuito Desafiante": ("CD", "ERL1"), "Liga Regional Sur": ("LRS", "ERL1")},
+}
+
+_BY_REGION = {"eu": LEAGUES_EU, "na": LEAGUES_NA, "kr": LEAGUES_KR,
+              "cn": LEAGUES_CN, "lcp": LEAGUES_LCP, "br": LEAGUES_BR}
 
 from region import REGION  # noqa: E402
 LEAGUES = _BY_REGION[REGION]
 
 
 def leagues_by_region(region):
-    """Configuration d'une région précise (eu / na / kr), quelle que soit SCOUT_REGION."""
+    """Configuration d'une région précise (eu / na / kr / cn / lcp / br), quelle que soit SCOUT_REGION."""
     return _BY_REGION[region]
 
 

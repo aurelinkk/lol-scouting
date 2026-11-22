@@ -46,4 +46,4 @@ export function originOf(country?: string | null, name?: string): Origin | null 
 }
 
 /** Grande région « locale » des ligues d'une région du site */
-export const HOME_ORIGIN: Record<Region, Origin> = { eu: "EMEA", na: "AMER", kr: "KR" };
+export const HOME_ORIGIN: Record<Region, Origin> = { eu: "EMEA", na: "AMER", kr: "KR", cn: "LPL", lcp: "LCP", br: "AMER" };

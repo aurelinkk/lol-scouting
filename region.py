@@ -1,4 +1,5 @@
-"""Région analysée : Europe (par défaut) ou Amérique du Nord.
+"""Région analysée : Europe (par défaut), Amérique du Nord, Corée, Chine,
+Pacifique (LCP) ou Brésil / Amérique latine (CBLOL).
 
 Choisie avec la variable d'environnement SCOUT_REGION :
     python fetch_pro.py --year 2026                    # Europe
@@ -30,6 +31,24 @@ REGIONS = {
     "kr": {"data": "data/kr", "web": "/kr", "home": ("Korea",),
            "top": ("LoL Champions Korea",), "top_name": "LCK", "has_em": False,
            "roster_tiers": ("LEC", "ERL1", "ERL2")},
+    # Chine : LPL ; 2e division = LDL (2023-2025), puis Asia Masters Elite et
+    # City Heroes Championship (2026, les qualifiés chinois du WSCI)
+    "cn": {"data": "data/cn", "web": "/cn", "home": ("China",),
+           "top": ("Tencent LoL Pro League",), "top_name": "LPL", "has_em": False,
+           "roster_tiers": ("LEC", "ERL1")},
+    # Pacifique : LCP depuis 2025 ; PCS, VCS, LJL (et LCO) = 2e division
+    # (en 2023-2024 ce sont les ligues majeures de la zone, sans ligue au-dessus)
+    "lcp": {"data": "data/lcp", "web": "/lcp",
+            "home": ("Asia Pacific", "PCS", "Vietnam", "Japan", "Oceania"),
+            "top": ("League of Legends Championship Pacific",), "top_name": "LCP", "has_em": False,
+            "roster_tiers": ("LEC", "ERL1")},
+    # Brésil et Amérique latine : CBLOL (LTA South en 2025, LLA en 2023-2024) ;
+    # 2e division = CBLOL Academy (2023-2024), Circuito Desafiante (2025+),
+    # Liga Regional Sur (et Norte jusqu'en 2025, la LRN alimente la LCS en 2026)
+    "br": {"data": "data/br", "web": "/br", "home": ("Brazil", "Latin America", "Americas"),
+           "top": ("Circuit Brazilian League of Legends", "League of Legends Championship of The Americas South",
+                   "Liga Latinoamerica"), "top_name": "CBLOL", "has_em": False,
+           "roster_tiers": ("LEC", "ERL1")},
 }
 ALL_REGIONS = tuple(REGIONS)
 

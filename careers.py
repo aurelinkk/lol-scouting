@@ -136,6 +136,15 @@ LEAGUE_SHORT = {
     "LVP SuperLiga": "LVP SL", "Northern League of Legends Championship": "NLC",
     "EMEA Masters": "EM",
     "LCK Challengers League": "LCK CL", "LCK Academy Series": "LCK AS",
+    # Chine, Pacifique, Brésil / Amérique latine
+    "LoL Development League": "LDL", "Asia Masters Elite Invitational Tournament": "AME",
+    "City Heroes Championship": "CHC",
+    "Pacific Championship Series": "PCS", "Vietnam Championship Series": "VCS", "LoL Japan League": "LJL",
+    "LoL Circuit Oceania": "LCO",
+    "League of Legends Championship of The Americas North": "LTA N",
+    "League of Legends Championship of The Americas South": "LTA S",
+    "Liga Latinoamerica": "LLA", "Circuit Brazilian League of Legends Academy": "CBLOL A",
+    "Circuito Desafiante": "CD", "Liga Regional Norte": "LRN", "Liga Regional Sur": "LRS",
 }
 
 

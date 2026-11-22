@@ -24,7 +24,9 @@ import subprocess
 import sys
 
 LOG = "run_all.log"
-ALL = ["eu", "na", "kr"]
+from region import ALL_REGIONS, data_dir  # noqa: E402
+
+ALL = list(ALL_REGIONS)
 
 
 def log(msg):
@@ -65,8 +67,7 @@ def seasons(region):
 
 
 def data_file(region, season):
-    base = {"eu": "data", "na": "data/na", "kr": "data/kr"}[region]
-    return f"{base}/pro_games_{season}.csv"
+    return f"{data_dir(region)}/pro_games_{season}.csv"
 
 
 def main():

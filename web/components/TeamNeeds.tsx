@@ -33,7 +33,8 @@ const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"];
 const SHORT_LIST = 5;
 const LONG_LIST = 10;
 /** Imports autorisés par équipe : 2 en LEC / LCS, aucun en LCK */
-const IMPORT_LIMIT: Record<Region, number> = { eu: 2, na: 2, kr: 0 };
+/** Imports autorisés par équipe (ordre de grandeur des règles de chaque ligue) */
+const IMPORT_LIMIT: Record<Region, number> = { eu: 2, na: 2, kr: 0, cn: 2, lcp: 2, br: 2 };
 
 type Need = "open" | "rumor" | "contract" | "official";
 const NEED: Record<Need, { label: string; color: string }> = {

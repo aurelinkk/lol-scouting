@@ -28,6 +28,22 @@ encore de soloQ (onglets Ligues, Ladder et Analyses : Europe seulement).
 Les scripts Python prennent la région dans la variable `SCOUT_REGION`
 (`eu` par défaut) : données dans `data/na/`, site dans `web/data/na/`.
 
+Régions suivies (`region.py`, ligues par saison dans `leagues.py`) :
+
+| Code | 1re division | 2e division |
+|---|---|---|
+| `eu` | LEC | ERL1, ERL2, EMEA Masters |
+| `na` | LCS (LTA North en 2025) | NACL |
+| `kr` | LCK | LCK CL, LCK Academy Series |
+| `cn` | LPL | LDL (2023-2025), Asia Masters Elite et City Heroes Championship (2026) |
+| `lcp` | LCP (depuis 2025) | PCS, VCS, LJL (+ LCO en 2023-2024, sans 1re division au-dessus) |
+| `br` | CBLOL (LTA South en 2025, + LLA en 2023-2024) | CBLOL Academy, Circuito Desafiante, Ligas Regionales |
+
+Hors Europe, le niveau des 2e divisions vient des tournois internationaux de 2e
+division (Asia Star Challengers Invitational, Asia Masters, World Star
+Challengers Invitational) : taux de victoire des équipes de chaque ligue, ramené
+vers une valeur de départ (`scoring.LEAGUE_PRIOR`) quand il y a peu de parties.
+
 ```bash
 SCOUT_REGION=na python fetch_pro.py --year 2026   # PowerShell : $env:SCOUT_REGION="na"
 SCOUT_REGION=na python export_web.py
