@@ -142,9 +142,10 @@ TALENT_USE_NEXT_SEASON = True
 # Recalibré le 18/11 avec les poids actuels (winrate, supports) : Europe 1.50
 # (39 montés), NA 0.93 (17), Corée 0.32 (23 : les meilleurs de LCK CL sont
 # déjà au niveau d'un titulaire moyen de LCK).
+# Calibré le 22/11 : Chine 0.68 (37 montés LDL -> LPL), Pacifique 0.73 (50 montés
+# PCS / VCS / LJL -> LCP), Brésil 0.65 (38 montés, 0.36 à 1.46 selon la saison).
 TOP_LEAGUE_BONUS = {"eu": 1.5, "na": 0.9, "kr": 0.3,
-                    # premières valeurs, à recalibrer (prospects.py --calibrate-top, étape 6 de run_all)
-                    "cn": 0.4, "lcp": 1.0, "br": 1.0}
+                    "cn": 0.7, "lcp": 0.7, "br": 0.65}
 # Régions sans EMEA Masters mais avec une 3e division (Corée : LCK Academy Series) :
 # malus fixe des joueurs de 3e division par rapport à la 2e (calibré comme le
 # bonus de 1re division : python prospects.py --calibrate-top)
