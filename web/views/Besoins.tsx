@@ -76,7 +76,11 @@ export default function BesoinsPage({ region }: { region: Region }) {
         <p className="mt-1 text-xs text-ink-3">
           {region === "kr"
             ? "La LCK ne prend aucun import : seuls les joueurs coréens sont proposés."
-            : `Maximum 2 imports par équipe (joueurs hors ${{ eu: "EMEA", na: "Amériques", cn: "Chine", lcp: "zone Pacifique", br: "Amériques" }[region as "eu" | "na" | "cn" | "lcp" | "br"]}) : quand les places sont prises, les imports ne sont plus proposés.`}{" "}
+            : `Règle de Riot : au moins 3 résidents dans le cinq de départ, donc 2 imports au plus. Quand les places sont prises, les imports ne sont plus proposés.${
+                region === "na" || region === "br"
+                  ? " LCS et CBLOL 2026 : un Brésilien est un import en LCS, un Nord-Américain un import au CBLOL ; les joueurs d'Amérique latine comptent comme résidents dans les deux (exception 2026-2027)."
+                  : ""
+              }`}{" "}
           Origine d&apos;après la nationalité ; exceptions (double nationalité, résidence acquise) dans{" "}
           <code>web/data/residency.json</code>.
         </p>

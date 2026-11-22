@@ -26,7 +26,7 @@ import { playerLink, publicData, REGION_INFO, tierName } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { type ContractEnd, type Signed, signedFromMercato } from "@/lib/mercato/signed";
 import { isStale } from "@/lib/mercato/stale";
-import { HOME_ORIGIN, ORIGINS, originOf } from "@/lib/origin";
+import { isResident, ORIGINS, originLabel, originOf } from "@/lib/origin";
 import { useWatchlist } from "@/lib/useWatchlist";
 
 /** Montée la saison suivante : 1re division (doré) ou ERL2 -> ERL1 (vert) */
@@ -235,13 +235,13 @@ export default function DataExplorer({
           </span>
         </Link>
         <span className="shrink-0 text-xs text-ink-3">{r.role}</span>
-        {o && o !== HOME_ORIGIN[region] && (
+        {o && !isResident(r.country, r.name, region) && (
           <span
             className="shrink-0 rounded px-1 text-[10px] font-semibold"
             style={{ background: `var(--origin-${o.toLowerCase()})`, color: "var(--origin-ink)" }}
             title={`Import · ${r.country} (${ORIGINS.find((x) => x.value === o)?.label})`}
           >
-            {o}
+            {originLabel(o, r.country)}
           </span>
         )}
         {(r.ex_lec || (r.played_lec && !promoted[`${r.season}:${r.id}`])) && (

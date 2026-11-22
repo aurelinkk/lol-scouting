@@ -47,3 +47,32 @@ export function originOf(country?: string | null, name?: string): Origin | null 
 
 /** Grande région « locale » des ligues d'une région du site */
 export const HOME_ORIGIN: Record<Region, Origin> = { eu: "EMEA", na: "AMER", kr: "KR", cn: "LPL", lcp: "LCP", br: "AMER" };
+
+/**
+ * Résident de la ligue (ne prend pas de place d'import) ? Règle mondiale de Riot :
+ * au moins 3 résidents dans le cinq de départ, donc 2 imports au plus.
+ * Amériques (règles LCS / CBLOL 2026) : un Brésilien est un import en LCS, un
+ * Nord-Américain un import au CBLOL ; exception 2026-2027, les joueurs
+ * d'Amérique latine comptent comme résidents dans les deux ligues.
+ * Nationalité inconnue : compté comme résident (pas de fausse alerte).
+ */
+const NORTH_AMERICA = new Set(["United States", "Canada"]);
+
+export function isResident(country: string | null | undefined, name: string | undefined, region: Region): boolean {
+  const forced = name ? RESIDENCY[name] ?? RESIDENCY[name.replace(/\s*\(.*\)$/, "")] : undefined;
+  const origin = originOf(country, name);
+  if (!origin) return true;
+  if (origin !== HOME_ORIGIN[region]) return false;
+  if (origin !== "AMER" || forced || !country) return true;
+  if (region === "na") return country !== "Brazil";
+  if (region === "br") return !NORTH_AMERICA.has(country);
+  return true;
+}
+
+/** Étiquette de l'origine : AMER précisé en NA / BR / LATAM (règles d'import des Amériques) */
+export function originLabel(origin: Origin, country?: string | null): string {
+  if (origin !== "AMER" || !country) return origin;
+  if (country === "Brazil") return "BR";
+  if (NORTH_AMERICA.has(country)) return "NA";
+  return "LATAM";
+}

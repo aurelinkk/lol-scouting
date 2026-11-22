@@ -11,7 +11,7 @@ import type { MercatoSlot, MercatoTeam } from "./MercatoBoard";
 import { fmtScore } from "@/lib/format";
 import { contractsFromMercato, signedFromMercato } from "@/lib/mercato/signed";
 import { isStale } from "@/lib/mercato/stale";
-import { HOME_ORIGIN, type Origin, originOf } from "@/lib/origin";
+import { isResident, originLabel, originOf } from "@/lib/origin";
 import { playerLink, type Region, REGION_INFO } from "@/lib/region";
 
 export interface Candidate {
@@ -72,7 +72,6 @@ export default function TeamNeeds({
   foreign?: { region: Region; label: string; byRole: Record<string, Candidate[]> }[];
 }) {
   const R = REGION_INFO[region];
-  const home = HOME_ORIGIN[region];
   const limit = IMPORT_LIMIT[region];
 
   // Mercato rafraîchi en ligne (même logique que Rosters / Données)
@@ -99,10 +98,8 @@ export default function TeamNeeds({
   const contracts = useMemo(() => contractsFromMercato(all), [all]);
   const topTeams = all.filter((t) => t.tier === "LEC" && t.league === R.top);
 
-  const originOfName = (name: string): Origin | null => {
-    const fromPool = Object.values(pool).flat().find((c) => c.name === name);
-    return originOf(fromPool?.country ?? countries[name] ?? countries[short(name)], name);
-  };
+  const countryOfName = (name: string): string | undefined =>
+    Object.values(pool).flat().find((c) => c.name === name)?.country ?? countries[name] ?? countries[short(name)];
 
   const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -135,10 +132,7 @@ export default function TeamNeeds({
         {topTeams.map((t) => {
           const slots = ROLES.map((role) => t.slots.find((s) => s.role === role)).filter(Boolean) as MercatoSlot[];
           const roster = slots.flatMap((s) => [s.after, ...(s.after_extra ?? [])]).filter(Boolean).map((p) => p!.name);
-          const imports = roster.filter((n) => {
-            const o = originOfName(n);
-            return o && o !== home;
-          });
+          const imports = roster.filter((n) => !isResident(countryOfName(n), n, region));
           return (
             <section key={t.team} className="card p-3">
               <header className="mb-2 flex items-center gap-2">
@@ -166,10 +160,7 @@ export default function TeamNeeds({
                   const available = (pool[s.role] ?? [])
                     .filter((c) => !taken.has(short(c.name)) && !signed[c.id])
                     .filter((c) => c.age === undefined || c.age <= MAX_AGE)
-                    .filter((c) => {
-                      const o = originOf(c.country, c.name);
-                      return !o || o === home || importOk;
-                    });
+                    .filter((c) => importOk || isResident(c.country, c.name, region));
                   const n = more[key] ? LONG_LIST : SHORT_LIST;
                   const top = available.slice(0, n);
                   // joueurs de 1re division sans club : toujours proposés, même plus bas
@@ -212,13 +203,13 @@ export default function TeamNeeds({
                                 <Link href={playerLink(region, c.id)} className="font-medium text-ink hover:underline">
                                   {short(c.name)}
                                 </Link>
-                                {o && o !== home && (
+                                {o && !isResident(c.country, c.name, region) && (
                                   <span
                                     className="rounded px-1 text-[10px] font-semibold"
                                     style={{ background: `var(--origin-${o.toLowerCase()})`, color: "var(--origin-ink)" }}
                                     title={`Import · ${c.country}`}
                                   >
-                                    {o}
+                                    {originLabel(o, c.country)}
                                   </span>
                                 )}
                                 {c.tier === "LEC" && (
@@ -272,13 +263,13 @@ export default function TeamNeeds({
                                       <Link href={playerLink(f.region, c.id)} className="font-medium text-ink hover:underline">
                                         {short(c.name)}
                                       </Link>
-                                      {o && o !== home ? (
+                                      {o && !isResident(c.country, c.name, region) ? (
                                         <span
                                           className="rounded px-1 text-[10px] font-semibold"
                                           style={{ background: `var(--origin-${o.toLowerCase()})`, color: "var(--origin-ink)" }}
                                           title={`Import · ${c.country}`}
                                         >
-                                          {o}
+                                          {originLabel(o, c.country)}
                                         </span>
                                       ) : (
                                         <span className="rounded border border-border px-1 text-[10px] text-ink-3" title={`Nationalité ${c.country ?? "?"} : ne prend pas de place d'import`}>
