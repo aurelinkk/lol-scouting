@@ -116,7 +116,9 @@ LEAGUES_NA = {
         "League of Legends Championship of The Americas": ("LCS", "LEC"),
         "North American Challengers League": ("NACL", "ERL1"),
     },
-    2026: _NA_COMMON,
+    # 2026 : la Liga Regional Norte (Mexique, Amérique centrale, Colombie...)
+    # passe dans l'écosystème LCS, 2e division parallèle à la NACL
+    2026: {**_NA_COMMON, "Liga Regional Norte": ("LRN", "ERL1")},
 }
 
 # Corée (SCOUT_REGION=kr) : LCK = 1re division, LCK CL = 2e, LCK Academy Series = 3e
