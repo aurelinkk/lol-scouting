@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ vars.SITE_URL != '' }}
     steps:
-      - name: Actualiser les 3 régions
+      - name: Actualiser les 6 régions
         env:
           SITE_URL: ${{ vars.SITE_URL }}
         run: |
-          for region in eu na kr; do
+          for region in eu na kr cn lcp br; do
             code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SITE_URL/api/mercato?region=$region" --max-time 90)
             echo "$region : HTTP $code"
           done
