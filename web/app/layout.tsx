@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-screen overflow-x-clip">
-        <header className="sticky top-0 z-20 border-b border-border/70 bg-bg/75 backdrop-blur-md">
+        <header className="sticky top-0 z-20 border-b border-border/70 bg-bg/75 backdrop-blur-md print:hidden">
           <div className="mx-auto flex max-w-screen-2xl items-center gap-3 px-4 py-2.5 sm:gap-5">
             <Link href="/" className="group flex shrink-0 items-center gap-2" aria-label="LoL Scouting, accueil">
               <span className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-accent to-[#7a5cff] text-white shadow-[0_0_18px_-4px_var(--accent)]">
@@ -43,12 +43,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ThemeToggle />
           </div>
         </header>
-        <main className="mx-auto max-w-screen-2xl px-4 py-6">
+        <main className="mx-auto max-w-screen-2xl px-4 py-6 print:max-w-none print:p-0">
           {/* filtres dans l'adresse de la page (onglet Données) */}
           <NuqsAdapter>{children}</NuqsAdapter>
         </main>
         <DeepRunner />
-        <footer className="mx-auto max-w-screen-2xl px-4 pb-8 pt-4 text-xs text-ink-3">
+        <footer className="mx-auto max-w-screen-2xl px-4 pb-8 pt-4 text-xs text-ink-3 print:hidden">
           Données : Leaguepedia (CC BY-SA 3.0)
           {meta.has_oe ? ", Oracle's Elixir" : ""}. Photos et logos affichés depuis Leaguepedia.
         </footer>

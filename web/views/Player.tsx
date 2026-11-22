@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileTextIcon } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Avatar, TeamLogo } from "@/components/Images";
 import { CareerTimeline, LevelSummary, Trophies } from "@/components/Career";
@@ -122,6 +123,13 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                   <dd className="inline font-medium">{player.country}</dd>
                 </div>
               )}
+              <Link
+                href={link(region, `/joueurs/${id}/fiche`)}
+                className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2.5 py-0.5 text-xs font-medium text-gold transition-colors hover:bg-gold/10"
+                title="Fiche A4 à imprimer ou enregistrer en PDF, pour l'envoyer"
+              >
+                <FileTextIcon className="size-3.5" /> Fiche PDF
+              </Link>
               {scores.find((x) => x.soloq_riot_id)?.soloq_riot_id && (
                 <DeepButton riotId={scores.find((x) => x.soloq_riot_id)!.soloq_riot_id!} />
               )}

@@ -143,3 +143,74 @@ body {
     color: var(--text-3);
   }
 }
+
+/* Fiche de scouting imprimable (/joueurs/<id>/fiche) : toujours en clair, format A4 */
+.sheet {
+  
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --border: #dfe4ee;
+  --text: #0b1222;
+  --text-2: #4a5468;
+  --text-3: #858fa3;
+  --accent: #2a78d6;
+  --accent-soft: #d6e6fb;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --good: #0ca30c;
+  --good-text: #006300;
+  --critical: #d03b3b;
+  --grid: #e7ebf2;
+  --tier-lec: #eda100;
+  --tier-erl1: #2a78d6;
+  --tier-erl2: #eb6834;
+  --tier-em: #1baf7a;
+  --gold: #c98500;
+  --glow-1: rgb(42 120 214 / 0.08);
+  --glow-2: rgb(237 161 0 / 0.06);
+  --card-highlight: rgb(255 255 255 / 0.6);
+  --m-team: #e2e1dd;
+  --origin-emea: #dbe4f3;
+  --origin-amer: #e6dcf5;
+  --origin-kr: #fbd9d9;
+  --origin-lpl: #fde7c2;
+  --origin-lcp: #d4efe4;
+  --origin-ink: #2a2a28;
+  --m-rumor_in: #bdecf3;
+  --m-rumor_out: #fbd2a5;
+  --m-out: #f0a7a0;
+  --m-in: #b4e3aa;
+  --m-fa: #cdb8ab;
+  --m-c2027: #f2b6c4;
+  --m-c2028: #f8dbe2;
+  --m-retired: #efe9e6;
+  color-scheme: light;
+  background: #ffffff;
+  color: var(--text);
+}
+
+@page {
+  size: A4;
+  margin: 9mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet {
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
