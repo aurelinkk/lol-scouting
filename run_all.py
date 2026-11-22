@@ -116,6 +116,9 @@ def main():
     for region in args.regions:
         status[f"export {region}"] = run([py, "export_web.py"], region)
 
+    # 5 bis. Score mondial (toutes les régions exportées sur l'échelle LEC)
+    status["score mondial"] = run([py, "world_scale.py", "--check"])
+
     # 6. Calibrage (informatif)
     for region in args.regions:
         run([py, "prospects.py", "--calibrate-top"], region)

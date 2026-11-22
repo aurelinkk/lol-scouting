@@ -1,0 +1,49 @@
+# Vérifie à chaque push que le site se construit et que les 6 régions ont leurs
+# données : un déploiement Vercel cassé est repéré tout de suite (GitHub envoie
+# un e-mail quand ça échoue), au lieu de « Pas encore de données » sur le site.
+name: Vérification du site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Scripts Python (syntaxe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compilation de tous les scripts
+        run: python -m py_compile *.py
+
+  web:
+    name: Données et build du site
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Données des 6 régions
+        run: node scripts/check-data.mjs
+      - run: npm ci
+      - name: Types
+        run: npx tsc --noEmit -p .
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

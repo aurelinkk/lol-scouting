@@ -32,6 +32,20 @@ export const getRankings = (region: Region = "eu"): RankingRow[] => {
   return getMeta(region).seasons.flatMap((season) => read<RankingRow[]>(...pub(region), `rankings_${season}.json`));
 };
 
+/** Effectifs par saison et par tournoi (fichier public, lu aussi côté serveur) */
+export interface RosterBlock {
+  season: number;
+  league_code: string;
+  tier: string;
+  tournament: string;
+  start?: string;
+  teams: { team: string; logo: string | null; players: { id: string; name: string; role: string; games: number; photo: string | null }[] }[];
+}
+export const getRosters = (region: Region = "eu"): RosterBlock[] => {
+  const file = path.join(process.cwd(), ...pub(region), "rosters.json");
+  return fs.existsSync(file) ? read<RosterBlock[]>(...pub(region), "rosters.json") : [];
+};
+
 export const getPlayer = (id: string, region: Region = "eu"): Player | undefined => getPlayers(region)[id];
 
 import type { MercatoTeam } from "@/components/MercatoBoard";

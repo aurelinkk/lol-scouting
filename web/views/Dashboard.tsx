@@ -3,6 +3,8 @@ import { HBarChart } from "@/components/Charts";
 import { Avatar, PlayerName, TeamLogo } from "@/components/Images";
 import RegionMissing from "@/components/RegionMissing";
 import { REGIONS } from "@/lib/region";
+import { worldScore } from "@/lib/world";
+import WorldStrength from "@/components/WorldStrength";
 import { link, playerLink, REGION_INFO, type Region, tierName } from "@/lib/region";
 import { getLeagues, getMeta, getPromotions, getRankings, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
@@ -129,8 +131,8 @@ export default function Dashboard({ region }: { region: Region }) {
       r.games >= MIN_GAMES,
   );
 
-  // Toutes régions : les meilleurs prospects d'Europe et de NA mélangés, classés
-  // par rang dans leur région (les scores ne sont pas comparables entre régions)
+  // Toutes régions : les meilleurs prospects de chaque région mélangés, classés
+  // par score mondial (échelle LEC, d'après les résultats internationaux)
   const crossRegion = REGIONS.filter(hasRegion).flatMap((reg) => {
     const info = REGION_INFO[reg];
     const s = Math.max(...getMeta(reg).seasons);
@@ -143,7 +145,7 @@ export default function Dashboard({ region }: { region: Region }) {
           (r.age === undefined || r.age <= info.prospectMaxAge) &&
           r.games >= MIN_GAMES,
       )
-      .map((r) => ({ ...r, region: reg }));
+      .map((r) => ({ ...r, region: reg, world: worldScore(r.final, reg, s, r.tier) }));
   });
   const multiRegion = new Set(crossRegion.map((r) => r.region)).size > 1;
 
@@ -249,7 +251,7 @@ export default function Dashboard({ region }: { region: Region }) {
         <Card
           eyebrow="Toutes régions"
           title="Meilleurs cracks"
-          subtitle="Europe, Amérique du Nord et Corée mélangées, classées par rang dans leur poste au sein de leur région (top 1 % d'abord) : les scores ne se comparent pas directement d'une région à l'autre. 21 ans ou moins (23 en NA), jamais passés par la 1re division."
+          subtitle="Les six régions mélangées, classées par score mondial : le score de chaque région est ramené à l'échelle de la LEC d'après les résultats internationaux (voir Niveau des régions). Jeunes joueurs (21 ans ou moins, 23 en NA), jamais passés par la 1re division."
         >
           <div className="grid gap-4 md:grid-cols-5">
             {ROLES.map((role) => (
@@ -258,7 +260,7 @@ export default function Dashboard({ region }: { region: Region }) {
                 <ol className="space-y-1.5">
                   {crossRegion
                     .filter((p) => p.role === role)
-                    .sort((a, b) => b.role_percentile - a.role_percentile || b.final - a.final)
+                    .sort((a, b) => (b.world ?? -99) - (a.world ?? -99) || b.role_percentile - a.role_percentile)
                     .slice(0, 5)
                     .map((p) => (
                       <li key={`${p.region}-${p.id}`}>
@@ -283,7 +285,14 @@ export default function Dashboard({ region }: { region: Region }) {
                               </span>
                             </div>
                           </div>
-                          <div className="text-right text-[11px] font-semibold">{topPercent(p.role_percentile)}</div>
+                          <div className="text-right">
+                            <div className="tabular text-sm font-semibold" title="Score mondial (échelle LEC)">
+                              {p.world !== null ? fmtScore(p.world) : "?"}
+                            </div>
+                            <div className="text-[10px] text-ink-3" title={`Rang dans son poste en ${REGION_INFO[p.region].short}`}>
+                              {topPercent(p.role_percentile)}
+                            </div>
+                          </div>
                         </Link>
                       </li>
                     ))}
@@ -291,6 +300,21 @@ export default function Dashboard({ region }: { region: Region }) {
               </div>
             ))}
           </div>
+        </Card>
+      )}
+
+      {multiRegion && (
+        <Card
+          eyebrow="Worlds · MSI · EWC · First Stand"
+          title="Niveau des régions"
+          subtitle="Force de chaque région d'après toutes ses parties internationales (la saison en cours compte double), convertie en score : le titulaire moyen de chaque 1re division, à l'échelle de la LEC. C'est ce décalage qui rend les scores comparables d'une région à l'autre (Besoins, Comparer, cracks ci-dessus)."
+          action={
+            <Link href="/comparer" className="inline-flex items-center gap-1 text-sm text-accent hover:underline">
+              Détail et face-à-face <ArrowRightIcon className="size-3.5" />
+            </Link>
+          }
+        >
+          <WorldStrength compact />
         </Card>
       )}
 

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Avatar, TeamLogo } from "./Images";
 import { fmtScore, fmtStat, STAT_LABELS, topPercent } from "@/lib/format";
+import { worldScore } from "@/lib/world";
 import { playerLink, publicData, REGION_INFO, type Region, REGIONS, tierName } from "@/lib/region";
 import type { RankingRow, StatKey } from "@/lib/types";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -178,6 +179,7 @@ function Header({ pick, row, leagues }: { pick: Pick; row: RankingRow; leagues: 
   const R = REGION_INFO[pick.region];
   const league = leagues.find((l) => l.code === row.league_code);
   const seasonInfo = league?.seasons?.[String(pick.season)];
+  const world = worldScore(row.final, pick.region, pick.season, row.tier);
   const [pseudo, realName] = (() => {
     const m = row.name.match(/^(.*?)\s*\((.*)\)$/);
     return m ? [m[1], m[2]] : [row.name, null];
@@ -211,6 +213,16 @@ function Header({ pick, row, leagues }: { pick: Pick; row: RankingRow; leagues: 
         <dd className="text-right font-semibold">
           {fmtScore(row.final)} <span className="text-xs font-normal text-ink-3">{topPercent(row.role_percentile)}</span>
         </dd>
+        {world !== null && (
+          <>
+            <dt className="text-ink-3" title="Score ramené à l'échelle de la LEC d'après les résultats internationaux de chaque région : comparable d'une région à l'autre">
+              Score mondial
+            </dt>
+            <dd className="text-right font-semibold text-gold" title="Échelle LEC : un joueur de LEC garde le même score">
+              {fmtScore(world)} <span className="text-xs font-normal text-ink-3">éch. LEC</span>
+            </dd>
+          </>
+        )}
         <dt className="text-ink-3">Perf. dans sa ligue</dt>
         <dd className="text-right">{fmtScore(row.league_score)}</dd>
         <dt className="text-ink-3">Bonus niveau de ligue</dt>

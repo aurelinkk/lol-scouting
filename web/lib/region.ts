@@ -116,6 +116,20 @@ export function link(region: Region, path: string): string {
 
 export const playerLink = (region: Region, id: string) => link(region, `/joueurs/${id}`);
 
+/** Identifiant d'URL d'une équipe : "Karmine Corp Blue" -> "karmine-corp-blue" */
+export function teamSlug(team: string): string {
+  return (
+    team
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "equipe"
+  );
+}
+
+export const teamLink = (region: Region, team: string) => link(region, `/equipes/${teamSlug(team)}`);
+
 /** Fichier public (téléchargé par le navigateur) de la région */
 export const publicData = (region: Region, file: string) =>
   region === "eu" ? `/data/${file}` : `/data/${region}/${file}`;

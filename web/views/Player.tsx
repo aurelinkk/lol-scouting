@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { Avatar, TeamLogo } from "@/components/Images";
 import { CareerTimeline, LevelSummary, Trophies } from "@/components/Career";
 import { TIER_COLOR } from "@/lib/tiers";
-import { link, REGION_INFO, type Region, REGIONS, tierName } from "@/lib/region";
+import { link, REGION_INFO, type Region, REGIONS, teamLink, tierName } from "@/lib/region";
+import { hasTeam } from "@/views/Team";
 import DeepButton from "@/components/DeepButton";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
 import { getMeta, getPlayer, getRankings, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
 import { similarPlayers } from "@/lib/similar";
+import { WORLD, worldOffset, worldScore } from "@/lib/world";
 
 // Pages pré-générées pour les joueurs classés ; les autres sont générées à la demande
 export function playerStaticParams(region: Region) {
@@ -91,7 +93,15 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
             <div className="flex items-center gap-3">
               <TeamLogo team={player.team} src={player.logo} size={40} />
               <div>
-                <div className="font-semibold">{player.team}</div>
+                <div className="font-semibold">
+                  {player.team && hasTeam(region, player.team) ? (
+                    <Link href={teamLink(region, player.team)} className="hover:underline">
+                      {player.team}
+                    </Link>
+                  ) : (
+                    player.team
+                  )}
+                </div>
                 <div className="text-xs text-ink-3">Club actuel</div>
               </div>
             </div>
@@ -285,6 +295,14 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                       <td className="pt-1">Score final</td>
                       <td className="pt-1 text-right">{fmtScore(s.final)}</td>
                     </tr>
+                    {region !== "eu" && worldScore(s.final, region, s.season, s.tier) !== null && (
+                      <tr className="text-gold">
+                        <td className="py-0.5" title="Score ramené à l'échelle de la LEC d'après les résultats internationaux de la région : comparable d'une région à l'autre">
+                          Score mondial <span className="font-normal text-ink-3">(échelle LEC, décalage {fmtScore(worldOffset(region, s.season, s.tier)!)} {s.tier !== "LEC" && (WORLD.lower?.[region]?.adjust ?? 0) !== 0 ? `, dont ${fmtScore(WORLD.lower![region]!.adjust)} pour la division inférieure` : ""})</span>
+                        </td>
+                        <td className="text-right font-semibold">{fmtScore(worldScore(s.final, region, s.season, s.tier)!)}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
                 {s.played_lec && <p className="mt-1 text-xs text-ink-3">A joué en {R.top} cette saison.</p>}

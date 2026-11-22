@@ -4,18 +4,17 @@ import { MAX_AGE } from "@/lib/needs";
 import { getMercato, getPlayers, getRankings, hasRegion } from "@/lib/data";
 import { signedFromMercato } from "@/lib/mercato/signed";
 import { type Region, REGION_INFO, REGIONS } from "@/lib/region";
+import { convertScore } from "@/lib/world";
 
 export const metadata = { title: "Besoins · LoL Scouting" };
 
 const POOL_PER_ROLE = 150;
 const FOREIGN_PER_ROLE = 10;
 
-export default function BesoinsPage({ region }: { region: Region }) {
-  if (!hasRegion(region)) return <RegionMissing region={region} />;
+/** Données de la page Besoins (réutilisées par la page équipe) */
+export function needsData(region: Region) {
   const mercato = getMercato(region);
-  const R = REGION_INFO[region];
-  if (!mercato) return <p className="text-sm text-ink-3">Pas de mercato exporté pour cette région.</p>;
-
+  if (!mercato) return null;
   // Viviers : joueurs de la dernière saison, par poste, les mieux classés d'abord
   const rankings = getRankings(region);
   const season = Math.max(...rankings.map((r) => r.season));
@@ -35,9 +34,9 @@ export default function BesoinsPage({ region }: { region: Region }) {
   }
 
   // Imports possibles : les meilleurs joueurs disponibles des autres régions
-  // suivies (sans club pour la saison suivante d'après leur mercato), par poste.
-  // Score de leur propre région : pas directement comparable d'une région à l'autre
-  const foreign = R.top === "LCK"
+  // suivies (sans club pour la saison suivante d'après leur mercato), par poste,
+  // avec leur score ramené à l'échelle de cette région (score mondial)
+  const foreign = REGION_INFO[region].top === "LCK"
     ? []
     : REGIONS.filter((r2) => r2 !== region && hasRegion(r2)).map((r2) => {
         const taken = new Set(Object.keys(signedFromMercato(getMercato(r2)?.teams ?? [], r2)));
@@ -49,9 +48,12 @@ export default function BesoinsPage({ region }: { region: Region }) {
           .sort((a, b) => b.final - a.final)) {
           const list = (byRole[r.role] ??= []);
           if (list.length >= FOREIGN_PER_ROLE) continue;
+          // Score ramené à l'échelle de la région affichée (score mondial)
+          const converted = convertScore(r.final, r2, region, last, r.tier);
+          if (converted === null) continue;
           list.push({
             id: r.id, name: r.name, role: r.role, team: r.current_team || r.team, league: r.league_code, tier: r.tier,
-            final: r.final, age: r.age, country: r.country, photo: r.photo, region: r2,
+            final: converted, regional: r.final, age: r.age, country: r.country, photo: r.photo, region: r2,
           });
         }
         return { region: r2, label: REGION_INFO[r2].short, byRole };
@@ -64,12 +66,30 @@ export default function BesoinsPage({ region }: { region: Region }) {
     for (const p of Object.values(getPlayers(r))) if (p.country && !countries[p.name]) countries[p.name] = p.country;
   }
 
+  return {
+    season: mercato.season,
+    generated: mercato.generated,
+    teams: mercato.teams,
+    pool: Object.fromEntries(byRole) as Record<string, Candidate[]>,
+    countries,
+    foreign,
+    rankSeason: season,
+  };
+}
+
+export default function BesoinsPage({ region }: { region: Region }) {
+  if (!hasRegion(region)) return <RegionMissing region={region} />;
+  const R = REGION_INFO[region];
+  const data = needsData(region);
+  if (!data) return <p className="text-sm text-ink-3">Pas de mercato exporté pour cette région.</p>;
+  const { season: mercatoSeason, rankSeason: season } = data;
+
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">Besoins des équipes · {mercato.season}</h1>
+        <h1 className="text-xl font-semibold">Besoins des équipes · {mercatoSeason}</h1>
         <p className="text-sm text-ink-2">
-          Pour chaque équipe de {R.top}, les postes encore à pourvoir ou pas officialisés pour {mercato.season}, et les
+          Pour chaque équipe de {R.top}, les postes encore à pourvoir ou pas officialisés pour {mercatoSeason}, et les
           meilleurs joueurs disponibles à ce poste (classement {season} de l&apos;onglet Données, {MAX_AGE} ans maximum), joueurs
           de {R.top} sans club compris. Suit le mercato en direct : un transfert dans Rosters change aussitôt les besoins.
         </p>
@@ -87,12 +107,12 @@ export default function BesoinsPage({ region }: { region: Region }) {
       </div>
       <TeamNeeds
         region={region}
-        season={mercato.season}
-        generated={mercato.generated}
-        teams={mercato.teams}
-        pool={Object.fromEntries(byRole)}
-        countries={countries}
-        foreign={foreign}
+        season={data.season}
+        generated={data.generated}
+        teams={data.teams}
+        pool={data.pool}
+        countries={data.countries}
+        foreign={data.foreign}
       />
     </div>
   );

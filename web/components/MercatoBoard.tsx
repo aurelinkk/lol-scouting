@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mentions } from "@/lib/watch";
-import { playerLink, REGION_INFO, type Region } from "@/lib/region";
+import { playerLink, REGION_INFO, type Region, teamLink } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { TeamLogo } from "./Images";
 
@@ -175,7 +175,7 @@ function Cell({
   );
 }
 
-function TeamCard({ t, season }: { t: MercatoTeam; season: number }) {
+export function TeamCard({ t, season, linkTeam = true }: { t: MercatoTeam; season: number; linkTeam?: boolean }) {
   const region = useRegion();
   const coachesBefore = (t.coaches ?? []).filter((c) => c.change !== "new");
   const coachesAfter = (t.coaches ?? []).filter((c) => c.change !== "leave");
@@ -185,7 +185,13 @@ function TeamCard({ t, season }: { t: MercatoTeam; season: number }) {
     <div className="overflow-hidden card">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <TeamLogo team={t.team} src={t.logo} size={22} />
-        <span className="truncate text-sm font-semibold">{t.team}</span>
+        {linkTeam ? (
+          <Link href={teamLink(region, t.team)} className="truncate text-sm font-semibold hover:underline">
+            {t.team}
+          </Link>
+        ) : (
+          <span className="truncate text-sm font-semibold">{t.team}</span>
+        )}
         {t.former_team &&
           (t.team_source?.startsWith("http") ? (
             <a

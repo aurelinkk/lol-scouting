@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Avatar, PlayerName, TeamLogo } from "./Images";
 import { TIER_COLOR } from "@/lib/tiers";
-import { playerLink, publicData, REGION_INFO } from "@/lib/region";
+import { playerLink, publicData, REGION_INFO, teamLink } from "@/lib/region";
 import { useRegion } from "@/lib/useRegion";
 import { NativeSelect } from "@/components/ui/native-select";
 
@@ -41,7 +41,9 @@ function TeamCard({ team }: { team: RosterTeam }) {
     <div className="overflow-hidden card">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <TeamLogo team={team.team} src={team.logo} size={24} />
-        <span className="truncate text-sm font-semibold">{team.team}</span>
+        <Link href={teamLink(region, team.team)} className="truncate text-sm font-semibold hover:underline">
+          {team.team}
+        </Link>
       </div>
       <ul className="divide-y divide-border">
         {ROLES.map((role, i) => {
