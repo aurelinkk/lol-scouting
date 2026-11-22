@@ -357,12 +357,13 @@ def player_ids(players):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seasons", type=int, nargs="+", help="par défaut : toutes celles téléchargées")
-    parser.add_argument("--only", choices=["mercato"],
-                        help="ne régénérer que le mercato (rapide, sans Oracle's Elixir)")
+    parser.add_argument("--only", choices=["mercato", "equipes"],
+                        help="ne régénérer que le mercato, ou les résultats / parties des équipes "
+                             "(rapide, sans Oracle's Elixir)")
     args = parser.parse_args()
     seasons = sorted(args.seasons or available_seasons())
 
-    if args.only == "mercato":
+    if args.only in ("mercato", "equipes"):
         games = load_games(seasons)
         _, logos = get_image_urls()
         print("Export web :")
@@ -372,7 +373,11 @@ def main():
         if os.path.exists(published):
             with open(published, encoding="utf-8") as f:
                 ids.update({p["name"]: pid for pid, p in json.load(f).items()})
-        export_mercato(games, ids, logos, max(seasons) + 1, refresh=True)
+        if args.only == "mercato":
+            export_mercato(games, ids, logos, max(seasons) + 1, refresh=True)
+        else:
+            from team_history import export_team_history
+            export_team_history(games, ids, seasons, refresh=True)
         return
 
     games = load_games(seasons)
@@ -619,6 +624,13 @@ def main():
     write("rosters.json", sorted(roster_list, key=lambda r: (r["season"], r["start"])), PUBLIC_DIR)
 
     export_mercato(games, ids, logos, max(seasons) + 1)
+
+    # --- Résultats et parties des équipes (page équipe) -----------------------
+    try:
+        from team_history import export_team_history
+        export_team_history(games, ids, seasons)
+    except Exception as e:  # le reste du site reste exporté
+        print(f"  (résultats des équipes non exportés : {e})")
 
     # --- Méta ------------------------------------------------------------
     write("meta.json", {

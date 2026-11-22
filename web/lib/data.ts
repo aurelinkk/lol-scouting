@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Region } from "./region";
 import { ageFrom, withCurrentAge } from "./age";
 import type { League, Meta, Player, Promotion, RankingRow } from "./types";
+import type { TeamMatch, TeamResult } from "@/components/TeamHistory";
 
 // Fichiers générés par `python export_web.py` à la racine du dépôt
 const cache = new Map<string, unknown>();
@@ -67,6 +68,16 @@ export interface RosterBlock {
 export const getRosters = (region: Region = "eu"): RosterBlock[] => {
   const file = path.join(process.cwd(), ...pub(region), "rosters.json");
   return fs.existsSync(file) ? read<RosterBlock[]>(...pub(region), "rosters.json") : [];
+};
+
+/** Résultats par tournoi et parties des équipes (team_history.py), si exportés */
+export const getTeamResults = (region: Region = "eu"): TeamResult[] | null => {
+  const file = path.join(process.cwd(), ...dir(region), "results.json");
+  return fs.existsSync(file) ? read<TeamResult[]>(...dir(region), "results.json") : null;
+};
+export const getTeamMatches = (region: Region = "eu"): TeamMatch[] | null => {
+  const file = path.join(process.cwd(), ...dir(region), "matches.json");
+  return fs.existsSync(file) ? read<TeamMatch[]>(...dir(region), "matches.json") : null;
 };
 
 export const getPlayer = (id: string, region: Region = "eu"): Player | undefined => getPlayers(region)[id];

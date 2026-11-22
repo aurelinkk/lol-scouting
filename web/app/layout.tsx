@@ -5,6 +5,7 @@ import { GeistSans } from "geist/font/sans";
 import { CrosshairIcon } from "lucide-react";
 import "./globals.css";
 import DeepRunner from "@/components/DeepRunner";
+import GlobalSearch from "@/components/GlobalSearch";
 import Nav from "@/components/Nav";
 import ThemeToggle from "@/components/ThemeToggle";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
@@ -37,7 +38,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
             </Link>
             <Nav />
-            <span className="ml-auto hidden text-[11px] text-ink-3 xl:block">
+            <div className="ml-auto" />
+            <GlobalSearch />
+            <span className="hidden text-[11px] text-ink-3 2xl:block">
               {meta.seasons[0]}–{meta.seasons.at(-1)} · MAJ {meta.generated}
             </span>
             <ThemeToggle />

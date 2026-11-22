@@ -30,6 +30,8 @@ for (const r of REGIONS) {
   if (!meta) continue;
   for (const f of ["players.json", "leagues.json", "promotions.json", "mercato.json"]) readJson(path.join(dataDir(r), f));
   readJson(path.join(pubDir(r), "rosters.json"));
+  for (const f of ["results.json", "matches.json"])
+    if (!fs.existsSync(path.join(dataDir(r), f))) warnings.push(`${r} : ${f} absent (onglet Résultats de la page équipe vide, python run_all.py)`);
   for (const s of meta.seasons ?? []) {
     const rows = readJson(path.join(pubDir(r), `rankings_${s}.json`));
     if (rows && !rows.length) errors.push(`${r} : classement ${s} vide`);

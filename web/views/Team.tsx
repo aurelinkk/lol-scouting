@@ -5,7 +5,8 @@ import RegionMissing from "@/components/RegionMissing";
 import TeamMercato from "@/components/TeamMercato";
 import TeamNeeds from "@/components/TeamNeeds";
 import type { MercatoPlayer, MercatoTeam } from "@/components/MercatoBoard";
-import { getMercato, getRankings, getRosters, hasRegion } from "@/lib/data";
+import { getMercato, getRankings, getRosters, getTeamMatches, getTeamResults, hasRegion } from "@/lib/data";
+import TeamHistory from "@/components/TeamHistory";
 import { fmtScore, topPercent } from "@/lib/format";
 import { IMPORT_LIMIT } from "@/lib/needs";
 import { isResident, originLabel, originOf } from "@/lib/origin";
@@ -20,7 +21,7 @@ const short = (n: string) => n.replace(/\s*\(.*\)$/, "");
 
 /** Toutes les équipes connues de la région : mercato + effectifs des saisons passées */
 const teamsCache = new Map<Region, Map<string, string>>();
-function allTeams(region: Region): Map<string, string> {
+export function allTeams(region: Region): Map<string, string> {
   const cached = teamsCache.get(region);
   if (cached) return cached;
   const out = new Map<string, string>();
@@ -216,6 +217,31 @@ export default function TeamView({ slug, region }: { slug: string; region: Regio
     .sort((a, b) => a.diff - b.diff);
 
   const needs = mt ? needsData(region) : null;
+
+  // ---- Résultats, matchs, anciens joueurs ----
+  const nameList = [...names];
+  const results = getTeamResults(region)?.filter((r) => names.has(r.team)) ?? null;
+  const matches = getTeamMatches(region)?.filter((m) => names.has(m.a.team) || names.has(m.b.team)) ?? null;
+  const currentIds = new Set(
+    (mt?.slots ?? []).flatMap((s) => [s.after, ...(s.after_extra ?? [])]).filter(Boolean).map((p) => p!.id ?? short(p!.name).toLowerCase()),
+  );
+  const formerMap = new Map<string, { id: string; name: string; role: string; first: number; last: number; games: number }>();
+  for (const h of history)
+    for (const p of h.list) {
+      if (!p.id || currentIds.has(p.id) || currentIds.has(short(p.name).toLowerCase())) continue;
+      const k = `${p.id}|${p.role}`;
+      const cur = formerMap.get(k);
+      if (cur) Object.assign(cur, { first: Math.min(cur.first, h.season), last: Math.max(cur.last, h.season), games: cur.games + p.games });
+      else formerMap.set(k, { id: p.id, name: p.name, role: p.role, first: h.season, last: h.season, games: p.games });
+    }
+  const nowTeam = (id: string) => {
+    const r = index.get(region)?.byId.get(id);
+    return r ? r.current_team ?? r.team : undefined;
+  };
+  const formers = [...formerMap.values()]
+    .filter((p) => p.games >= 3)
+    .map((p) => ({ ...p, now: nowTeam(p.id) }))
+    .sort((a, b) => b.last - a.last || b.games - a.games);
 
   return (
     <div className="space-y-4">
@@ -423,7 +449,17 @@ export default function TeamView({ slug, region }: { slug: string; region: Regio
         </Section>
       )}
 
-      <Section title="Historique" subtitle="Effectifs saison par saison d'après les parties jouées (titulaire = le plus de parties au poste).">
+      <Section
+        title="Historique"
+        subtitle="Résultats par tournoi (Leaguepedia), toutes les parties avec les picks, anciens joueurs et effectifs saison par saison."
+      >
+        <TeamHistory
+          region={region}
+          names={nameList}
+          results={results}
+          matches={matches}
+          formers={formers}
+          rosters={
         <div className="space-y-3">
           {history.map((h) => (
             <div key={h.season} className="rounded-lg border border-border p-3">
@@ -462,6 +498,8 @@ export default function TeamView({ slug, region }: { slug: string; region: Regio
           ))}
           {!history.length && <p className="text-xs text-ink-3">Pas de partie trouvée pour cette équipe.</p>}
         </div>
+          }
+        />
       </Section>
     </div>
   );
