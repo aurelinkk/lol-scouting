@@ -69,8 +69,12 @@ def stints(games):
     période (ils couperaient une saison en morceaux : ex. Looki chez DKB).
     """
     g = games[(games["tier"] != "EM")
-              & ~games["tournament"].str.contains(NOT_TITLE_PATTERN + "|Invitational",
-                                                  case=False, na=False)]
+              & ~games["tournament"].str.contains(NOT_TITLE_PATTERN, case=False, na=False)]
+    # Invitational écartés, sauf pour une ligue qui n'a que ça cette saison-là
+    # (Chine 2026 : Asia Masters Elite Invitational Tournament)
+    inv = g["tournament"].str.contains("Invitational", case=False, na=False)
+    key = pd.Series(list(zip(g["season"], g["league"])), index=g.index)
+    g = g[~inv | ~key.isin(set(key[~inv]))]
     # Équipes invitées en LEC (ex : KC Blue en LEC Versus 2026) : pas une période en LEC
     lec = g[g["tier"] == "LEC"]
     special = lec["tournament"].str.contains(r"Versus|Showmatch|All-Star", case=False, na=False)

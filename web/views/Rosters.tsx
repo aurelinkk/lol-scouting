@@ -2,7 +2,7 @@ import MercatoBoard from "@/components/MercatoBoard";
 import RostersBrowser from "@/components/RostersBrowser";
 import RegionMissing from "@/components/RegionMissing";
 import { getMercato, hasRegion } from "@/lib/data";
-import type { Region } from "@/lib/region";
+import { type Region, REGION_INFO } from "@/lib/region";
 
 export const metadata = { title: "Rosters · LoL Scouting" };
 
@@ -14,11 +14,7 @@ export default function RostersPage({ region }: { region: Region }) {
       <div>
         <h1 className="text-xl font-semibold">Rosters</h1>
         <p className="text-sm text-ink-2">
-          {region === "eu"
-            ? "Effectifs de la LEC et des ERL1"
-            : region === "na"
-              ? "Effectifs de la LCS et de la NACL"
-              : "Effectifs de la LCK et de la LCK CL"} depuis 2023, d&apos;après les parties jouées, et le mercato de la saison à
+          Effectifs de la {REGION_INFO[region].top} et des divisions inférieures ({REGION_INFO[region].lower}) depuis 2023, d&apos;après les parties jouées, et le mercato de la saison à
           venir.
         </p>
       </div>

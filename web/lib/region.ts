@@ -65,7 +65,7 @@ export const REGION_INFO: Record<Region, RegionInfo> = {
     short: "CN",
     tiers: { LEC: "LPL", ERL1: "LDL / AME", ERL2: "Div. 3", EM: "Tournoi international", OTHER: "Autre région" },
     top: "LPL",
-    lower: "2e division (LDL, AME, CHC)",
+    lower: "LDL / AME / CHC",
     hasEm: false,
     hasLeagues: false,
     hasSoloq: false,

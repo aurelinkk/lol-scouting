@@ -233,7 +233,11 @@ def base_rosters(games, season):
     rc = rc.merge(last, on=["league_code", "team", "tournament"])
     # Équipes venues seulement pour un tournoi ouvert (LFL Invitational de janvier,
     # avec des équipes de LFL2) : pas de place dans la ligue
-    rc = rc[~rc["tournament"].str.contains("Invitational", case=False, na=False)]
+    # Sauf quand la ligue n'a que ça (Chine 2026 : la 2e division est l'Asia
+    # Masters Elite Invitational Tournament)
+    inv = rc["tournament"].str.contains("Invitational", case=False, na=False)
+    regular = set(rc.loc[~inv, "league_code"])
+    rc = rc[~inv | ~rc["league_code"].isin(regular)]
     # Équipe renommée en cours de saison (DRX -> Kiwoom DRX, BRION -> HANJIN
     # BRION) : l'ancien nom a les mêmes joueurs qu'une équipe plus récente de la
     # même ligue (au moins 3 en commun) -> écarté

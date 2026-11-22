@@ -169,7 +169,11 @@ def team_levels(season):
         g["league_code"] = g["league"].map(lambda l: config.get(l, (l, "?"))[0])
         g["tier"] = g["league"].map(lambda l: config.get(l, (l, "?"))[1])
         g = g[g["tier"].isin(["LEC", "ERL1", "ERL2"])
-              & ~g["tournament"].str.contains("Promotion|Qualifier|Invitational|Versus", case=False, na=False)]
+              & ~g["tournament"].str.contains("Promotion|Qualifier|Versus", case=False, na=False)]
+        # Tournois « Invitational » écartés, sauf pour une ligue qui n'a que ça
+        # (Chine 2026 : Asia Masters Elite Invitational Tournament)
+        inv = g["tournament"].str.contains("Invitational", case=False, na=False)
+        g = g[~inv | ~g["league_code"].isin(set(g.loc[~inv, "league_code"]))]
         n = g.groupby(["team", "league_code", "tier"])["game_id"].nunique().reset_index(name="n")
         n = n[n["n"] >= 10].sort_values("n", ascending=False).drop_duplicates("team")
         for _, r in n.iterrows():
