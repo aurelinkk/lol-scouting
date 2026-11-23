@@ -5,7 +5,8 @@
   d'après la table TournamentResults de Leaguepedia, avec le bilan en parties
   et l'effectif aligné (d'après les parties jouées).
 - matches.json : toutes les parties de la région et les parties
-  internationales de ses équipes, avec les joueurs et champions de chaque côté.
+  internationales de ses équipes, avec les joueurs, champions et stats
+  (K/D/A, CS, gold, dégâts) de chaque côté.
 
 Les deux fichiers vont dans web/data/<région>/ (lus par le serveur au build).
 Appelé par export_web.py ; seul : SCOUT_REGION=kr python team_history.py
@@ -158,8 +159,14 @@ def build_matches(every, ids):
         for t in teams:
             tg = g[g["team"] == t].sort_values("role", key=lambda s: s.map(rank).fillna(9))
             win = str(tg["win"].iloc[0]).lower() in ("true", "1")
+            def num(v):
+                return None if pd.isna(v) else int(round(float(v)))
+            # [pseudo, id, champion, kills, morts, assists, CS, gold, dégâts]
             sides.append({"team": t, "win": win,
-                          "players": [[r["player"], ids.get(r["player"]), r["champion"]] for _, r in tg.iterrows()]})
+                          "players": [[r["player"], ids.get(r["player"]), r["champion"],
+                                       num(r.get("kills")), num(r.get("deaths")), num(r.get("assists")),
+                                       num(r.get("cs")), num(r.get("gold")), num(r.get("damage"))]
+                                      for _, r in tg.iterrows()]})
         first = g.iloc[0]
         out.append({
             "date": str(first["date"])[:16], "season": int(first["season"]),

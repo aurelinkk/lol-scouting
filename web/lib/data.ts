@@ -97,7 +97,8 @@ export interface PromotionModel {
   coefficients: { name: string; key: string; coef: number }[];
   role_rates: Record<string, Record<string, { eligible: number; promoted: number; rate: number | null; top3_rate: number | null; per_season: number }>>;
   role_profiles: Record<string, { promoted: number; others: number; age_up: number; age_stay: number; diffs: [string, number][] }>;
-  live: { known: number; median_p: number | null; in_top3: number; players: { region: Region; id: string; p: number; rank_role: number; team?: string }[] };
+  history?: Partial<Record<Region, Record<string, Record<string, [number, number]>>>>;
+  live: { known: number; median_p: number | null; in_top3: number; in_top5?: number; players: { region: Region; id: string; p: number; rank_role: number; team?: string }[] };
   players: Partial<Record<Region, Record<string, PromotionChance>>>;
 }
 export interface PromotionChance {

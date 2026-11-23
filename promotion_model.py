@@ -200,6 +200,11 @@ def features(d, with_stats=True):
     X = pd.DataFrame(index=d.index)
     X["Score dans son poste"] = zscore(d, "final", grp)
     X["Rang dans son poste"] = -np.log(d["rank"])  # 1er = 0, 2e = -0.69, 10e = -2.3
+    # Rang dans sa propre ligue (les équipes recrutent les meilleurs de chaque ligue)
+    lgrp = ["region", "season", "league_code", "role"]
+    lrank = d.groupby(lgrp)["final"].rank(ascending=False, method="first")
+    X["Rang dans sa ligue"] = -np.log(lrank)
+    X["1er de sa ligue"] = (lrank == 1).astype(float)
     X["Forme du dernier split"] = zscore(d.assign(f=d["form_score"].fillna(d["final"])), "f", grp)
     X["Progression sur un an"] = d["trend"].fillna(0.0).clip(-2, 2)
     X["Pas de saison précédente"] = d["trend"].isna().astype(float)
@@ -215,7 +220,9 @@ def features(d, with_stats=True):
     X["Win rate"] = zscore(d, "winrate", grp)
     orig = d["country"].map(origin)
     X["Import"] = [float(o is not None and o != HOME[r]) for o, r in zip(orig, d["region"])]
-    X["Académie d'un club de 1re division"] = d["academy"].astype(float)
+    # Académie : seulement en Corée et en Chine, où elle mène vraiment à l'équipe
+    # mère (en Europe, les joueurs de KC Blue montent souvent, mais ailleurs qu'à KC)
+    X["Académie d'un club de 1re division"] = (d["academy"] & d["region"].isin(["kr", "cn"])).astype(float)
     if with_stats:
         for s in STATS:
             if s not in d:
@@ -348,6 +355,11 @@ def explain(name, r, x, contrib):
     if name == "Rang dans son poste":
         n = int(round(math.exp(-x)))
         return f"{n}{'er' if n == 1 else 'e'} de son poste au score" + ("" if up else " (d'autres devant)")
+    if name in ("Rang dans sa ligue", "1er de sa ligue"):
+        n = int(round(math.exp(-x))) if name == "Rang dans sa ligue" else (1 if x else 0)
+        if name == "1er de sa ligue" or not up or n > 2:
+            return None  # regroupé dans « Rang dans sa ligue », affiché seulement s'il aide
+        return f"{n}{'er' if n == 1 else 'e'} de sa ligue ({r['league_code']}) à son poste"
     if name == "Score dans son poste":
         return "Score élevé dans son poste" if up else "Score en dessous des meilleurs du poste"
     if name == "Âge":
@@ -460,6 +472,15 @@ def build(verbose=False):
             calib.append({"from": lo, "to": min(hi, 1), "n": int(sel.sum()), "predicted": round(float(cv_p[sel].mean()), 3),
                           "observed": round(float(yt[sel].mean()), 3)})
 
+    # Saisons passées : probabilité que le modèle donnait aux montés SANS les avoir
+    # vus (validation par saison), pour les cartes de l'onglet Montées
+    past = d[train_mask].assign(p=cv_p)
+    past["prank"] = past.groupby(["region", "season", "role"])["p"].rank(ascending=False, method="first")
+    history = {}
+    for _, r in past[past["y"] == 1].iterrows():
+        history.setdefault(r["region"], {}).setdefault(str(int(r["season"])), {})[r["id"]] = [
+            round(float(r["p"]), 4), int(r["prank"])]
+
     # Modèle final : toutes les saisons connues ; prédiction de la dernière
     model = Logit(lam).fit(Xn[train_mask], yv[train_mask])
     cols = list(X.columns)
@@ -526,6 +547,9 @@ def build(verbose=False):
             elif name == "Âge²":
                 c[cols.index("Âge")] += c[j]
                 c[j] = 0
+            elif name == "1er de sa ligue":
+                c[cols.index("Rang dans sa ligue")] += c[j]
+                c[j] = 0
         order = np.argsort(-np.abs(c))
         factors = []
         for j in order:
@@ -563,7 +587,9 @@ def build(verbose=False):
         "role_rates": role_rates,
         "role_profiles": role_profiles,
         "live": {"known": n_live, "median_p": round(float(np.median([x["p"] for x in live])), 3) if live else None,
-                 "in_top3": int(sum(x["rank_role"] <= 3 for x in live)), "players": live[:40]},
+                 "in_top3": int(sum(x["rank_role"] <= 3 for x in live)),
+                 "in_top5": int(sum(x["rank_role"] <= 5 for x in live)), "players": live[:60]},
+        "history": history,
         "players": players,
     }
     with open(OUT, "w", encoding="utf-8") as f:

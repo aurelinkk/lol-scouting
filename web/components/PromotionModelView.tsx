@@ -91,8 +91,12 @@ export default function PromotionModelView({ region }: { region: Region }) {
         />
         <Quality
           label={`Mercato ${model.target} en cours`}
-          value={`${live.filter((x) => x.rank_role <= 3).length}/${live.length}`}
-          hint={live.length ? `montées déjà connues dans le top 3 prédit de leur poste` : "pas encore de montée connue"}
+          value={live.length ? `${live.filter((x) => x.rank_role <= 3).length} · ${live.filter((x) => x.rank_role <= 5).length} / ${live.length}` : "–"}
+          hint={
+            live.length
+              ? `montées déjà connues (rumeurs comprises) dans le top 3 · le top 5 prédit de leur poste`
+              : "pas encore de montée connue"
+          }
         />
       </div>
 
