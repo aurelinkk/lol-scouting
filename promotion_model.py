@@ -270,15 +270,16 @@ class Logit:
 
 
 def lgbm_fit_predict(Xtr, ytr, Xte):
-    """LightGBM : 300 arbres de 7 feuilles au plus, pas de 0.03, sous-échantillonnage
-    (lignes et variables) et pénalité L2 ; moyenne sur plusieurs graines."""
+    """LightGBM (API native, sans scikit-learn) : 300 arbres de 7 feuilles au plus,
+    pas de 0.03, sous-échantillonnage (lignes et variables) et pénalité L2 ;
+    moyenne sur plusieurs graines."""
     ps = []
     for seed in range(LGBM_SEEDS):
-        m = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.03, num_leaves=7, min_child_samples=30,
-                               subsample=0.8, subsample_freq=1, colsample_bytree=0.8, reg_lambda=5,
-                               random_state=seed, verbose=-1)
-        m.fit(Xtr, ytr)
-        ps.append(m.predict_proba(Xte)[:, 1])
+        params = {"objective": "binary", "learning_rate": 0.03, "num_leaves": 7, "min_data_in_leaf": 30,
+                  "bagging_fraction": 0.8, "bagging_freq": 1, "feature_fraction": 0.8, "lambda_l2": 5.0,
+                  "seed": seed, "verbose": -1, "num_threads": 0}
+        booster = lgb.train(params, lgb.Dataset(Xtr, label=ytr), num_boost_round=300)
+        ps.append(booster.predict(Xte))
     return np.mean(ps, axis=0)
 
 
@@ -426,6 +427,12 @@ def build(verbose=False):
 
     # Mélange avec LightGBM : moyenne des deux probabilités (même validation par saison)
     mix = lgb is not None
+    if mix:
+        try:  # test rapide : si LightGBM plante sur ce PC, on garde la logistique seule
+            lgbm_fit_predict(Xn[:200], np.r_[np.ones(20), np.zeros(180)], Xn[:5])
+        except Exception as e:
+            print(f"  (LightGBM inutilisable : {e} ; régression logistique seule)")
+            mix = False
     if mix:
         Xt, yt_, dt = Xn[train_mask], yv[train_mask], d[train_mask]
         boost_p = np.zeros(len(yt_))
