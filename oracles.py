@@ -100,8 +100,10 @@ def champion_key(name):
 
 
 def oe_file(season):
-    files = sorted(glob.glob(os.path.join(OE_DIR, f"{season}_*OraclesElixir*.csv")))
-    return files[-1] if files else None
+    """Fichier Oracle's Elixir de la saison ; s'il y en a plusieurs (nouveau
+    téléchargement « ... (1).csv »), le plus récent."""
+    files = glob.glob(os.path.join(OE_DIR, f"{season}_*OraclesElixir*.csv"))
+    return max(files, key=os.path.getmtime) if files else None
 
 
 def load_oe(season):

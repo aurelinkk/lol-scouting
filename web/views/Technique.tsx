@@ -163,7 +163,8 @@ function ModelTab() {
         <F>{`Classification binaire, une ligne = (joueur, saison) en 2e / 3e division, ≥ 8 parties
 y = 1 si le joueur joue en 1re division la saison suivante (début ou en cours), dans sa région
     ou dans une autre (même pseudo et même poste dans un effectif de 1re division : ex. Yukino → FlyQuest)
-Entraînement : ${m.trained_on.join(", ")} → ${m.validation.n} lignes, ${m.validation.promoted} positifs (${pct(m.validation.promoted / m.validation.n)})
+Entraînement : ${m.trained_on.join(", ")}${m.old_seasons?.seasons.length ? `  (${m.old_seasons.seasons.join(", ")} : poids ${m.old_seasons.weight}, choisi en validation)` : ""}
+Validation   : ${(m.validated_on ?? m.trained_on).join(", ")} → ${m.validation.n} lignes, ${m.validation.promoted} positifs (${pct(m.validation.promoted / m.validation.n)})
 Prédiction   : ${m.season} → ${m.target}      Exclu : LCP 2023-2024 (création de la ligue)`}</F>
       </Block>
 

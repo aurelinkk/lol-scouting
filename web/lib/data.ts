@@ -88,6 +88,8 @@ export interface PromotionModel {
   trained_on: number[];
   model?: string;
   lambda?: number;
+  validated_on?: number[];
+  old_seasons?: { seasons: number[]; weight: number };
   logit_validation?: PromotionModel["validation"];
   logit_forward?: PromotionModel["validation"];
   validation: { n: number; promoted: number; auc: number; logloss: number; brier: number; top3_share: number; top1_share: number };
@@ -106,6 +108,12 @@ export interface PromotionChance {
   rank_role: number;
   score_rank: number;
   factors: [string, number][];
+  /** Ce qui lui manque : [phrase, gain de probabilité] si cette variable atteignait le niveau des montés de son poste */
+  gaps?: [string, number][];
+  /** Probabilité si tous ces manques étaient comblés */
+  ceiling?: number;
+  /** Freins hors de son contrôle (âge, import, 3e division) */
+  brakes?: string[];
   /** Montée déjà annoncée (officielle ou rumeur), éventuellement dans une autre région */
   official?: { team?: string; mid?: boolean; league?: string; rumor?: boolean };
 }
