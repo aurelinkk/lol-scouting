@@ -415,6 +415,7 @@ def main():
                    "ex_lec", "ex_lec_malus", "soloq_bonus", "soloq_riot_id", "soloq_tier", "soloq_lp", "soloq_rank",
                    "soloq_games", "soloq_winrate", "soloq_lp_7d", "soloq_games_7d",
                    "form_bonus", "form_score", "form_split", "form_games",
+                   "form_prev_split", "form_prev_score", "split_progress",
                    "role_percentile", "played_lec"] + STATS
     rankings = []
     scores = {}  # (season, player) -> détail du score

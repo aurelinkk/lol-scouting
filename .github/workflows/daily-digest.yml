@@ -1,0 +1,21 @@
+# Récap quotidien sur Discord : top 5 par poste des moins de 25 ans hors
+# 1re division, et plus fortes progressions (salon du webhook DISCORD_WEBHOOK_URL
+# configuré sur Vercel). Régions : variable DIGEST_REGIONS (ex : eu,na), eu par défaut.
+name: Récap quotidien Discord
+
+on:
+  schedule:
+    - cron: "17 7 * * *"   # 8 h 17 à Paris (heure d'hiver)
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    if: ${{ vars.SITE_URL != '' }}
+    steps:
+      - name: Envoyer le récap
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          REGIONS: ${{ vars.DIGEST_REGIONS || 'eu' }}
+        run: |
+          curl -s -X POST "$SITE_URL/api/alerts/digest?regions=$REGIONS" --max-time 60

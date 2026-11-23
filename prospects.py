@@ -234,6 +234,14 @@ def last_split_form(games):
             zip(last["player"], last["league_code"], last["split"], last["score"], last["games"])}
 
 
+def previous_split(games):
+    """Avant-dernier split de chaque joueur dans la saison : {joueur: (split, score)}
+    (pour la progression d'un split à l'autre)."""
+    sp = split_scores(games).sort_values("last_game")
+    prev = sp.groupby("player").nth(-2) if len(sp) else sp
+    return {p: (s, float(sc)) for p, s, sc in zip(prev["player"], prev["split"], prev["score"])}
+
+
 def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=None):
     """Classement de tous les joueurs d'ERL de la saison (LEC exclue).
 
@@ -349,6 +357,11 @@ def build_ranking(games, season, coef_seasons, min_games=10, use_next_season=Non
     ranking["form_split"] = [h[1] if ok else None for h, ok in zip(hit, same)]
     ranking["form_score"] = [h[2] if ok else float("nan") for h, ok in zip(hit, same)]
     ranking["form_games"] = [h[3] if ok else 0 for h, ok in zip(hit, same)]
+    # Progression d'un split à l'autre (score du dernier split - celui du précédent)
+    prev = previous_split(games)
+    ranking["form_prev_split"] = [prev[p][0] if p in prev else None for p in ranking["player"]]
+    ranking["form_prev_score"] = [prev[p][1] if p in prev else float("nan") for p in ranking["player"]]
+    ranking["split_progress"] = ranking["form_score"] - ranking["form_prev_score"]
     ranking["form_bonus"] = (scoring.FORM_WEIGHT * ranking["form_score"]
                              * ranking["form_games"] / (ranking["form_games"] + SAMPLE_SHRINK_GAMES)).fillna(0.0)
 

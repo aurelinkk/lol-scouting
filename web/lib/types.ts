@@ -58,6 +58,10 @@ export interface RankingRow extends Partial<Record<StatKey, number>> {
   form_games?: number;
   /** Progression : score final de la saison - celui de la saison précédente */
   trend?: number;
+  /** Progression d'un split à l'autre : score du dernier split - celui du précédent */
+  split_progress?: number;
+  form_prev_split?: string;
+  form_prev_score?: number;
   trend_split?: string;
   trend_prev?: string;
   role_percentile: number;
