@@ -41,7 +41,11 @@ MIN_GAMES = 8
 OUT = "web/data/promotion_model.json"
 # Saisons sans vraie 1re division l'année suivante (LCP créée en 2025 : les
 # équipes PCS / VCS / LJL y sont passées d'office, ce ne sont pas des montées)
-SKIP = {("lcp", 2023), ("lcp", 2024)}
+SKIP = {("lcp", 2020), ("lcp", 2021), ("lcp", 2022), ("lcp", 2023), ("lcp", 2024)}
+# Validation sur les saisons récentes ; les plus anciennes ne servent qu'à
+# l'entraînement, avec un poids choisi parmi OLD_WEIGHTS (0 = écartées)
+RECENT_FROM = 2023
+OLD_WEIGHTS = [0.0, 0.25, 0.5, 1.0]
 STATS = ["kda", "kp", "dpm", "cs_min", "gd15", "csd15", "xpd15", "vision_min", "deaths_pg"]
 LOWER_IS_BETTER = {"deaths_pg"}
 
@@ -244,7 +248,8 @@ class Logit:
     def __init__(self, lam=1.0):
         self.lam = lam
 
-    def fit(self, X, y):
+    def fit(self, X, y, sw=None):
+        sw = np.ones(len(y)) if sw is None else np.asarray(sw, dtype=float)
         self.mu = X.mean(0)
         self.sd = X.std(0)
         self.sd[self.sd == 0] = 1
@@ -255,8 +260,8 @@ class Logit:
         pen[0] = 0
         for _ in range(60):
             p = 1 / (1 + np.exp(-np.clip(Z @ w, -30, 30)))
-            g = Z.T @ (y - p) - pen * w
-            H = (Z * (p * (1 - p))[:, None]).T @ Z + np.diag(pen + 1e-9)
+            g = Z.T @ (sw * (y - p)) - pen * w
+            H = (Z * (sw * p * (1 - p))[:, None]).T @ Z + np.diag(pen + 1e-9)
             step = np.linalg.solve(H, g)
             step *= min(1.0, 2.0 / max(1e-9, np.abs(step).max()))  # pas amorti (stabilité)
             w += step
@@ -276,7 +281,7 @@ class Logit:
         return self.z(X) * self.w[1:]
 
 
-def lgbm_fit_predict(Xtr, ytr, Xte):
+def lgbm_fit_predict(Xtr, ytr, Xte, sw=None):
     """LightGBM (API native, sans scikit-learn) : 300 arbres de 7 feuilles au plus,
     pas de 0.03, sous-échantillonnage (lignes et variables) et pénalité L2 ;
     moyenne sur plusieurs graines."""
@@ -285,7 +290,7 @@ def lgbm_fit_predict(Xtr, ytr, Xte):
         params = {"objective": "binary", "learning_rate": 0.03, "num_leaves": 7, "min_data_in_leaf": 30,
                   "bagging_fraction": 0.8, "bagging_freq": 1, "feature_fraction": 0.8, "lambda_l2": 5.0,
                   "seed": seed, "verbose": -1, "num_threads": 0}
-        booster = lgb.train(params, lgb.Dataset(Xtr, label=ytr), num_boost_round=300)
+        booster = lgb.train(params, lgb.Dataset(Xtr, label=ytr, weight=sw), num_boost_round=300)
         ps.append(booster.predict(Xte))
     return np.mean(ps, axis=0)
 
@@ -312,13 +317,18 @@ def metrics(y, p, d):
     return out
 
 
-def backtest(d, y, X, lam, seasons):
-    """Chaque saison prédite par un modèle appris sur les autres saisons."""
-    p = np.zeros(len(y))
+def backtest(d, y, X, lam, seasons, sw=None, boost=False):
+    """Chaque saison de `seasons` prédite par un modèle appris sur toutes les
+    AUTRES saisons (pondérées par sw). Lignes des autres saisons : NaN."""
+    sw = np.ones(len(y)) if sw is None else sw
+    p = np.full(len(y), np.nan)
     for s in seasons:
         test = (d["season"] == s).to_numpy()
-        m = Logit(lam).fit(X[~test], y[~test])
-        p[test] = m.predict(X[test])
+        tr = ~test & (sw > 0)
+        if boost:
+            p[test] = lgbm_fit_predict(X[tr], y[tr], X[test], sw[tr])
+        else:
+            p[test] = Logit(lam).fit(X[tr], y[tr], sw[tr]).predict(X[test])
     return p
 
 
@@ -405,37 +415,55 @@ def build(verbose=False):
     train_mask = (d["season"] < last).to_numpy()
     seasons = sorted(d.loc[train_mask, "season"].unique())
 
-    # Choix des variables et de la régularisation en validation par saison
+    # Saisons de validation : les plus récentes (>= RECENT_FROM) ; les plus
+    # anciennes (2020-2022 : autre méta, autres formats) servent seulement à
+    # l'entraînement, avec un poids choisi en validation (0 = écartées)
+    recent = [s_ for s_ in seasons if s_ >= RECENT_FROM]
+    if len(recent) < 2:
+        recent = seasons
+    old_seasons = [s_ for s_ in seasons if s_ not in recent]
+    yv = d["y"].to_numpy()
+    eval_mask = d["season"].isin(recent).to_numpy()
+    de, ye = d[eval_mask], yv[eval_mask]
+    weights_for = lambda w_old: np.where(d["season"].isin(old_seasons).to_numpy(), w_old, 1.0)
+    old_weights = OLD_WEIGHTS if old_seasons else [1.0]
+
     results = {}
     for with_stats in (False, True):
         X, _ = features(d, with_stats)
-        Xt, yt, dt = X[train_mask].to_numpy(), d.loc[train_mask, "y"].to_numpy(), d[train_mask]
-        for lam in (1, 3, 10, 30, 100):
-            p = backtest(dt, yt, Xt, lam, seasons)
-            results[(with_stats, lam)] = (metrics(yt, p, dt), p)
+        Xa = X.to_numpy()
+        for w_old in old_weights:
+            sw = weights_for(w_old) * train_mask
+            for lam in (1, 3, 10, 30):
+                p = backtest(d, yv, Xa, lam, recent, sw)
+                results[(with_stats, lam, w_old)] = (metrics(ye, p[eval_mask], de), p)
+    best = min(results, key=lambda k: results[k][0]["logloss"])
+    with_stats, lam, w_old = best
+    cv, cv_full = results[best]
+    sw = weights_for(w_old) * train_mask
     # Référence : le score seul (rang + score dans le poste + région)
     Xb, _ = features(d, False)
     base_cols = ["Score dans son poste", "Rang dans son poste"] + [c for c in Xb if c.startswith("Région")]
-    pb = backtest(d[train_mask], d.loc[train_mask, "y"].to_numpy(), Xb.loc[train_mask, base_cols].to_numpy(), 10, seasons)
-    baseline = metrics(d.loc[train_mask, "y"].to_numpy(), pb, d[train_mask])
-    best = min(results, key=lambda k: results[k][0]["logloss"])
-    with_stats, lam = best
-    cv, cv_p = results[best]
+    pb = backtest(d, yv, Xb[base_cols].to_numpy(), 10, recent, sw)
+    baseline = metrics(ye, pb[eval_mask], de)
     if verbose:
         for k, (m, _) in sorted(results.items()):
-            print(f"  stats={k[0]!s:5} lambda={k[1]:<4} AUC {m['auc']:.3f}  logloss {m['logloss']:.4f}  "
-                  f"top3 {m['top3_share']:.2f}")
+            print(f"  stats={k[0]!s:5} lambda={k[1]:<4} poids 2020-22={k[2]:<5} AUC {m['auc']:.3f}  "
+                  f"logloss {m['logloss']:.4f}  top3 {m['top3_share']:.2f}")
         print(f"  référence (score seul) : AUC {baseline['auc']:.3f} logloss {baseline['logloss']:.4f} top3 {baseline['top3_share']:.2f}")
+    if old_seasons:
+        print(f"  Saisons anciennes ({', '.join(map(str, old_seasons))}) : poids retenu {w_old} "
+              f"(validation sur {', '.join(map(str, recent))})")
 
-    # Test « dans le futur » : 2025 prédite par un modèle appris sur 2023-2024 seulement
     X, rank = features(d, with_stats)
     Xn = X.to_numpy()
-    yv = d["y"].to_numpy()
-    fwd_test = (d["season"] == seasons[-1]).to_numpy()
-    fwd_train = train_mask & ~fwd_test
-    m_fwd = Logit(lam).fit(Xn[fwd_train], yv[fwd_train])
-    p_fwd = m_fwd.predict(Xn[fwd_test])
+    # Test « dans le futur » : dernière saison connue prédite par un modèle appris sur les précédentes
+    fwd_test = (d["season"] == recent[-1]).to_numpy()
+    fwd_train = train_mask & (d["season"] < recent[-1]).to_numpy() & (sw > 0)
+    p_fwd = Logit(lam).fit(Xn[fwd_train], yv[fwd_train], sw[fwd_train]).predict(Xn[fwd_test])
     logit_cv, logit_forward = cv, metrics(yv[fwd_test], p_fwd, d[fwd_test])
+    # Historique (cartes de l'onglet Montées) : chaque saison connue prédite sans elle
+    p_hist = backtest(d, yv, Xn, lam, seasons, sw)
 
     # Mélange avec LightGBM : moyenne des deux probabilités (même validation par saison)
     mix = lgb is not None
@@ -446,25 +474,24 @@ def build(verbose=False):
             print(f"  (LightGBM inutilisable : {e} ; régression logistique seule)")
             mix = False
     if mix:
-        Xt, yt_, dt = Xn[train_mask], yv[train_mask], d[train_mask]
-        boost_p = np.zeros(len(yt_))
-        for s_ in seasons:
-            te = (dt["season"] == s_).to_numpy()
-            boost_p[te] = lgbm_fit_predict(Xt[~te], yt_[~te], Xt[te])
-        boost_cv = metrics(yt_, boost_p, dt)
-        cv_p = (cv_p + boost_p) / 2
-        cv = metrics(yt_, cv_p, dt)
-        p_fwd = (p_fwd + lgbm_fit_predict(Xn[fwd_train], yv[fwd_train], Xn[fwd_test])) / 2
+        boost_full = backtest(d, yv, Xn, lam, recent, sw, boost=True)
+        boost_cv = metrics(ye, boost_full[eval_mask], de)
+        cv_full = np.where(eval_mask, (cv_full + boost_full) / 2, cv_full)
+        cv = metrics(ye, cv_full[eval_mask], de)
+        p_fwd = (p_fwd + lgbm_fit_predict(Xn[fwd_train], yv[fwd_train], Xn[fwd_test], sw[fwd_train])) / 2
+        hist_boost = backtest(d, yv, Xn, lam, seasons, sw, boost=True)
+        p_hist = (p_hist + hist_boost) / 2
         if verbose:
             print(f"  LightGBM seul : AUC {boost_cv['auc']:.3f} logloss {boost_cv['logloss']:.4f} ; "
                   f"mélange : AUC {cv['auc']:.3f} logloss {cv['logloss']:.4f}")
     else:
         print("  (LightGBM absent : régression logistique seule. Pour le mélange : pip install lightgbm)")
     forward = metrics(yv[fwd_test], p_fwd, d[fwd_test])
+    cv_p = cv_full[eval_mask]
 
     # Calibration (validation par saison) : prédit vs observé par tranche
     bins = [0, 0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 1.01]
-    yt = d.loc[train_mask, "y"].to_numpy()
+    yt = ye
     calib = []
     for lo, hi in zip(bins[:-1], bins[1:]):
         sel = (cv_p >= lo) & (cv_p < hi)
@@ -474,7 +501,7 @@ def build(verbose=False):
 
     # Saisons passées : probabilité que le modèle donnait aux montés SANS les avoir
     # vus (validation par saison), pour les cartes de l'onglet Montées
-    past = d[train_mask].assign(p=cv_p)
+    past = d[train_mask].assign(p=p_hist[train_mask])
     past["prank"] = past.groupby(["region", "season", "role"])["p"].rank(ascending=False, method="first")
     history = {}
     for _, r in past[past["y"] == 1].iterrows():
@@ -482,7 +509,8 @@ def build(verbose=False):
             round(float(r["p"]), 4), int(r["prank"])]
 
     # Modèle final : toutes les saisons connues ; prédiction de la dernière
-    model = Logit(lam).fit(Xn[train_mask], yv[train_mask])
+    fit_mask = train_mask & (sw > 0)
+    model = Logit(lam).fit(Xn[fit_mask], yv[fit_mask], sw[fit_mask])
     cols = list(X.columns)
     coefs = sorted(({"name": label_text(c, 0), "key": c, "coef": round(float(w), 3)}
                     for c, w in zip(cols, model.w[1:])), key=lambda x: -abs(x["coef"]))
@@ -531,7 +559,7 @@ def build(verbose=False):
     cur = ~train_mask
     p_cur = model.predict(Xn[cur])
     if mix:
-        p_cur = (p_cur + lgbm_fit_predict(Xn[train_mask], yv[train_mask], Xn[cur])) / 2
+        p_cur = (p_cur + lgbm_fit_predict(Xn[fit_mask], yv[fit_mask], Xn[cur], sw[fit_mask])) / 2
     contrib = model.contributions(Xn[cur])
     players = {}
     dc = d[cur].assign(p=p_cur)
@@ -577,7 +605,9 @@ def build(verbose=False):
     data = {
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "season": last, "target": last + 1,
-        "trained_on": [int(s) for s in seasons],
+        "trained_on": [int(s) for s in seasons if s in recent or w_old > 0],
+        "validated_on": [int(s) for s in recent],
+        "old_seasons": {"seasons": [int(s) for s in old_seasons], "weight": w_old},
         "model": "Régression logistique + LightGBM (moyenne)" if mix else "Régression logistique",
         "logit_validation": logit_cv, "logit_forward": logit_forward,
         "with_stats": with_stats, "lambda": lam,

@@ -44,7 +44,8 @@ def fetch_em_results(seasons, refresh=False):
         tables="TournamentResults=TR,Tournaments=T",
         join_on="TR.OverviewPage=T.OverviewPage",
         fields="T.Name=tournament,T.Year=season,TR.Team=team,TR.Place_Number=place",
-        where=f"T.League='EMEA Masters' AND T.Year IN ({','.join(map(str, seasons))})",
+        # « European Masters » jusqu'en 2022, « EMEA Masters » depuis 2023
+        where=f"T.League IN ('EMEA Masters','European Masters') AND T.Year IN ({','.join(map(str, seasons))})",
     )
     df = pd.DataFrame(rows)[["tournament", "season", "team", "place"]]
     df["season"] = df["season"].astype(int)

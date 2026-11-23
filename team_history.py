@@ -29,7 +29,7 @@ def league_names(seasons):
     """Noms Leaguepedia des ligues suivies dans la région + compétitions internationales."""
     names = set(INTL_LEAGUES)
     if REGION == "eu":
-        names.add("EMEA Masters")
+        names |= {"EMEA Masters", "European Masters"}
     config = leagues_by_region(REGION)
     for s in seasons:
         names |= set(config.get(s, {}))
@@ -119,7 +119,7 @@ def build_results(games, ids, seasons, refresh=False):
         out.append({
             "season": int(r["season"]), "tournament": r["tournament"], "league": r["league"],
             "code": code_of.get(r["tournament"]), "tier": tier_of.get(r["tournament"]),
-            "intl": r["league"] in INTL_LEAGUES or r["league"] == "EMEA Masters",
+            "intl": r["league"] in INTL_LEAGUES or r["league"] in ("EMEA Masters", "European Masters"),
             "start": r["start"][:10] or None, "end": r["end"][:10] or None,
             "team": r["team"], "place": r["place"] or None,
             "place_n": None if pd.isna(place_n) else int(place_n),

@@ -88,6 +88,8 @@ export interface PromotionModel {
   trained_on: number[];
   model?: string;
   lambda?: number;
+  validated_on?: number[];
+  old_seasons?: { seasons: number[]; weight: number };
   logit_validation?: PromotionModel["validation"];
   logit_forward?: PromotionModel["validation"];
   validation: { n: number; promoted: number; auc: number; logloss: number; brier: number; top3_share: number; top1_share: number };

@@ -138,7 +138,13 @@ LEAGUE_SHORT = {
     "LoL EMEA Championship": "LEC", "La Ligue Française": "LFL",
     "Prime League Pro Division": "PRM", "Liga Española de League of Legends": "LES",
     "LVP SuperLiga": "LVP SL", "Northern League of Legends Championship": "NLC",
-    "EMEA Masters": "EM",
+    "EMEA Masters": "EM", "European Masters": "EM",
+    # Noms d'avant 2023
+    "NA Academy League": "LCS A", "Challengers Korea": "CK", "Oceanic Pro League": "OPL",
+    "Brazilian Challenger Circuit": "CBLOL A", "LVP SuperLiga Orange": "LVP SL", "Ultraliga": "UL",
+    "PG Nationals": "PGN", "UK League Championship": "UKLC", "Baltic Masters": "BM",
+    "Belgian League": "BL", "Dutch League": "DL", "Greek Legends League": "GLL",
+    "Elite Series: League of Legends": "ES",
     "LCK Challengers League": "LCK CL", "LCK Academy Series": "LCK AS",
     # Chine, Pacifique, Brésil / Amérique latine
     "LoL Development League": "LDL", "Asia Masters Elite Invitational Tournament": "AME",

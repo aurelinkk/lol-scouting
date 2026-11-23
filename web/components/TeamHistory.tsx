@@ -57,7 +57,7 @@ const MAJOR_INTL = ["World Championship", "Mid-Season Invitational", "Esports Wo
 /** Vrai tournoi international (pas l'EMEA Masters, compétition de 2e division, ni une qualification) */
 const isMajor = (r: TeamResult) =>
   !!r.league && MAJOR_INTL.includes(r.league) && !/qualifier|qualification/i.test(r.tournament);
-const isEM = (r: TeamResult) => r.league === "EMEA Masters" || r.code === "EM" || /EMEA Masters|^EM \d/.test(r.tournament);
+const isEM = (r: TeamResult) => r.league === "EMEA Masters" || r.league === "European Masters" || r.code === "EM" || /EMEA Masters|^EM \d/.test(r.tournament);
 const short = (n: string) => n.replace(/\s*\(.*\)$/, "");
 const fmtDate = (d?: string | null) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "–");
 const MEDAL: Record<number, string> = { 1: "#f2b440", 2: "#b9c3d6", 3: "#cd7f45" };
