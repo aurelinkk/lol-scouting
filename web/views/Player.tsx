@@ -11,6 +11,8 @@ import { Evolution, StatsVsRole } from "@/components/PlayerStats";
 import { getMeta, getPlayer, getPromotionModel, getRankings, hasRegion } from "@/lib/data";
 import { fmtScore, topPercent } from "@/lib/format";
 import { similarPlayers } from "@/lib/similar";
+import { similarTrajectories } from "@/lib/trajectory";
+import TrajectoryChart from "@/components/TrajectoryChart";
 import { WORLD, worldOffset, worldScore } from "@/lib/world";
 
 // Pages pré-générées pour les joueurs classés ; les autres sont générées à la demande
@@ -275,6 +277,60 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                 .
               </p>
             </div>
+          </Section>
+        );
+      })()}
+
+      {(() => {
+        const t2 = getPromotionModel()?.tier2;
+        const c = t2?.players[region]?.[id];
+        if (!t2 || !c) return null;
+        return (
+          <Section title={`Chance de monter en ${tierName("ERL1", region)} en ${t2.target} (3e → 2e division)`}>
+            <div className="flex flex-wrap items-start gap-5">
+              <div>
+                <div className="text-3xl font-bold tabular-nums" style={{ color: "var(--good-text)" }}>
+                  {Math.round(c.p * 100)} %
+                </div>
+                <div className="text-xs text-ink-3">{c.rank_role === 1 ? "1re" : `${c.rank_role}e`} chance de son poste</div>
+                {c.official && (
+                  <div className="mt-1 text-xs font-semibold" style={{ color: c.official.rumor ? "var(--gold)" : "var(--good-text)" }}>
+                    {c.official.rumor ? "→ rumeur" : "✓ déjà annoncé"}
+                    {c.official.team ? ` : ${c.official.team}` : ""}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-60 flex-1 space-y-1 text-sm">
+                {c.gaps?.map(([text, gain]) => (
+                  <div key={text} className="flex items-center gap-2">
+                    <span className="w-14 shrink-0 rounded px-1 text-center text-xs font-bold tabular-nums" style={{ background: "color-mix(in srgb, var(--good) 22%, transparent)", color: "var(--good-text)" }}>
+                      +{Math.round(gain * 100)} pts
+                    </span>
+                    <span>{text}</span>
+                  </div>
+                ))}
+                {c.brakes?.map((b) => (
+                  <div key={b} className="flex items-center gap-2 text-ink-2">
+                    <span className="w-14 shrink-0 text-center text-xs text-ink-3">frein</span>
+                    <span>{b}</span>
+                  </div>
+                ))}
+                <p className="text-[11px] text-ink-3">
+                  Modèle moins fiable que celui de la 1re division : beaucoup de montées en 2e division se font avec toute
+                  l&apos;équipe, via un tournoi de promotion.
+                </p>
+              </div>
+            </div>
+          </Section>
+        );
+      })()}
+
+      {(() => {
+        const t = similarTrajectories(region, id);
+        if (!t?.matches.length) return null;
+        return (
+          <Section title="Trajectoire comparée aux montés">
+            <TrajectoryChart region={region} name={player.name} me={t.me} matches={t.matches} />
           </Section>
         );
       })()}

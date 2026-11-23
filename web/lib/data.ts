@@ -102,6 +102,8 @@ export interface PromotionModel {
   history?: Partial<Record<Region, Record<string, Record<string, [number, number]>>>>;
   live: { known: number; median_p: number | null; in_top3: number; in_top5?: number; players: { region: Region; id: string; p: number; rank_role: number; team?: string }[] };
   players: Partial<Record<Region, Record<string, PromotionChance>>>;
+  /** Modèle 3e -> 2e division (même format) */
+  tier2?: PromotionModel;
 }
 export interface PromotionChance {
   p: number;

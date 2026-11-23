@@ -84,7 +84,11 @@ def pub(region, *parts):
 # ---------------------------------------------------------------------------
 # Données
 # ---------------------------------------------------------------------------
-def load():
+# Cible : 1re division (top) ou, pour les joueurs de 3e division, 2e division ou plus (tier2)
+TARGETS = {"top": {"LEC"}, "tier2": {"ERL1", "LEC"}}
+
+
+def load(level="top"):
     rows, labels, official = [], {}, {}
     for region in REGIONS:
         if not os.path.exists(web(region, "meta.json")):
@@ -97,7 +101,7 @@ def load():
         # en cours de saison suivante (from = s + 1, mid_season)
         for block in json.load(open(web(region, "promotions.json"), encoding="utf-8")):
             for p in block["players"]:
-                if p["new_level"] != "LEC":
+                if p["new_level"] not in TARGETS[level]:
                     continue
                 target = p["from_season"] if not p["mid_season"] else p["from_season"] - 1
                 if p["mid_season"] and p["from_season"] != block["from"]:
@@ -106,7 +110,8 @@ def load():
                 if block["to"] == max(seasons) + 1:
                     official[(region, p["id"])] = {"team": p.get("new_team"), "mid": p["mid_season"]}
     df = pd.DataFrame(rows)
-    cross_region_labels(df, labels, official)
+    if level == "top":
+        cross_region_labels(df, labels, official)
     return df, labels, official
 
 
@@ -156,9 +161,10 @@ def cross_region_labels(df, labels, official):
     print(f"  Montées vers la 1re division d'une autre région ajoutées : {added}")
 
 
-def eligible(df):
-    """Joueurs de division inférieure, pas déjà montés dans la saison."""
-    d = df[(df["tier"] != "LEC") & (~df["played_lec"].fillna(False).astype(bool)) & (df["games"] >= MIN_GAMES)].copy()
+def eligible(df, level="top"):
+    """Joueurs de division inférieure (3e division seulement pour tier2), pas déjà montés dans la saison."""
+    low = df["tier"] == "ERL2" if level == "tier2" else df["tier"] != "LEC"
+    d = df[low & (~df["played_lec"].fillna(False).astype(bool)) & (df["games"] >= MIN_GAMES)].copy()
     d = d[~d.apply(lambda r: (r["region"], r["season"]) in SKIP, axis=1)]
     # un joueur par (région, saison) : la ligne avec le plus de parties
     d = d.sort_values("games", ascending=False).drop_duplicates(["region", "season", "id"])
@@ -426,7 +432,7 @@ STAT_GAP = {"kda": "KDA", "kp": "participation aux kills", "dpm": "dégâts/min"
             "vision_min": "vision", "deaths_pg": "nombre de morts"}
 
 
-def what_if(d, X, cur, yv, train_mask, predict, p_cur):
+def what_if(d, X, cur, yv, train_mask, predict, p_cur, level="top"):
     """Ce qui manque à chaque joueur pour monter : pour chaque variable sur
     laquelle il peut agir et où il est en dessous du monté typique de son poste
     (médiane des montés, saisons d'entraînement), nouvelle probabilité si on la
@@ -495,7 +501,7 @@ def what_if(d, X, cur, yv, train_mask, predict, p_cur):
             brakes.append(f"Âge ({r['age']:.0f} ans) : les montés ont en moyenne 21 ans")
         if X.iloc[i].get("Import", 0):
             brakes.append("Import : prend une des 2 places d'import")
-        if X.iloc[i].get("3e division", 0):
+        if level == "top" and X.iloc[i].get("3e division", 0):
             brakes.append("Joue en 3e division : la plupart des montés viennent de la 2e")
         if items or brakes:
             out[d.index[i]] = {"gaps": items[:4], "ceiling": round(float(max(ps[-1], base)), 4), "brakes": brakes}
@@ -503,9 +509,9 @@ def what_if(d, X, cur, yv, train_mask, predict, p_cur):
 
 
 # ---------------------------------------------------------------------------
-def build(verbose=False):
-    df, labels, official = load()
-    d = eligible(df)
+def build(verbose=False, level="top"):
+    df, labels, official = load(level)
+    d = eligible(df, level)
     acad = academies(df)
     d["academy"] = [acad.get((r, s, t), False) for r, s, t in zip(d["region"], d["season"], d["team"])]
     d["y"] = [1.0 if (r, i, s) in labels else 0.0 for r, i, s in zip(d["region"], d["id"], d["season"])]
@@ -662,7 +668,7 @@ def build(verbose=False):
         return (p_ + lgbm_predict(boosters, Xm)) / 2 if mix else p_
 
     p_cur = predict(Xn[cur])
-    gaps = what_if(d, X, cur, yv, train_mask, predict, p_cur)
+    gaps = what_if(d, X, cur, yv, train_mask, predict, p_cur, level)
     contrib = model.contributions(Xn[cur])
     players = {}
     dc = d[cur].assign(p=p_cur)
@@ -726,17 +732,29 @@ def build(verbose=False):
         "history": history,
         "players": players,
     }
-    with open(OUT, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"  Modèle de montée : {int(yv[train_mask].sum())} montées apprises sur {int(train_mask.sum())} joueurs "
+    what = "Modèle de montée" if level == "top" else "Modèle 3e -> 2e division"
+    print(f"  {what} : {int(yv[train_mask].sum())} montées apprises sur {int(train_mask.sum())} joueurs "
           f"({', '.join(map(str, seasons))}) ; validation AUC {cv['auc']:.3f} (score seul {baseline['auc']:.3f}), "
           f"{cv['top3_share']:.0%} des montés dans le top 3 prédit de leur poste")
     print(f"  Test dans le futur ({seasons[-1]}) : AUC {forward['auc']:.3f}, top 3 {forward['top3_share']:.0%} ; "
-          f"montées {last + 1} déjà connues : {n_live}, dont {data['live']['in_top3']} dans le top 3 prédit -> {OUT}")
+          f"montées {last + 1} déjà connues : {n_live}, dont {data['live']['in_top3']} dans le top 3 prédit")
+    return data
+
+
+def main(verbose=False):
+    data = build(verbose, "top")
+    # 3e -> 2e division (Europe, Corée : les régions avec une 3e division)
+    try:
+        data["tier2"] = build(verbose, "tier2")
+    except Exception as e:
+        print(f"  (modèle 3e -> 2e division non calculé : {e})")
+    with open(OUT, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"  -> {OUT}")
     return data
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--verbose", action="store_true")
-    build(parser.parse_args().verbose)
+    main(parser.parse_args().verbose)
