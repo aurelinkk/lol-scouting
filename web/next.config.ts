@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   // classements (public/data/**/rankings_<saison>.json) ont un nom calculé,
   // que Next ne repère pas tout seul.
   outputFileTracingIncludes: { "/**": ["./data/**", "./public/data/**"] },
+  // Parties des équipes (plusieurs dizaines de Mo) : lues seulement au build, quand
+  // toutes les pages équipe sont générées ; pas besoin dans les fonctions serveur
+  outputFileTracingExcludes: { "/**": ["./data/**/matches.json", "./data/matches.json"] },
 };
 
 export default nextConfig;

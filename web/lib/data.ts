@@ -108,6 +108,12 @@ export interface PromotionChance {
   rank_role: number;
   score_rank: number;
   factors: [string, number][];
+  /** Ce qui lui manque : [phrase, gain de probabilité] si cette variable atteignait le niveau des montés de son poste */
+  gaps?: [string, number][];
+  /** Probabilité si tous ces manques étaient comblés */
+  ceiling?: number;
+  /** Freins hors de son contrôle (âge, import, 3e division) */
+  brakes?: string[];
   /** Montée déjà annoncée (officielle ou rumeur), éventuellement dans une autre région */
   official?: { team?: string; mid?: boolean; league?: string; rumor?: boolean };
 }

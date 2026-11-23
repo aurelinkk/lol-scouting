@@ -32,6 +32,9 @@ export interface TeamMatchSide {
   win: boolean;
   /** [pseudo, id, champion, kills, morts, assists, CS, gold, dégâts] (stats : exports récents) */
   players: [string, string | null, string, ...(number | null)[]][];
+  /** Objectifs : [tours, dragons, barons, hérauts, larves, inhibiteurs, gold, elders, atakhans] */
+  o?: (number | null)[];
+  bans?: string[];
 }
 export interface TeamMatch {
   date: string;
@@ -39,6 +42,7 @@ export interface TeamMatch {
   tournament: string;
   code?: string | null;
   duration?: number | null;
+  patch?: string;
   a: TeamMatchSide;
   b: TeamMatchSide;
 }
@@ -286,6 +290,55 @@ const sumOf = (side: TeamMatchSide, i: number) =>
   side.players.reduce((n, p) => n + ((p[i] as number | null | undefined) ?? 0), 0);
 const hasStats = (side: TeamMatchSide) => side.players.some((p) => typeof p[3] === "number");
 
+const OBJ: [number, string][] = [
+  [0, "Tours"], [1, "Dragons"], [7, "Elders"], [2, "Barons"], [3, "Hérauts"], [4, "Larves"], [8, "Atakhan"], [5, "Inhibiteurs"],
+];
+
+function Objectives({ us, them }: { us: TeamMatchSide; them: TeamMatchSide }) {
+  const rows = OBJ.filter(([i]) => (us.o?.[i] ?? null) !== null || (them.o?.[i] ?? null) !== null).filter(
+    ([i]) => (us.o?.[i] ?? 0) + (them.o?.[i] ?? 0) > 0 || i <= 2,
+  );
+  if (!us.o && !them.o) return null;
+  const goldA = us.o?.[6] ?? null;
+  const goldB = them.o?.[6] ?? null;
+  const line = (label: string, a: number | null, b: number | null, fmt = (x: number) => String(x)) => {
+    const total = (a ?? 0) + (b ?? 0) || 1;
+    return (
+      <div key={label} className="grid grid-cols-[3rem_1fr_6rem_1fr_3rem] items-center gap-2 text-xs">
+        <span className={`text-right font-semibold tabular-nums ${(a ?? 0) > (b ?? 0) ? "text-ink" : "text-ink-3"}`}>{a === null ? "–" : fmt(a)}</span>
+        <div className="flex h-1.5 justify-end overflow-hidden rounded-full bg-surface-2">
+          <div className="h-full rounded-full" style={{ width: `${(100 * (a ?? 0)) / total}%`, background: "var(--accent)" }} />
+        </div>
+        <span className="text-center text-[11px] text-ink-3">{label}</span>
+        <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+          <div className="h-full rounded-full" style={{ width: `${(100 * (b ?? 0)) / total}%`, background: "var(--series-2)" }} />
+        </div>
+        <span className={`font-semibold tabular-nums ${(b ?? 0) > (a ?? 0) ? "text-ink" : "text-ink-3"}`}>{b === null ? "–" : fmt(b)}</span>
+      </div>
+    );
+  };
+  return (
+    <div className="space-y-1 rounded-xl border border-border bg-surface/60 p-3">
+      {goldA !== null && goldB !== null && line("Gold", goldA, goldB, (x) => `${(x / 1000).toFixed(1)}k`)}
+      {rows.map(([i, label]) => line(label, us.o?.[i] ?? null, them.o?.[i] ?? null))}
+    </div>
+  );
+}
+
+function Bans({ bans, version, mirror }: { bans?: string[]; version: string | null; mirror: boolean }) {
+  if (!bans?.length) return null;
+  return (
+    <div className={`mb-2 flex items-center gap-1 ${mirror ? "flex-row-reverse" : ""}`} title={`Bans : ${bans.join(", ")}`}>
+      <span className="text-[10px] uppercase text-ink-3">Bans</span>
+      {bans.map((b) => (
+        <span key={b} className="opacity-60 grayscale">
+          <Champ name={b} version={version} size={20} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function MatchDetail({ m, us, them, region }: { m: TeamMatch; us: TeamMatchSide; them: TeamMatchSide; region: Region }) {
   const version = useDdragonVersion();
   const stats = hasStats(us) && hasStats(them);
@@ -310,6 +363,7 @@ function MatchDetail({ m, us, them, region }: { m: TeamMatch; us: TeamMatchSide;
           </span>
         )}
       </div>
+      <Bans bans={s.bans} version={version} mirror={mirror} />
       <ul className="space-y-1">
         {s.players.map(([name, id, champ, kills, deaths, assists, cs, gold, dmg], i) => {
           const kda = typeof kills === "number" ? `${kills}/${deaths}/${assists}` : null;
@@ -362,6 +416,7 @@ function MatchDetail({ m, us, them, region }: { m: TeamMatch; us: TeamMatchSide;
         <span className="font-semibold text-ink">{m.tournament}</span>
         <span>{m.date.replace("T", " ").slice(0, 16).split(" ")[0].split("-").reverse().join("/")} {m.date.slice(11, 16)}</span>
         {minutes && <span>durée {Math.floor(minutes)}:{String(Math.round((minutes % 1) * 60)).padStart(2, "0")}</span>}
+        {m.patch && <span>patch {m.patch}</span>}
         {stats && (
           <span className="ml-auto flex items-center gap-3 tabular-nums">
             <span className="text-base font-bold text-ink">
@@ -374,11 +429,14 @@ function MatchDetail({ m, us, them, region }: { m: TeamMatch; us: TeamMatchSide;
           </span>
         )}
       </div>
+      <Objectives us={us} them={them} />
       <div className="grid gap-3 lg:grid-cols-2">
         {side(us, false)}
         {side(them, true)}
       </div>
-      {!stats && <p className="text-[11px] text-ink-3">K/D/A, CS et dégâts : au prochain export (python run_all.py).</p>}
+      {(!stats || (!us.o && !them.o)) && (
+        <p className="text-[11px] text-ink-3">K/D/A, CS, dégâts, objectifs et bans : au prochain export (python run_all.py).</p>
+      )}
     </div>
   );
 }

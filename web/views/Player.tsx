@@ -225,6 +225,46 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                   ))}
                 </ul>
               </div>
+              {(c.gaps?.length || c.brakes?.length) ? (
+                <div className="w-full rounded-lg border border-border bg-surface-2/40 p-3">
+                  <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">Ce qui lui manque pour monter</span>
+                    {c.gaps?.length && c.ceiling !== undefined ? (
+                      <span className="text-xs text-ink-2">
+                        tout combiné : <b>{Math.round(c.p * 100)} %</b> →{" "}
+                        <b style={{ color: "var(--gold)" }}>{Math.round(c.ceiling * 100)} %</b>
+                      </span>
+                    ) : null}
+                  </div>
+                  <ul className="space-y-1 text-sm">
+                    {c.gaps?.map(([text, gain]) => (
+                      <li key={text} className="flex items-center gap-2">
+                        <span
+                          className="w-14 shrink-0 rounded px-1 text-center text-xs font-bold tabular-nums"
+                          style={{ background: "color-mix(in srgb, var(--good) 22%, transparent)", color: "var(--good-text)" }}
+                          title="Points de probabilité gagnés si ce point atteignait le niveau des montés de son poste, le reste égal"
+                        >
+                          +{Math.round(gain * 100)} pts
+                        </span>
+                        <span>{text}</span>
+                      </li>
+                    ))}
+                    {c.brakes?.map((b) => (
+                      <li key={b} className="flex items-center gap-2 text-ink-2">
+                        <span className="w-14 shrink-0 text-center text-xs text-ink-3">frein</span>
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {!c.gaps?.length && (
+                    <p className="mt-1 text-xs text-ink-3">Déjà au niveau des montés de son poste sur tout ce qui dépend de lui.</p>
+                  )}
+                  <p className="mt-1.5 text-[11px] text-ink-3">
+                    Simulation : on remonte un seul point au niveau du monté typique de son poste (médiane des montés 2023-2025), le
+                    reste égal, et on recalcule sa probabilité avec le modèle.
+                  </p>
+                </div>
+              ) : null}
               <p className="w-full text-xs text-ink-3">
                 {model.model ?? "Modèle"} appris sur les montées réelles {model.trained_on.join(", ")} des six régions (rang dans le
                 poste, score, forme, progression, âge, expérience, stats clés, académie, poste). Les facteurs viennent de la partie

@@ -281,18 +281,25 @@ class Logit:
         return self.z(X) * self.w[1:]
 
 
-def lgbm_fit_predict(Xtr, ytr, Xte, sw=None):
+def lgbm_fit(Xtr, ytr, sw=None):
     """LightGBM (API native, sans scikit-learn) : 300 arbres de 7 feuilles au plus,
     pas de 0.03, sous-échantillonnage (lignes et variables) et pénalité L2 ;
-    moyenne sur plusieurs graines."""
-    ps = []
+    un modèle par graine (les prédictions sont moyennées)."""
+    boosters = []
     for seed in range(LGBM_SEEDS):
         params = {"objective": "binary", "learning_rate": 0.03, "num_leaves": 7, "min_data_in_leaf": 30,
                   "bagging_fraction": 0.8, "bagging_freq": 1, "feature_fraction": 0.8, "lambda_l2": 5.0,
                   "seed": seed, "verbose": -1, "num_threads": 0}
-        booster = lgb.train(params, lgb.Dataset(Xtr, label=ytr, weight=sw), num_boost_round=300)
-        ps.append(booster.predict(Xte))
-    return np.mean(ps, axis=0)
+        boosters.append(lgb.train(params, lgb.Dataset(Xtr, label=ytr, weight=sw), num_boost_round=300))
+    return boosters
+
+
+def lgbm_predict(boosters, X):
+    return np.mean([b.predict(X) for b in boosters], axis=0)
+
+
+def lgbm_fit_predict(Xtr, ytr, Xte, sw=None):
+    return lgbm_predict(lgbm_fit(Xtr, ytr, sw), Xte)
 
 
 def auc(y, p):
@@ -402,6 +409,97 @@ def explain(name, r, x, contrib):
             return None
         return good if x > 0 else bad
     return name
+
+
+# Variables sur lesquelles un joueur peut agir (plus haut = mieux), et phrase
+ACTIONABLE = {
+    "Rang dans son poste": "rank",
+    "Score dans son poste": "Un score dans son poste au niveau des montés",
+    "Forme du dernier split": "Un dernier split au niveau des montés",
+    "Expérience (parties)": "games",
+    "Win rate": "winrate",
+    "Progression sur un an": "Progresser sur un an comme les montés",
+    "EMEA Masters / international": "Jouer l'EMEA Masters / l'international",
+}
+STAT_GAP = {"kda": "KDA", "kp": "participation aux kills", "dpm": "dégâts/min", "cs_min": "farm (CS/min)",
+            "gd15": "gold d'avance à 15 min", "csd15": "CS d'avance à 15 min", "xpd15": "XP d'avance à 15 min",
+            "vision_min": "vision", "deaths_pg": "nombre de morts"}
+
+
+def what_if(d, X, cur, yv, train_mask, predict, p_cur):
+    """Ce qui manque à chaque joueur pour monter : pour chaque variable sur
+    laquelle il peut agir et où il est en dessous du monté typique de son poste
+    (médiane des montés, saisons d'entraînement), nouvelle probabilité si on la
+    remonte à ce niveau, les autres restant égales. Aussi : tout combiné, et
+    les freins hors de son contrôle (âge, import, 3e division)."""
+    cols = list(X.columns)
+    ci = {c: i for i, c in enumerate(cols)}
+    promoted = train_mask & (yv == 1)
+    Xa = X.to_numpy()
+    targets, raw = {}, {}
+    for role in ROLES:
+        sel = promoted & (d["role"] == role).to_numpy()
+        targets[role] = np.median(Xa[sel], axis=0) if sel.sum() >= 5 else np.median(Xa[promoted], axis=0)
+        sub = d[sel] if sel.sum() >= 5 else d[promoted]
+        ranks = np.exp(-X.loc[sub.index, "Rang dans son poste"])
+        raw[role] = {"games": float(sub["games"].median()), "winrate": float(sub["winrate"].median()),
+                     "rank": float(ranks.median())}
+    keys = [c for c in ACTIONABLE if c in ci] + [c for c in cols if c.startswith("stat:")]
+    out = {}
+    idxs = np.where(cur)[0]
+    for k, i in enumerate(idxs):
+        row = Xa[i]
+        role = d.iloc[i]["role"]
+        tgt = targets[role]
+        base = p_cur[k]
+        trials, labels = [], []
+        for c in keys:
+            j = ci[c]
+            if row[j] >= tgt[j] - 1e-9:
+                continue
+            new = row.copy()
+            new[j] = tgt[j]
+            if c == "Rang dans son poste":  # garder les colonnes liées cohérentes
+                for rc in cols:
+                    if rc.startswith("Rang × ") and new[ci[rc]] != 0:
+                        new[ci[rc]] = tgt[j]
+                if "Rang dans sa ligue" in ci:
+                    new[ci["Rang dans sa ligue"]] = max(new[ci["Rang dans sa ligue"]], tgt[j])
+                    new[ci["1er de sa ligue"]] = float(new[ci["Rang dans sa ligue"]] >= -1e-9)
+            trials.append(new)
+            labels.append(c)
+        r = d.iloc[i]
+        ps = predict(np.vstack(trials + [np.max(np.vstack(trials), axis=0)])) if trials else np.array([base])
+        items = []
+        for c, p_new in zip(labels, ps[:-1]):
+            gain = float(p_new - base)
+            if gain < 0.01:
+                continue
+            spec = ACTIONABLE.get(c)
+            if spec == "rank":
+                tr = max(1, int(round(raw[role]["rank"])))
+                now = int(round(math.exp(-row[ci["Rang dans son poste"]])))
+                text = f"Monter au {tr}{'er' if tr == 1 else 'e'} rang de son poste au score (aujourd'hui {now}e)"
+            elif spec == "games":
+                text = f"Jouer plus : {int(r['games'])} parties → ~{int(raw[role]['games'])} (comme les montés)"
+            elif spec == "winrate":
+                text = f"Gagner plus : {round(100 * r['winrate'])} % → ~{round(100 * raw[role]['winrate'])} % de victoires"
+            elif c.startswith("stat:"):
+                text = f"{STAT_GAP.get(c[5:], c[5:]).capitalize()} au niveau des montés de son poste"
+            else:
+                text = spec
+            items.append([text, round(gain, 3)])
+        items.sort(key=lambda x: -x[1])
+        brakes = []
+        if pd.notna(r["age"]) and r["age"] >= 23.5:
+            brakes.append(f"Âge ({r['age']:.0f} ans) : les montés ont en moyenne 21 ans")
+        if X.iloc[i].get("Import", 0):
+            brakes.append("Import : prend une des 2 places d'import")
+        if X.iloc[i].get("3e division", 0):
+            brakes.append("Joue en 3e division : la plupart des montés viennent de la 2e")
+        if items or brakes:
+            out[d.index[i]] = {"gaps": items[:4], "ceiling": round(float(max(ps[-1], base)), 4), "brakes": brakes}
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -557,9 +655,14 @@ def build(verbose=False):
 
     # Prédictions de la dernière saison, avec les 3 facteurs les plus forts
     cur = ~train_mask
-    p_cur = model.predict(Xn[cur])
-    if mix:
-        p_cur = (p_cur + lgbm_fit_predict(Xn[fit_mask], yv[fit_mask], Xn[cur], sw[fit_mask])) / 2
+    boosters = lgbm_fit(Xn[fit_mask], yv[fit_mask], sw[fit_mask]) if mix else None
+
+    def predict(Xm):
+        p_ = model.predict(Xm)
+        return (p_ + lgbm_predict(boosters, Xm)) / 2 if mix else p_
+
+    p_cur = predict(Xn[cur])
+    gaps = what_if(d, X, cur, yv, train_mask, predict, p_cur)
     contrib = model.contributions(Xn[cur])
     players = {}
     dc = d[cur].assign(p=p_cur)
@@ -590,6 +693,7 @@ def build(verbose=False):
         players.setdefault(r["region"], {})[r["id"]] = {
             "p": round(float(r["p"]), 4), "rank_role": int(r["prank"]), "score_rank": int(rank[idx]),
             "factors": factors,
+            **gaps.get(idx, {}),
             **({"official": official[(r["region"], r["id"])]} if (r["region"], r["id"]) in official else {}),
         }
 
