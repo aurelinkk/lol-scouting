@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { playerLink, type Region, teamLink } from "@/lib/region";
+import { champIcon, useDdragonVersion } from "@/lib/champions";
 
 export interface TeamResult {
   season: number;
@@ -29,7 +30,8 @@ export interface TeamResult {
 export interface TeamMatchSide {
   team: string;
   win: boolean;
-  players: [string, string | null, string][];
+  /** [pseudo, id, champion, kills, morts, assists, CS, gold, dégâts] (stats : exports récents) */
+  players: [string, string | null, string, ...(number | null)[]][];
 }
 export interface TeamMatch {
   date: string;
@@ -51,6 +53,11 @@ export interface FormerPlayer {
 }
 
 const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"];
+const MAJOR_INTL = ["World Championship", "Mid-Season Invitational", "Esports World Cup", "First Stand"];
+/** Vrai tournoi international (pas l'EMEA Masters, compétition de 2e division, ni une qualification) */
+const isMajor = (r: TeamResult) =>
+  !!r.league && MAJOR_INTL.includes(r.league) && !/qualifier|qualification/i.test(r.tournament);
+const isEM = (r: TeamResult) => r.league === "EMEA Masters" || r.code === "EM" || /EMEA Masters|^EM \d/.test(r.tournament);
 const short = (n: string) => n.replace(/\s*\(.*\)$/, "");
 const fmtDate = (d?: string | null) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "–");
 const MEDAL: Record<number, string> = { 1: "#f2b440", 2: "#b9c3d6", 3: "#cd7f45" };
@@ -104,7 +111,8 @@ function Results({ results, region }: { results: TeamResult[]; region: Region })
     const list = results.filter(
       (r) =>
         (season === "all" || r.season === Number(season)) &&
-        (kind === "all" || (kind === "intl" ? r.intl : !r.intl)) &&
+        (kind === "all" ||
+          (kind === "intl" ? isMajor(r) : kind === "em" ? isEM(r) : kind === "league" ? !r.intl && !isEM(r) : true)) &&
         (kind !== "playoffs" || /playoff|final/i.test(r.tournament)) &&
         (!query || r.tournament.toLowerCase().includes(query) || (r.league ?? "").toLowerCase().includes(query)),
     );
@@ -118,7 +126,8 @@ function Results({ results, region }: { results: TeamResult[]; region: Region })
 
   const titles = results.filter((r) => r.place_n === 1);
   const podiums = results.filter((r) => r.place_n && r.place_n <= 3);
-  const intlBest = results.filter((r) => r.intl && r.place_n).sort((a, b) => a.place_n! - b.place_n!)[0];
+  const intlBest = results.filter((r) => isMajor(r) && r.place_n).sort((a, b) => a.place_n! - b.place_n! || (b.end ?? "").localeCompare(a.end ?? ""))[0];
+  const emBest = results.filter((r) => isEM(r) && r.place_n).sort((a, b) => a.place_n! - b.place_n!)[0];
   const prize = results.reduce((n, r) => n + (r.prize ?? 0), 0);
   const total = rows.reduce((acc, r) => ({ w: acc.w + (r.wins ?? 0), g: acc.g + (r.games ?? 0) }), { w: 0, g: 0 });
   const SortIcon = sort.asc ? ArrowUpIcon : ArrowDownIcon;
@@ -134,7 +143,20 @@ function Results({ results, region }: { results: TeamResult[]; region: Region })
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Titres" value={titles.length} hint={titles.slice(0, 3).map((t) => t.tournament).join(" · ") || "aucun depuis 2023"} gold />
         <Stat label="Podiums" value={podiums.length} hint={`sur ${results.filter((r) => r.place).length} tournois classés`} />
-        <Stat label="Meilleur résultat international" value={intlBest ? intlBest.place ?? "–" : "–"} hint={intlBest ? intlBest.tournament : "pas de classement international"} />
+        <Stat
+          label="Meilleur résultat international"
+          value={intlBest ? intlBest.place ?? "–" : "–"}
+          hint={
+            intlBest
+              ? results
+                  .filter((r) => isMajor(r) && r.place_n === intlBest.place_n)
+                  .map((r) => r.tournament)
+                  .join(" · ")
+              : emBest
+                ? `pas de Worlds / MSI / EWC / First Stand ; EMEA Masters : ${emBest.place} (${emBest.tournament})`
+                : "Worlds, MSI, EWC, First Stand : aucun classement"
+          }
+        />
         <Stat label="Gains" value={prize ? `${prize.toLocaleString("fr-FR")} $` : "–"} hint="prize money renseigné sur Leaguepedia" />
       </div>
 
@@ -151,7 +173,8 @@ function Results({ results, region }: { results: TeamResult[]; region: Region })
           <option value="all">Tous les tournois</option>
           <option value="league">Ligue</option>
           <option value="playoffs">Playoffs et finales</option>
-          <option value="intl">International</option>
+          <option value="intl">International (Worlds, MSI, EWC, First Stand)</option>
+          {results.some(isEM) && <option value="em">EMEA Masters</option>}
         </NativeSelect>
         <label className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2 text-sm">
           <SearchIcon className="size-3.5 text-ink-3" />
@@ -182,7 +205,8 @@ function Results({ results, region }: { results: TeamResult[]; region: Region })
                 <td className="whitespace-nowrap py-1.5 pr-2 tabular-nums text-ink-2">{fmtDate(r.end ?? r.start)}</td>
                 <td className="py-1.5 pr-2">
                   <div className="flex items-center gap-1.5">
-                    {r.intl && <span className="rounded bg-accent-soft px-1 text-[10px] font-semibold text-accent">INTL</span>}
+                    {isMajor(r) && <span className="rounded bg-accent-soft px-1 text-[10px] font-semibold text-accent">INTL</span>}
+                    {isEM(r) && <span className="rounded bg-surface-2 px-1 text-[10px] font-semibold text-ink-2">EM</span>}
                     <span className="font-medium">{r.tournament}</span>
                   </div>
                   {r.team !== results[0]?.team && <div className="text-[11px] text-ink-3">sous le nom {r.team}</div>}
@@ -228,6 +252,136 @@ function Stat({ label, value, hint, gold }: { label: string; value: React.ReactN
 }
 
 const PAGE = 40;
+
+function Champ({ name, version, size = 30 }: { name: string; version: string | null; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const initials = name.replace(/[^A-Za-z ]/g, "").split(" ").map((w) => w[0]).join("").slice(0, 2);
+  if (!version || failed)
+    return (
+      <span
+        className="grid shrink-0 place-items-center rounded-md bg-surface-2 text-[10px] font-semibold text-ink-3"
+        style={{ width: size, height: size }}
+        title={name}
+      >
+        {initials}
+      </span>
+    );
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={champIcon(version, name)}
+      alt={name}
+      title={name}
+      width={size}
+      height={size}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="shrink-0 rounded-md ring-1 ring-border"
+    />
+  );
+}
+
+const k = (n?: number | null) => (n === null || n === undefined ? "–" : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+const sumOf = (side: TeamMatchSide, i: number) =>
+  side.players.reduce((n, p) => n + ((p[i] as number | null | undefined) ?? 0), 0);
+const hasStats = (side: TeamMatchSide) => side.players.some((p) => typeof p[3] === "number");
+
+function MatchDetail({ m, us, them, region }: { m: TeamMatch; us: TeamMatchSide; them: TeamMatchSide; region: Region }) {
+  const version = useDdragonVersion();
+  const stats = hasStats(us) && hasStats(them);
+  const maxDmg = Math.max(1, ...[...us.players, ...them.players].map((p) => (p[8] as number | null) ?? 0));
+  const minutes = m.duration ?? null;
+  const goldDiff = stats ? sumOf(us, 7) - sumOf(them, 7) : null;
+  const side = (s: TeamMatchSide, mirror: boolean) => (
+    <div className={`rounded-xl border p-3 ${s.win ? "border-[color-mix(in_srgb,var(--good)_45%,transparent)]" : "border-border"}`}>
+      <div className={`mb-2 flex items-center gap-2 ${mirror ? "flex-row-reverse text-right" : ""}`}>
+        <Link href={teamLink(region, s.team)} className="truncate font-semibold hover:underline">
+          {s.team}
+        </Link>
+        <span
+          className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase"
+          style={{ background: `color-mix(in srgb, ${s.win ? "var(--good)" : "var(--critical)"} 22%, transparent)`, color: s.win ? "var(--good-text)" : "var(--critical)" }}
+        >
+          {s.win ? "Victoire" : "Défaite"}
+        </span>
+        {stats && (
+          <span className={`text-xs tabular-nums text-ink-3 ${mirror ? "mr-auto" : "ml-auto"}`}>
+            {sumOf(s, 3)}/{sumOf(s, 4)}/{sumOf(s, 5)} · {k(sumOf(s, 7))} gold
+          </span>
+        )}
+      </div>
+      <ul className="space-y-1">
+        {s.players.map(([name, id, champ, kills, deaths, assists, cs, gold, dmg], i) => {
+          const kda = typeof kills === "number" ? `${kills}/${deaths}/${assists}` : null;
+          const ratio = typeof kills === "number" ? ((kills + (assists ?? 0)) / Math.max(1, deaths ?? 0)).toFixed(1) : null;
+          return (
+            <li key={name + i} className={`flex items-center gap-2 ${mirror ? "flex-row-reverse text-right" : ""}`}>
+              <Champ name={champ as string} version={version} />
+              <div className="min-w-0 flex-1">
+                <div className={`flex items-baseline gap-1.5 ${mirror ? "flex-row-reverse" : ""}`}>
+                  <span className="w-7 shrink-0 text-[10px] uppercase text-ink-3">{(ROLES[i] ?? "").slice(0, 3)}</span>
+                  {id ? (
+                    <Link href={playerLink(region, id as string)} className="truncate text-sm font-medium hover:underline">
+                      {short(name as string)}
+                    </Link>
+                  ) : (
+                    <span className="truncate text-sm font-medium">{short(name as string)}</span>
+                  )}
+                  <span className="truncate text-[11px] text-ink-3">{champ}</span>
+                </div>
+                {typeof dmg === "number" && (
+                  <div className={`mt-0.5 flex items-center gap-1.5 ${mirror ? "flex-row-reverse" : ""}`} title={`${dmg.toLocaleString("fr-FR")} dégâts aux champions`}>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+                      <div
+                        className={`h-full rounded-full ${mirror ? "ml-auto" : ""}`}
+                        style={{ width: `${(100 * dmg) / maxDmg}%`, background: s.win ? "var(--good)" : "var(--series-2)" }}
+                      />
+                    </div>
+                    <span className="w-9 shrink-0 text-[10px] tabular-nums text-ink-3">{k(dmg)}</span>
+                  </div>
+                )}
+              </div>
+              {kda && (
+                <div className="w-28 shrink-0 text-xs tabular-nums">
+                  <div className="font-semibold">{kda}</div>
+                  <div className="text-[10px] text-ink-3">
+                    KDA {ratio} · {cs} CS{minutes ? ` (${((cs as number) / minutes).toFixed(1)})` : ""}
+                  </div>
+                </div>
+              )}
+              {typeof gold === "number" && <div className="hidden w-11 shrink-0 text-[11px] tabular-nums text-ink-3 sm:block">{k(gold)}</div>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+  return (
+    <div className="mb-3 space-y-3 rounded-xl bg-surface-2/40 p-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
+        <span className="font-semibold text-ink">{m.tournament}</span>
+        <span>{m.date.replace("T", " ").slice(0, 16).split(" ")[0].split("-").reverse().join("/")} {m.date.slice(11, 16)}</span>
+        {minutes && <span>durée {Math.floor(minutes)}:{String(Math.round((minutes % 1) * 60)).padStart(2, "0")}</span>}
+        {stats && (
+          <span className="ml-auto flex items-center gap-3 tabular-nums">
+            <span className="text-base font-bold text-ink">
+              {sumOf(us, 3)} <span className="text-ink-3">–</span> {sumOf(them, 3)}
+            </span>
+            <span style={{ color: goldDiff! >= 0 ? "var(--good-text)" : "var(--critical)" }}>
+              {goldDiff! >= 0 ? "+" : "−"}
+              {k(Math.abs(goldDiff!))} gold
+            </span>
+          </span>
+        )}
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {side(us, false)}
+        {side(them, true)}
+      </div>
+      {!stats && <p className="text-[11px] text-ink-3">K/D/A, CS et dégâts : au prochain export (python run_all.py).</p>}
+    </div>
+  );
+}
 
 function Matches({ matches, names, region }: { matches: TeamMatch[]; names: string[]; region: Region }) {
   const seasons = [...new Set(matches.map((m) => m.season))].sort((a, b) => b - a);
@@ -315,35 +469,7 @@ function Matches({ matches, names, region }: { matches: TeamMatch[]; names: stri
                 </span>
                 <span className="text-right tabular-nums text-xs text-ink-3">{m.duration ? `${Math.floor(m.duration)}:${String(Math.round((m.duration % 1) * 60)).padStart(2, "0")}` : ""}</span>
               </button>
-              {expanded && (
-                <div className="mb-2 grid gap-3 rounded-lg bg-surface-2/60 p-3 text-xs sm:grid-cols-2">
-                  {[us, them].map((side) => (
-                    <div key={side.team}>
-                      <div className="mb-1 flex items-center gap-2 font-semibold">
-                        <Link href={teamLink(region, side.team)} className="hover:underline">
-                          {side.team}
-                        </Link>
-                        <span style={{ color: side.win ? "var(--good-text)" : "var(--critical)" }}>{side.win ? "victoire" : "défaite"}</span>
-                      </div>
-                      <ul className="space-y-0.5">
-                        {side.players.map(([name, id, champ], i) => (
-                          <li key={name + i} className="grid grid-cols-[3.4rem_minmax(0,1fr)_minmax(0,1fr)] gap-2">
-                            <span className="text-ink-3">{ROLES[i] ?? ""}</span>
-                            {id ? (
-                              <Link href={playerLink(region, id)} className="truncate hover:underline">
-                                {short(name)}
-                              </Link>
-                            ) : (
-                              <span className="truncate">{short(name)}</span>
-                            )}
-                            <span className="truncate text-ink-2">{champ}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {expanded && <MatchDetail m={m} us={us} them={them} region={region} />}
             </li>
           );
         })}

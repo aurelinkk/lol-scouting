@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Avatar, PlayerName, TeamLogo } from "@/components/Images";
 import SeasonTabs from "@/components/SeasonTabs";
 import RegionMissing from "@/components/RegionMissing";
-import { getPromotions, hasRegion } from "@/lib/data";
+import { getPromotionModel, getPromotions, hasRegion, type PromotionModel } from "@/lib/data";
 import { playerLink, REGION_INFO, type Region, tierName } from "@/lib/region";
 import { fmtScore, fmtStat, topPercent } from "@/lib/format";
 import type { Promotion, PromotionPlayer } from "@/lib/types";
@@ -122,7 +122,38 @@ export default function MonteesPage({ region }: { region: Region }) {
   );
 }
 
+/** Chance donnée par le modèle de montée : prédiction en cours pour la saison à
+ *  venir, sinon prédiction faite sans avoir vu cette saison (validation) */
+function modelChance(model: PromotionModel | null, region: Region, p: PromotionPlayer): { p: number; rank: number; past: boolean } | null {
+  if (!model || p.new_level !== "LEC" || p.from_season === undefined) return null;
+  const season = p.mid_season ? p.from_season - 1 : p.from_season;
+  if (season === model.season) {
+    const c = model.players[region]?.[p.id];
+    return c ? { p: c.p, rank: c.rank_role, past: false } : null;
+  }
+  const h = model.history?.[region]?.[String(season)]?.[p.id];
+  return h ? { p: h[0], rank: h[1], past: true } : null;
+}
+
+function ChanceChip({ c }: { c: { p: number; rank: number; past: boolean } }) {
+  const pct = Math.round(c.p * 100);
+  return (
+    <span
+      className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums"
+      style={{ background: `color-mix(in srgb, var(--gold) ${Math.min(65, Math.round(c.p * 85) + 10)}%, transparent)`, color: "var(--text)" }}
+      title={
+        c.past
+          ? `Le modèle lui donnait ${pct} % (${c.rank}e chance de son poste), sans avoir vu cette saison`
+          : `Chance donnée par le modèle : ${pct} % (${c.rank}e chance de son poste)`
+      }
+    >
+      {pct < 1 ? "<1" : pct} % <span className="font-normal">· {c.rank === 1 ? "1er" : `${c.rank}e`}</span>
+    </span>
+  );
+}
+
 function PromotionSeason({ promo, region, during = false }: { promo: Promotion; region: Region; during?: boolean }) {
+        const model = getPromotionModel();
         const R = REGION_INFO[region];
         const T = (tier: string) => tierName(tier, region);
         const lec = promo.players.filter((p) => p.new_level === "LEC");
@@ -142,6 +173,7 @@ function PromotionSeason({ promo, region, during = false }: { promo: Promotion; 
                 {top10(lec)} sur {lec.length} étaient dans le top 10 % des {T("ERL1")} de leur poste en {promo.from}
                 {during ? " (score de leur partie de saison en ERL)" : ""}.
                 {region === "eu" && " Équipes invitées (ex : LEC Versus) exclues."}
+                {model && " Pourcentage doré : chance donnée par le modèle de montée et rang de cette chance dans son poste (saisons passées : prédiction faite sans avoir vu la saison)."}
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {lec.map((p) => (
@@ -156,7 +188,11 @@ function PromotionSeason({ promo, region, during = false }: { promo: Promotion; 
                         <span className="truncate text-sm">
                           <PlayerName name={p.name} />
                         </span>
-                        <span className="text-xs text-ink-3">
+                        <span className="flex items-center gap-1 text-xs text-ink-3">
+                          {(() => {
+                            const c = modelChance(model, region, p);
+                            return c ? <ChanceChip c={c} /> : null;
+                          })()}
                           {p.ex_lec && (
                             <span className="mr-1 rounded border border-border px-1" title={`Déjà en ${R.top} : ${p.ex_lec}`}>
                               retour
