@@ -37,6 +37,8 @@ export interface Promoted {
   team: string;
   season: number;
   rumor: boolean;
+  /** Monté en cours de saison puis libéré au mercato : club quitté, et nouvelle piste éventuelle */
+  left?: { team: string; rumor: boolean; to?: string; toRumor?: boolean };
 }
 const PROMO_COLOR = { top: "var(--tier-lec)", second: "var(--tier-em)", move: "var(--text-3)" };
 
@@ -70,6 +72,7 @@ export default function DataExplorer({
   mercatoGenerated,
   mercatoSeason,
   promotionChance = {},
+  stayChance = {},
 }: {
   seasons: number[];
   hasOe: boolean;
@@ -82,6 +85,8 @@ export default function DataExplorer({
   mercatoSeason?: number;
   /** Modèle de montée (saison en cours) : probabilité de jouer en 1re division la saison suivante */
   promotionChance?: Record<string, number>;
+  /** Probabilité de rester en 1re division (joueurs de 1re division cette saison) */
+  stayChance?: Record<string, number>;
 }) {
   const region = useRegion();
   const R = REGION_INFO[region];
@@ -321,6 +326,24 @@ export default function DataExplorer({
             {p.rumor && <span className="text-ink-3">(rumeur)</span>}
           </span>
         )}
+        {p?.left && (
+          <span
+            className="flex items-center gap-1 text-xs text-ink-3"
+            title={`Mercato ${next} : quitte ${p.left.team}${p.left.rumor ? " (rumeur)" : ""}${p.left.to ? `, piste : ${p.left.to}${p.left.toRumor ? " (rumeur)" : ""}` : ""}`}
+          >
+            · quitte {p.left.team}
+            {p.left.rumor && " (rumeur)"}
+            {p.left.to && (
+              <>
+                {" "}→{" "}
+                <Link href={teamLink(region, p.left.to)} onClick={(e) => e.stopPropagation()} className="text-ink-2 hover:underline">
+                  {p.left.to}
+                </Link>
+                {p.left.toRumor && " (rumeur)"}
+              </>
+            )}
+          </span>
+        )}
         {isCurrent && r.current_league && r.current_league !== r.league_code && (
           <span className="text-xs text-ink-3">{r.current_league}</span>
         )}
@@ -431,6 +454,36 @@ export default function DataExplorer({
           );
         },
       });
+    if (isCurrent && Object.keys(stayChance).length)
+      cols.push({
+        id: "stay",
+        header: "Reste",
+        accessorFn: (r) => stayChance[r.id],
+        sortUndefined: "last",
+        sortDescFirst: true,
+        meta: {
+          align: "right",
+          group: "score",
+          title: `Joueurs de 1re division cette saison : probabilité de jouer encore en 1re division en ${season + 1} (${R.top} ou une autre région ; modèle de maintien, voir l'onglet Montées)`,
+        } satisfies Meta,
+        cell: ({ getValue }) => {
+          const v = getValue() as number | undefined;
+          if (v === undefined) return <span className="text-ink-3">–</span>;
+          const pct = Math.round(v * 100);
+          return (
+            <span
+              className="inline-block min-w-10 rounded px-1 text-xs font-semibold tabular-nums"
+              style={{
+                background: `color-mix(in srgb, var(--accent) ${Math.min(45, Math.round(v * 45))}%, transparent)`,
+                color: v >= 0.5 ? "var(--text)" : "var(--text-2)",
+              }}
+              title={v < 0.5 ? "Place en 1re division menacée" : undefined}
+            >
+              {pct < 1 ? "<1" : pct} %
+            </span>
+          );
+        },
+      });
     if (hasTrend)
       cols.push(
         num("trend", "Prog.", { group: "score", title: "Progression : score final de la saison moins celui de la saison précédente" }, (r) =>
@@ -460,7 +513,7 @@ export default function DataExplorer({
     return cols;
     // renderPlayer / renderClub lisent watch, promoOf... : recréées avec eux
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCurrent, season, region, hasContracts, contracts, f.sansniveau, f.lec, hasTrend, R, hasOe, watch.list, promoOf, signedOf, promotionChance]);
+  }, [isCurrent, season, region, hasContracts, contracts, f.sansniveau, f.lec, hasTrend, R, hasOe, watch.list, promoOf, signedOf, promotionChance, stayChance]);
 
   // Colonnes affichées : choix mémorisé dans ce navigateur
   const [visibility, setVisibility] = useState<VisibilityState>({});

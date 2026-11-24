@@ -3,7 +3,7 @@ import DataExplorer from "@/components/data/DataExplorer";
 import RegionMissing from "@/components/RegionMissing";
 import { getMercato, getMeta, getPromotions, hasRegion, getPromotionModel } from "@/lib/data";
 import type { Promoted } from "@/components/data/DataExplorer";
-import { contractsFromMercato, signedFromMercato } from "@/lib/mercato/signed";
+import { contractsFromMercato, departureFromMercato, signedFromMercato } from "@/lib/mercato/signed";
 import { REGION_INFO, type Region } from "@/lib/region";
 
 export const metadata = { title: "Données · LoL Scouting" };
@@ -56,6 +56,21 @@ export default function DonneesPage({ region }: { region: Region }) {
     }
   }
 
+  // Monté en cours de saison puis libéré au mercato (Daglas : TH Academy -> Team
+  // Heretics en avril 2026, quitte TH en novembre) : la montée reste affichée,
+  // avec le départ et la nouvelle piste éventuelle
+  const mercato = getMercato(region);
+  const signed = signedFromMercato(mercato?.teams ?? [], region);
+  for (const [key, p] of Object.entries(promoted)) {
+    const id = key.split(":")[1];
+    if (!mercatoSeason || p.season !== mercatoSeason - 1 || !key.startsWith(`${mercatoSeason - 1}:`)) continue;
+    const dep = departureFromMercato(mercato, id);
+    if (!dep || dep.tier !== "LEC") continue;
+    const sg = signed[id];
+    const to = sg && !sg.stays && sg.team !== dep.team ? sg : undefined;
+    promoted[key] = { ...p, left: { team: dep.team, rumor: !dep.official, to: to?.team, toRumor: to ? !to.official : undefined } };
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -75,6 +90,9 @@ export default function DonneesPage({ region }: { region: Region }) {
           mercatoSeason={mercatoSeason}
           promotionChance={Object.fromEntries(
             Object.entries(getPromotionModel()?.players[region] ?? {}).map(([id, v]) => [id, v.p]),
+          )}
+          stayChance={Object.fromEntries(
+            Object.entries(getPromotionModel()?.stay?.players[region] ?? {}).map(([id, v]) => [id, v.p]),
           )}
         />
       </Suspense>

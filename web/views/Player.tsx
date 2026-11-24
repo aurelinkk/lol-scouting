@@ -8,7 +8,8 @@ import { link, REGION_INFO, type Region, REGIONS, teamLink, tierName } from "@/l
 import { hasTeam } from "@/views/Team";
 import DeepButton from "@/components/DeepButton";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
-import { getMeta, getPlayer, getPromotionModel, getRankings, hasRegion } from "@/lib/data";
+import { getMercato, getMeta, getPlayer, getPromotionModel, getRankings, hasRegion } from "@/lib/data";
+import { departureFromMercato, signedFromMercato } from "@/lib/mercato/signed";
 import { fmtScore, topPercent } from "@/lib/format";
 import { similarPlayers } from "@/lib/similar";
 import { similarTrajectories } from "@/lib/trajectory";
@@ -320,6 +321,72 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                   l&apos;équipe, via un tournoi de promotion.
                 </p>
               </div>
+            </div>
+          </Section>
+        );
+      })()}
+
+      {(() => {
+        const stay = getPromotionModel()?.stay;
+        const c = stay?.players[region]?.[id];
+        if (!stay || !c) return null;
+        const pctv = Math.round(c.p * 100);
+        // Situation au mercato : reste, nouveau club, ou départ sans piste
+        const mercato = getMercato(region);
+        const sg = signedFromMercato(mercato?.teams ?? [], region)[id];
+        const leaving = departureFromMercato(mercato, id);
+        const rate = stay.rates[region];
+        return (
+          <Section title={`Chance de rester en 1re division en ${stay.target}`}>
+            <div className="flex flex-wrap items-start gap-5">
+              <div>
+                <div className="text-4xl font-bold tabular-nums" style={{ color: c.p >= 0.5 ? "var(--accent)" : "var(--critical)" }}>
+                  {c.p < 0.01 ? "<1" : pctv} %
+                </div>
+                <div className="text-xs text-ink-3">
+                  {c.games} parties de {R.top} en {stay.season} avec {c.team}
+                  {c.mid_season ? " · monté en cours de saison" : ""}
+                </div>
+                {sg ? (
+                  <div className="mt-1 text-xs font-semibold" style={{ color: sg.official ? "var(--good-text)" : "var(--gold)" }}>
+                    {sg.stays ? `✓ reste à ${sg.team}` : `→ ${sg.team}`}
+                    {sg.kind === "rumor" ? " (rumeur)" : sg.kind === "contract" ? " (sous contrat)" : ""}
+                    {sg.tier && sg.tier !== "LEC" ? ` · ${tierName(sg.tier, region)}` : ""}
+                  </div>
+                ) : leaving ? (
+                  <div className="mt-1 text-xs font-semibold" style={{ color: "var(--critical)" }}>
+                    Quitte {leaving.team}
+                    {leaving.official ? "" : " (rumeur)"} · pas encore de nouveau club connu
+                  </div>
+                ) : null}
+              </div>
+              <div className="min-w-60 flex-1">
+                <div className="mb-1 text-[11px] uppercase tracking-wide text-ink-3">Ce qui pèse le plus</div>
+                <ul className="space-y-0.5 text-sm">
+                  {c.factors.map(([name, v]) => (
+                    <li key={name} className="flex items-center gap-2">
+                      <span style={{ color: v >= 0 ? "var(--good-text)" : "var(--critical)" }}>{v >= 0 ? "▲" : "▼"}</span>
+                      <span>{name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="w-full text-xs text-ink-3">
+                Probabilité de jouer encore au moins quelques parties en 1re division ({R.top} ou une autre région) la saison
+                prochaine.{" "}
+                {rate
+                  ? `En ${R.short}, ${Math.round(rate.rate * 100)} % des joueurs de ${R.top} y sont encore l'année suivante${
+                      rate.mid_season !== null ? ` (${Math.round(rate.mid_season * 100)} % pour les montés en cours de saison)` : ""
+                    }. `
+                  : ""}
+                {stay.model} appris sur les saisons {stay.trained_on.join(", ")} des six régions (place de titulaire, résultats de
+                l&apos;équipe, score en 1re division, expérience, âge, montée en cours de saison, import) ; fiabilité dans
+                l&apos;onglet{" "}
+                <Link href={link(region, "/montees")} className="text-accent hover:underline">
+                  Montées
+                </Link>
+                .
+              </p>
             </div>
           </Section>
         );

@@ -104,6 +104,33 @@ export interface PromotionModel {
   players: Partial<Record<Region, Record<string, PromotionChance>>>;
   /** Modèle 3e -> 2e division (même format) */
   tier2?: PromotionModel;
+  /** Maintien : joueurs de 1re division encore en 1re division la saison suivante */
+  stay?: StayModel;
+}
+export interface StayMetrics { n: number; stayed: number; auc: number; logloss: number; brier: number }
+export interface StayModel {
+  season: number;
+  target: number;
+  trained_on: number[];
+  validated_on: number[];
+  model: string;
+  lambda: number;
+  with_stats: boolean;
+  old_weight: number;
+  validation: StayMetrics;
+  forward: StayMetrics;
+  baseline: StayMetrics;
+  /** Taux de maintien réel par région (saisons validées), et pour les montés en cours de saison */
+  rates: Partial<Record<Region, { n: number; rate: number; mid_season: number | null }>>;
+  coefficients: [string, number][];
+  players: Partial<Record<Region, Record<string, StayChance>>>;
+}
+export interface StayChance {
+  p: number;
+  team: string;
+  games: number;
+  mid_season: boolean;
+  factors: [string, number][];
 }
 export interface PromotionChance {
   p: number;

@@ -30,7 +30,7 @@ COMMANDS = {
     "niveau-ligues": ("scouting.analysis.league_talent", "Niveau des ligues saison par saison (joueurs passés, montés)"),
     "montees": ("scouting.analysis.promotions", "Qui est monté d'une saison à l'autre (--from 2025 --to 2026)"),
     "score-mondial": ("scouting.analysis.world_score", "Force des régions (Bradley-Terry sur l'international, --check)"),
-    "modele": ("scouting.model.promotion_model", "Modèle de montée en 1re et 2e division (--verbose)"),
+    "modele": ("scouting.model.promotion_model", "Modèles de montée (1re et 2e division) et de maintien en 1re division (--verbose)"),
     # Site
     "export": ("scouting.export.site", "Données du site pour une région (--only mercato|equipes)"),
     "reglages": ("scouting.export.settings", "Réglages du score pour la page Technique"),

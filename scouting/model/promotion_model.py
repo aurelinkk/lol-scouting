@@ -17,7 +17,7 @@ d'arbres, effets non linéaires ; si installé : pip install lightgbm). Variable
 Validation honnête : chaque saison est prédite par un modèle qui ne l'a pas
 vue (et la plus récente par un modèle appris seulement sur le passé).
 
-Écrit web/data/promotion_model.json. Usage : python scout.py modele [--verbose]
+Écrit web/data/promotion_model.json (avec le modèle de maintien en 1re division, stay_model.py). Usage : python scout.py modele [--verbose]
 """
 import argparse
 import json
@@ -774,6 +774,12 @@ def main(verbose=False):
         data["tier2"] = build(verbose, "tier2")
     except Exception as e:
         print(f"  (modèle 3e -> 2e division non calculé : {e})")
+    # Maintien en 1re division (joueurs déjà en haut : agents libres, remplaçants, montés en cours de saison)
+    try:
+        from scouting.model import stay_model
+        data["stay"] = stay_model.build(verbose)
+    except Exception as e:
+        print(f"  (modèle de maintien non calculé : {e})")
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"  -> {OUT}")

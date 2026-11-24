@@ -1,5 +1,6 @@
 import PromotionModelView from "@/components/PromotionModelView";
 import Tier2ModelView from "@/components/Tier2ModelView";
+import StayModelView from "@/components/StayModelView";
 import Link from "next/link";
 import { Avatar, PlayerName, TeamLogo } from "@/components/Images";
 import SeasonTabs from "@/components/SeasonTabs";
@@ -97,6 +98,7 @@ export default function MonteesPage({ region }: { region: Region }) {
 
       <PromotionModelView region={region} />
       <Tier2ModelView region={region} />
+      <StayModelView region={region} />
 
       <SeasonTabs
         items={promotions.flatMap((promo) => {

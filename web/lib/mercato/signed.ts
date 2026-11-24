@@ -50,6 +50,26 @@ export function signedFromMercato(teams: MercatoTeam[], region: Region): Record<
   return out;
 }
 
+/** Départ d'un joueur de son club au mercato (remplacé, libéré, retraite), officiel ou rumeur.
+ *  Officiel si la case le dit ou si le fil des nouveautés l'a annoncé (« Daglas quitte Team Heretics »). */
+export function departureFromMercato(
+  mercato: { teams: MercatoTeam[]; news?: { team: string; text: string; official: boolean }[] } | null,
+  id: string,
+): { team: string; tier?: string; official: boolean } | undefined {
+  for (const t of mercato?.teams ?? []) {
+    for (const s of t.slots) {
+      const b = s.before;
+      if (!b?.id || b.region || b.id !== id || s.after?.id === id) continue;
+      if (!s.after && !["out", "rumor_out", "fa", "retired"].includes(s.left ?? "")) continue;
+      const official =
+        s.left === "out" || s.left === "fa" || s.left === "retired" || s.status.includes("confirmé") ||
+        (mercato?.news ?? []).some((n) => n.official && n.team === t.team && n.text === `${b.name} quitte ${t.team}`);
+      return { team: t.team, tier: t.tier, official };
+    }
+  }
+  return undefined;
+}
+
 /** Fin de contrat (GCD) de chaque joueur avec son club de la saison passée */
 export interface ContractEnd {
   team: string;
