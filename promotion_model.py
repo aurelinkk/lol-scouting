@@ -57,6 +57,33 @@ LCP = {"Taiwan", "Hong Kong", "Macau", "Vietnam", "Japan", "Australia", "New Zea
 HOME = {"eu": "EMEA", "na": "AMER", "kr": "KR", "cn": "LPL", "lcp": "LCP", "br": "AMER"}
 
 
+_RES_LP = None
+
+
+def resident(name, country, region):
+    """Résident de la 1re division de `region` ? Résidence officielle Leaguepedia et
+    double nationalité (web/data/residency_lp.json, python residency.py) si connues,
+    sinon d'après la nationalité (règles LCS / CBLOL : un Brésilien est un import en
+    LCS, un Nord-Américain un import au CBLOL). Nationalité inconnue : résident."""
+    global _RES_LP
+    if _RES_LP is None:
+        path = "web/data/residency_lp.json"
+        _RES_LP = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+    lp = _RES_LP.get(name) or _RES_LP.get(str(name).split(" (")[0])
+    if lp:
+        return region in lp.split("+")
+    o = origin(country)
+    if o is None:
+        return True
+    if o != HOME[region]:
+        return False
+    if region == "na":
+        return country != "Brazil"
+    if region == "br":
+        return country not in ("United States", "Canada")
+    return True
+
+
 def origin(country):
     if not isinstance(country, str) or not country:
         return None
@@ -228,8 +255,7 @@ def features(d, with_stats=True):
     X["Ancien de 1re division"] = d["ex_lec"].notna().astype(float)
     X["EMEA Masters / international"] = ((d["em_games"].fillna(0) > 0) | (d["intl_games"].fillna(0) > 0)).astype(float)
     X["Win rate"] = zscore(d, "winrate", grp)
-    orig = d["country"].map(origin)
-    X["Import"] = [float(o is not None and o != HOME[r]) for o, r in zip(orig, d["region"])]
+    X["Import"] = [float(not resident(n, c, r)) for n, c, r in zip(d["name"], d["country"], d["region"])]
     # Académie : seulement en Corée et en Chine, où elle mène vraiment à l'équipe
     # mère (en Europe, les joueurs de KC Blue montent souvent, mais ailleurs qu'à KC)
     X["Académie d'un club de 1re division"] = (d["academy"] & d["region"].isin(["kr", "cn"])).astype(float)

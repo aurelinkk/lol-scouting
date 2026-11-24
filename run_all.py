@@ -112,6 +112,9 @@ def main():
     if "eu" in args.regions and not args.skip_soloq:
         status["soloQ EUW"] = run([py, "soloq.py", "snapshot"], "eu")
 
+    # 4 bis. Résidence officielle et double nationalité des joueurs (places d'import, modèle)
+    status["résidence"] = run([py, "residency.py"])
+
     # 5. Export du site
     for region in args.regions:
         status[f"export {region}"] = run([py, "export_web.py"], region)

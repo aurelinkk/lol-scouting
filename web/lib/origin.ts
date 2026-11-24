@@ -1,4 +1,5 @@
 import residency from "@/data/residency.json";
+import residencyLp from "@/data/residency_lp.json";
 import type { Region } from "@/lib/region";
 
 /**
@@ -58,8 +59,16 @@ export const HOME_ORIGIN: Record<Region, Origin> = { eu: "EMEA", na: "AMER", kr:
  */
 const NORTH_AMERICA = new Set(["United States", "Canada"]);
 
+// Résidence officielle Leaguepedia et double nationalité (python residency.py) :
+// seulement les joueurs dont la résidence ne se déduit pas de la nationalité.
+// Ex : CoreJJ "na" (coréen résident en Amérique du Nord), Busio "eu+na"
+// (américain et polonais : résident en LEC comme en LCS)
+const RESIDENCY_LP = residencyLp as Record<string, string>;
+
 export function isResident(country: string | null | undefined, name: string | undefined, region: Region): boolean {
   const forced = name ? RESIDENCY[name] ?? RESIDENCY[name.replace(/\s*\(.*\)$/, "")] : undefined;
+  const lp = name && !forced ? RESIDENCY_LP[name] ?? RESIDENCY_LP[name.replace(/\s*\(.*\)$/, "")] : undefined;
+  if (lp) return lp.split("+").includes(region);
   const origin = originOf(country, name);
   if (!origin) return true;
   if (origin !== HOME_ORIGIN[region]) return false;
