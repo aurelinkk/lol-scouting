@@ -6,7 +6,7 @@ import { ageFrom, withCurrentAge } from "./age";
 import type { League, Meta, Player, Promotion, RankingRow } from "./types";
 import type { TeamMatch, TeamResult } from "@/components/TeamHistory";
 
-// Fichiers générés par `python export_web.py` à la racine du dépôt
+// Fichiers générés par `python scout.py export` à la racine du dépôt
 const cache = new Map<string, unknown>();
 
 function read<T>(...parts: string[]): T {
@@ -19,7 +19,7 @@ function read<T>(...parts: string[]): T {
 const dir = (region: Region) => (region === "eu" ? ["data"] : ["data", region]);
 const pub = (region: Region) => (region === "eu" ? ["public", "data"] : ["public", "data", region]);
 
-/** La région a-t-elle été exportée ? (SCOUT_REGION=na python export_web.py) */
+/** La région a-t-elle été exportée ? (python scout.py export --region na) */
 export const hasRegion = (region: Region) =>
   fs.existsSync(path.join(process.cwd(), ...dir(region), "meta.json"));
 
@@ -80,7 +80,7 @@ export const getTeamMatches = (region: Region = "eu"): TeamMatch[] | null => {
   return fs.existsSync(file) ? read<TeamMatch[]>(...dir(region), "matches.json") : null;
 };
 
-/** Modèle de montée (python promotion_model.py), toutes régions */
+/** Modèle de montée (python scout.py modele), toutes régions */
 export interface PromotionModel {
   generated: string;
   season: number;

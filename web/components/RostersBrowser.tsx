@@ -133,7 +133,7 @@ export default function RostersBrowser() {
     }
   }, [tournaments, tournament]);
 
-  if (error) return <p className="text-sm text-ink-2">Pas encore de rosters : relance <code>python export_web.py</code>.</p>;
+  if (error) return <p className="text-sm text-ink-2">Pas encore de rosters : relance <code>python scout.py export</code>.</p>;
   if (!events || season === null) return <p className="text-sm text-ink-3">Chargement…</p>;
 
   const current = tournaments.find((t) => t.tournament === tournament);

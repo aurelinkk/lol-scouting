@@ -45,7 +45,7 @@ const world = readJson(path.join(root, "data", "world.json"));
 if (world) {
   const last = Math.max(...Object.keys(world.seasons).map(Number));
   const missing = REGIONS.filter((r) => !world.seasons[last]?.[r]);
-  if (missing.length) warnings.push(`score mondial ${last} : pas de décalage pour ${missing.join(", ")} (python world_scale.py)`);
+  if (missing.length) warnings.push(`score mondial ${last} : pas de décalage pour ${missing.join(", ")} (python scout.py score-mondial)`);
 }
 
 for (const w of warnings) console.log(`::warning::${w}`);

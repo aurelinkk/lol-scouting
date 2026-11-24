@@ -70,7 +70,7 @@ function KV({ items }: { items: [string, React.ReactNode, string?][] }) {
 
 // ---------------------------------------------------------------------------
 function ScoreTab({ c }: { c: ScoringConfig | null }) {
-  if (!c) return <p className="text-sm text-ink-3">Réglages pas encore exportés (python export_config.py).</p>;
+  if (!c) return <p className="text-sm text-ink-3">Réglages pas encore exportés (python scout.py reglages).</p>;
   const stats = [...new Set(ROLES.flatMap((r) => Object.keys(c.ROLE_WEIGHTS[r] ?? {})))] as StatKey[];
   return (
     <div className="space-y-6">
@@ -94,7 +94,7 @@ function ScoreTab({ c }: { c: ScoringConfig | null }) {
         </p>
       </Block>
 
-      <Block title="Coefficient de ligue (league_strength.py, league_talent.py)">
+      <Block title="Coefficient de ligue (analysis/league_strength.py, league_talent.py)">
         <F>{`Europe : coef = placement moyen à l'EMEA Masters sur 2 ans (1 = vainqueur), tiré vers 0.5
          avec ${c.SHRINK_APPEARANCES} participations fictives ; ERL2 = ERL1 du pays − ${c.ERL2_DISCOUNT}
          + niveau des joueurs (anciens de LEC, montés, victoires contre l'ERL1)
@@ -150,7 +150,7 @@ Autres régions : coef 2e div. = win rate aux tournois Asia Masters / ASCI / WSC
 // ---------------------------------------------------------------------------
 function ModelTab() {
   const m = getPromotionModel();
-  if (!m) return <p className="text-sm text-ink-3">Modèle pas encore entraîné (python promotion_model.py).</p>;
+  if (!m) return <p className="text-sm text-ink-3">Modèle pas encore entraîné (python scout.py modele).</p>;
   const pct = (x: number) => `${Math.round(x * 100)} %`;
   const rows: [string, typeof m.validation | undefined][] = [
     ["Score seul (référence)", m.baseline],
@@ -250,7 +250,7 @@ function WorldTab() {
   const cur = WORLD.seasons[String(last)];
   return (
     <div className="space-y-6">
-      <Block title="Force des régions : Bradley-Terry (world_scale.py)">
+      <Block title="Force des régions : Bradley-Terry (analysis/world_score.py)">
         <F>{`P(région A bat région B) = σ(θ_A − θ_B)
 θ = argmax Σ_parties ω · log P(résultat) − ‖θ‖² / (2·1²)       a priori N(0, 1), Newton
 ω = 1 (saison), 0.5 (saison −1), 0.25 (saison −2)        ${WORLD.games} parties entre régions`}</F>
@@ -310,7 +310,7 @@ function StatsTab() {
       <p className="text-sm text-ink-2">
         Moyennes par joueur sur la saison (ou le split), pondérées par partie. Les percentiles des fiches comparent chaque valeur aux
         joueurs du même poste dans la même ligue (au moins 10 parties). Oracle&apos;s Elixir est rattaché partie par partie
-        (oracles.py) ; une stat absente pour une ligue n&apos;entre pas dans le score.
+        (sources/oracles_elixir.py) ; une stat absente pour une ligue n&apos;entre pas dans le score.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[620px] text-sm">
@@ -340,19 +340,18 @@ function StatsTab() {
 
 // ---------------------------------------------------------------------------
 const PIPELINE: [string, string][] = [
-  ["fetch_pro.py · leaguepedia.py", "Parties pro par saison et ligue via l'API Cargo de Leaguepedia (ScoreboardGames / ScoreboardPlayers), cache CSV"],
-  ["oracles.py", "Fusion des CSV Oracle's Elixir (stats @15, first blood, wards) partie par partie"],
-  ["intl.py", "Worlds, MSI, EWC, First Stand : parties internationales communes aux 6 régions"],
-  ["league_strength.py · league_talent.py", "Coefficient de chaque ligue (EMEA Masters, tournois de 2e division, niveau des joueurs)"],
-  ["prospects.py · scoring.py", "Score de prospect (z-scores pondérés, bonus, forme), réglages centralisés"],
-  ["promotions.py · careers.py", "Montées d'une saison à l'autre, périodes en club, titres et récompenses"],
-  ["mercato.py · sheep.py", "Mercato : rumeurs / transferts Leaguepedia, contrats (GCD), coachs, scoops Sheep Esports (Google News RSS)"],
-  ["team_history.py", "Classements par tournoi (TournamentResults) et parties avec picks pour les pages équipe"],
-  ["world_scale.py", "Score mondial (Bradley-Terry sur l'international)"],
-  ["promotion_model.py", "Modèle de montée (logistique numpy + LightGBM)"],
-  ["soloq.py · riot_api.py", "Ladder EUW et profils soloQ (API Riot)"],
-  ["export_web.py · export_config.py", "Export JSON du site (web/data : serveur ; web/public/data : navigateur)"],
-  ["run_all.py", "Tout enchaîner : git pull, téléchargements, exports, modèles, commit, push"],
+  ["scout.py · run_all.py", "Point d'entrée de toutes les commandes (python scout.py) ; run_all enchaîne git pull, téléchargements, exports, modèles, commit, push"],
+  ["config/ (regions · leagues · scoring)", "Régions suivies, ligues par saison avec leur niveau (1re / 2e / 3e division), tous les poids du score"],
+  ["sources/ (leaguepedia · riot_api · oracles_elixir · sheep_esports · images)", "Clients des sources : API Cargo de Leaguepedia, API Riot, CSV Oracle's Elixir (stats @15), scoops Sheep Esports (Google News RSS), photos et logos"],
+  ["collect/pro_games · international", "Parties pro par saison et ligue (ScoreboardGames / ScoreboardPlayers) ; Worlds, MSI, EWC, First Stand communs aux 6 régions"],
+  ["collect/careers · residency · team_history · soloq", "Périodes en club, titres, récompenses ; résidence officielle et double nationalité ; résultats et matchs des équipes ; ladder EUW et profils soloQ"],
+  ["analysis/league_strength · league_talent", "Coefficient de chaque ligue (EMEA Masters, tournois de 2e division, niveau des joueurs)"],
+  ["analysis/prospects · promotions", "Score de prospect (z-scores pondérés, bonus, forme) ; montées d'une saison à l'autre"],
+  ["analysis/world_score", "Score mondial (Bradley-Terry sur l'international)"],
+  ["model/promotion_model", "Modèle de montée (logistique numpy + LightGBM), 1re et 2e division"],
+  ["mercato/ (mercato · rosters)", "Rosters et mercato : rumeurs / transferts Leaguepedia, contrats (GCD), coachs, scoops Sheep"],
+  ["export/ (site · settings)", "Export JSON du site (web/data : serveur ; web/public/data : navigateur), réglages pour cette page"],
+  ["corrections/", "Corrections à la main versionnées : dates de naissance, postes du mercato, équipes renommées, comptes soloQ, homonymes"],
 ];
 const WEB: [string, string][] = [
   ["Next.js 15 (App Router)", "≈ 10 000 pages générées au build (SSG) ; fiches PDF et pages rares générées à la première visite puis en cache (ISR)"],
@@ -372,12 +371,12 @@ function StackTab() {
     <div className="space-y-6">
       <Block title="Flux de données">
         <F>{`Leaguepedia (Cargo) ─┐
-Oracle's Elixir (CSV)─┼─► data/<région>/*.csv ─► prospects / modèles ─► export_web ─► web/data (JSON)
+Oracle's Elixir (CSV)─┼─► data/<région>/*.csv ─► analysis / model ─► export ─► web/data (JSON)
 API Riot (soloQ) ─────┤                                                              │
 Google News (Sheep) ──┘                                     git push ─► Vercel (build Next.js) ─► site
                                           Upstash Redis ◄─► /api/mercato (mises à jour entre deux exports)`}</F>
       </Block>
-      <Block title="Pipeline Python (PC : python run_all.py)">
+      <Block title="Pipeline Python, dossier scouting/ (PC : python run_all.py)">
         <KV items={PIPELINE.map(([k, v]) => [k, <span key={k} className="font-sans text-xs text-ink-2">{v}</span>])} />
       </Block>
       <Block title="Site (dossier web/)">

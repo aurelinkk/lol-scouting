@@ -326,7 +326,7 @@ export default function Dashboard({ region }: { region: Region }) {
             Tout le classement <ArrowRightIcon className="size-3.5" />
           </Link>
         }
-        subtitle={`Hors joueurs déjà passés par la ${R.top}, au moins ${MIN_GAMES} parties. « âge ? » = date de naissance inconnue (à compléter dans birthdates.csv). Score = ${R.hasEm ? "perf. dans sa ligue + niveau de la ligue + EMEA Masters" : "perf. dans la NACL comparée aux joueurs du même poste"}.`}
+        subtitle={`Hors joueurs déjà passés par la ${R.top}, au moins ${MIN_GAMES} parties. « âge ? » = date de naissance inconnue (à compléter dans corrections/birthdates.csv). Score = ${R.hasEm ? "perf. dans sa ligue + niveau de la ligue + EMEA Masters" : "perf. dans la NACL comparée aux joueurs du même poste"}.`}
       >
         <div className="grid gap-4 md:grid-cols-5">
           {ROLES.map((role) => (

@@ -644,8 +644,7 @@ export default function TeamHistory({
 function NotExported() {
   return (
     <p className="rounded-lg border border-dashed border-border p-4 text-sm text-ink-3">
-      Pas encore exporté pour cette région : lancer <code>python run_all.py</code> (ou <code>python team_history.py</code> avec
-      SCOUT_REGION) sur le PC.
+      Pas encore exporté pour cette région : lancer <code>python run_all.py</code> (ou <code>python scout.py equipes --region …</code>) sur le PC.
     </p>
   );
 }

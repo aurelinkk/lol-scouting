@@ -4,7 +4,7 @@ import { WORLD, winProbability } from "@/lib/world";
 const pct = (x: number) => `${Math.round(100 * x)} %`;
 const sign = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}`;
 
-/** Niveau des régions d'après l'international (python world_scale.py) */
+/** Niveau des régions d'après l'international (python scout.py score-mondial) */
 export default function WorldStrength({ compact = false }: { compact?: boolean }) {
   const seasons = Object.keys(WORLD.seasons).map(Number).sort();
   const last = seasons.at(-1);

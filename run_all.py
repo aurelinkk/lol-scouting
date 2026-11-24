@@ -5,26 +5,33 @@
     python run_all.py --full           # retélécharge aussi la saison en cours
     python run_all.py --no-push        # sans envoyer sur GitHub
     python run_all.py --mercato        # seulement le mercato (rumeurs Sheep, X, transferts) : 2 min
+    (ou python scout.py tout [options] ; chaque étape seule : python scout.py)
 
 Étapes (chacune est sautée proprement si elle échoue, le résumé le dit) :
-  1. git pull (arrêt si ça échoue : rien n'est lancé sur un vieux code)
+  1. git pull (arrêt si ça échoue : rien n'est lancé sur un vieux code ; si run_all.py
+     a changé, la nouvelle version reprend la main)
   2. matchs pros de chaque région : saisons manquantes (+ saison en cours si --full)
   3. tournois internationaux (Worlds, MSI, EWC, First Stand)
   4. relevé du ladder soloQ EUW (si RIOT_API_KEY dans .env)
-  5. export du site pour chaque région (classements, fiches, montées, mercato...)
-  6. bonus de 1re division conseillé pour chaque région (informatif, dans le journal)
-  7. git add / commit / push des données du site
+  5. résidence officielle des joueurs, puis export du site pour chaque région
+  6. score mondial, modèle de montée, réglages pour la page Technique
+  7. bonus de 1re division conseillé pour chaque région (informatif, dans le journal)
+  8. git add / commit / push des données du site
 
 Journal complet : run_all.log
 """
 import argparse
 import datetime
+import hashlib
 import os
 import subprocess
 import sys
 
+ROOT = os.path.dirname(os.path.abspath(__file__))
+os.chdir(ROOT)
+sys.path.insert(0, ROOT)
 LOG = "run_all.log"
-from region import ALL_REGIONS, data_dir  # noqa: E402
+from scouting.config.regions import ALL_REGIONS, data_dir  # noqa: E402
 
 ALL = list(ALL_REGIONS)
 
@@ -60,6 +67,16 @@ def run(cmd, region=None, check=False):
     return ok
 
 
+def scout(*args):
+    """Commande du pipeline (voir python scout.py)."""
+    return [sys.executable, "scout.py", *args]
+
+
+def file_hash(path):
+    with open(path, "rb") as f:
+        return hashlib.sha1(f.read()).hexdigest()
+
+
 def seasons(region):
     out = subprocess.run([sys.executable, "-c", "from leagues import LEAGUES; print(*sorted(LEAGUES))"],
                          env=dict(os.environ, SCOUT_REGION=region), capture_output=True, text=True)
@@ -70,25 +87,32 @@ def data_file(region, season):
     return f"{data_dir(region)}/pro_games_{season}.csv"
 
 
-def main():
-    parser = argparse.ArgumentParser()
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="run_all.py", description="Tout mettre à jour (voir le début du fichier)")
     parser.add_argument("--regions", nargs="+", default=ALL, choices=ALL)
     parser.add_argument("--full", action="store_true", help="retélécharger aussi la saison en cours")
     parser.add_argument("--no-push", action="store_true")
     parser.add_argument("--skip-soloq", action="store_true")
     parser.add_argument("--mercato", action="store_true",
                         help="seulement le mercato des régions (rumeurs, transferts, contrats)")
-    args = parser.parse_args()
-    py = sys.executable
+    parser.add_argument("--no-pull", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
     status = {}
     log(f"===== Mise à jour complète : {', '.join(args.regions)} =====")
 
-    # 1. Code à jour (sinon on calcule avec une vieille version)
-    run(["git", "pull", "--no-rebase"], check=True)
+    # 1. Code à jour (sinon on calcule avec une vieille version). Si run_all.py
+    # lui-même a changé, on relance la nouvelle version (celle en mémoire est périmée).
+    if not args.no_pull:
+        before = file_hash(__file__)
+        run(["git", "pull", "--no-rebase"], check=True)
+        if file_hash(__file__) != before:
+            log("run_all.py mis à jour : relance avec la nouvelle version")
+            again = sys.argv[1:] if argv is None else argv
+            raise SystemExit(subprocess.call([sys.executable, __file__, *again, "--no-pull"]))
 
     if args.mercato:
         for region in args.regions:
-            status[f"mercato {region}"] = run([py, "export_web.py", "--only", "mercato"], region)
+            status[f"mercato {region}"] = run(scout("export", "--only", "mercato"), region)
         push(args, status)
         summary(status)
         return
@@ -101,33 +125,33 @@ def main():
             current = season == max(all_seasons)
             if os.path.exists(data_file(region, season)) and not (args.full and current):
                 continue
-            cmd = [py, "fetch_pro.py", "--year", str(season)] + (["--refresh"] if args.full and current else [])
+            cmd = scout("matchs", "--year", str(season)) + (["--refresh"] if args.full and current else [])
             ok &= run(cmd, region)
         status[f"matchs {region}"] = ok
 
     # 3. Internationaux (communs à toutes les régions)
-    status["internationaux"] = run([py, "intl.py"])
+    status["internationaux"] = run(scout("international"))
 
     # 4. Ladder soloQ EUW
     if "eu" in args.regions and not args.skip_soloq:
-        status["soloQ EUW"] = run([py, "soloq.py", "snapshot"], "eu")
+        status["soloQ EUW"] = run(scout("soloq", "snapshot"), "eu")
 
     # 4 bis. Résidence officielle et double nationalité des joueurs (places d'import, modèle)
-    status["résidence"] = run([py, "residency.py"])
+    status["résidence"] = run(scout("residence"))
 
     # 5. Export du site
     for region in args.regions:
-        status[f"export {region}"] = run([py, "export_web.py"], region)
+        status[f"export {region}"] = run(scout("export"), region)
 
     # 5 bis. Score mondial (toutes les régions exportées sur l'échelle LEC)
-    status["score mondial"] = run([py, "world_scale.py", "--check"])
+    status["score mondial"] = run(scout("score-mondial", "--check"))
     # Modèle de montée (appris sur les montées des saisons passées, toutes régions)
-    status["modèle de montée"] = run([py, "promotion_model.py"])
-    run([py, "export_config.py"])  # réglages du score pour la page Technique
+    status["modèle de montée"] = run(scout("modele"))
+    run(scout("reglages"))  # réglages du score pour la page Technique
 
     # 6. Calibrage (informatif)
     for region in args.regions:
-        run([py, "prospects.py", "--calibrate-top"], region)
+        run(scout("classement", "--calibrate-top"), region)
 
     # 7. Envoi
     push(args, status)

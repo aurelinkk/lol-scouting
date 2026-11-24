@@ -59,7 +59,7 @@ export const HOME_ORIGIN: Record<Region, Origin> = { eu: "EMEA", na: "AMER", kr:
  */
 const NORTH_AMERICA = new Set(["United States", "Canada"]);
 
-// Résidence officielle Leaguepedia et double nationalité (python residency.py) :
+// Résidence officielle Leaguepedia et double nationalité (python scout.py residence) :
 // seulement les joueurs dont la résidence ne se déduit pas de la nationalité.
 // Ex : CoreJJ "na" (coréen résident en Amérique du Nord), Busio "eu+na"
 // (américain et polonais : résident en LEC comme en LCS)

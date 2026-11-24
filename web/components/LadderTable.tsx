@@ -92,7 +92,7 @@ export default function LadderTable() {
   if (error)
     return (
       <p className="text-sm text-ink-2">
-        Pas encore de relevé soloQ. Lance <code>python soloq.py snapshot</code> puis <code>python export_web.py</code>.
+        Pas encore de relevé soloQ. Lance <code>python scout.py soloq snapshot</code> puis <code>python scout.py export</code>.
       </p>
     );
   if (!data) return <p className="text-sm text-ink-3">Chargement…</p>;

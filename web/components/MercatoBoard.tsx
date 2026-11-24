@@ -544,7 +544,7 @@ export default function MercatoBoard({
             ))}
             <p className="mt-2 text-[11px] leading-snug text-ink-3">
               ↗ ouvre l&apos;article ou le post (Sheep Esports, X, annonce officielle). Contrats : base GCD de Riot via
-              Leaguepedia. Corrections : <code>rosters_{season}.csv</code>.
+              Leaguepedia. Corrections : <code>corrections/rosters_{season}.csv</code>.
             </p>
           </div>
           {undecided.length > 0 && (

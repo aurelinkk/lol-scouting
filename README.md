@@ -1,128 +1,260 @@
 # LoL Scouting
 
-Outil privé de scouting League of Legends : repérer les **prospects européens**
-(ERL1, ERL2, EMEA Masters, soloQ) **avant** qu'ils montent en LEC, en croisant
-les matchs pros de 2023 à aujourd'hui, la soloQ EUW et le mercato.
+Outil privé de scouting League of Legends. Il repère les prospects de 2e et 3e
+division **avant** leur montée en 1re division, dans 6 régions. Il croise :
 
-## Ce que fait le site
+- les matchs pros de 2020 à aujourd'hui ;
+- les stats à 15 min d'Oracle's Elixir ;
+- la soloQ EUW ;
+- le mercato en direct ;
+- un modèle de montée appris sur les montées passées.
 
-| Onglet | À quoi ça sert |
-|---|---|
-| **Indicateurs** | Meilleurs prospects par poste (21 ans ou moins), niveau des ligues, taux de montée selon le rang |
-| **Données** | Classement complet filtrable (saison, poste, ligue, âge, club actuel…), avec ou sans le niveau de ligue |
-| **Fiche joueur** | Photo, club, âge, carrière en frise (LEC / ERL1 / ERL2 / autres régions), titres, récompenses, chaque stat vs son poste, détail du score, évolution par tournoi |
-| **Ligues** | Niveau de chaque ligue saison par saison : résultats à l'EMEA Masters, ex-LEC, joueurs passés par la division du dessus, montés l'année suivante, ERL2 contre l'ERL1 du pays |
-| **Montées** | Par saison : qui est monté (ERL2 → ERL1, ERL1 → LEC) et son profil l'année d'avant. Valide le score : 9 montés en LEC sur 11 étaient dans notre top 10 % |
-| **Comparer** | Deux joueurs côte à côte (Europe ou NA, n'importe quelle saison) : score, niveau de la ligue, chaque stat située dans sa ligue |
-| **Rosters** | Effectifs LEC + ERL1 depuis 2023 et **mercato automatique** de la saison suivante (transferts officiels, rumeurs Sheep Esports / X, fins de contrat GCD, pistes non tranchées) |
-| **Ladder** | Top 1000 soloQ EUW : non-pros à scouter, progression de LP, volume de jeu, score soloQ par poste (⭐ = top 5 %) |
-| **Analyses** | Analyse soloQ approfondie d'un joueur ciblé (toutes ses parties de l'année) lancée depuis le site, rapport prêt en ~20 min |
+Le dépôt contient deux parties :
 
-## Europe et Amérique du Nord
+- **`scouting/`** : le pipeline Python, lancé sur le PC. Il télécharge, calcule et exporte des fichiers JSON.
+- **`web/`** : le site Next.js, hébergé sur Vercel. Il lit ces fichiers JSON et se redéploie à chaque push sur `main`.
 
-Le sélecteur **EU / NA** en haut du site change de région. Les deux classements
-restent séparés : aucune compétition ne permet de comparer le niveau de la NACL
-à celui des ERL. En NA, le score est la performance dans la NACL (même calcul
-par poste, malus ex-LCS) ; pas de coefficient de ligue ni d'EMEA Masters, pas
-encore de soloQ (onglets Ligues, Ladder et Analyses : Europe seulement).
-Les scripts Python prennent la région dans la variable `SCOUT_REGION`
-(`eu` par défaut) : données dans `data/na/`, site dans `web/data/na/`.
+## Sommaire
 
-Régions suivies (`region.py`, ligues par saison dans `leagues.py`) :
+- [Démarrage rapide](#démarrage-rapide)
+- [Organisation du dépôt](#organisation-du-dépôt)
+- [Commandes](#commandes)
+- [Régions suivies](#régions-suivies)
+- [Le site](#le-site)
+- [Comment le score est calculé](#comment-le-score-est-calculé)
+- [Modèle de montée](#modèle-de-montée)
+- [Corrections à la main](#corrections-à-la-main)
+- [Réglages (Vercel, GitHub, Discord)](#réglages-vercel-github-discord)
+- [Sources](#sources)
 
-| Code | 1re division | 2e division |
-|---|---|---|
-| `eu` | LEC | ERL1, ERL2, EMEA Masters |
-| `na` | LCS (LTA North en 2025) | NACL |
-| `kr` | LCK | LCK CL, LCK Academy Series |
-| `cn` | LPL | LDL (2023-2025), Asia Masters Elite et City Heroes Championship (2026) |
-| `lcp` | LCP (depuis 2025) | PCS, VCS, LJL (+ LCO en 2023-2024, sans 1re division au-dessus) |
-| `br` | CBLOL (LTA South en 2025, + LLA en 2023-2024) | CBLOL Academy, Circuito Desafiante, Ligas Regionales |
+## Démarrage rapide
 
-Hors Europe, le niveau des 2e divisions vient des tournois internationaux de 2e
-division (Asia Star Challengers Invitational, Asia Masters, World Star
-Challengers Invitational) : taux de victoire des équipes de chaque ligue, ramené
-vers une valeur de départ (`scoring.LEAGUE_PRIOR`) quand il y a peu de parties.
+Sur le PC, à la racine du dépôt :
 
 ```bash
-SCOUT_REGION=na python fetch_pro.py --year 2026   # PowerShell : $env:SCOUT_REGION="na"
-SCOUT_REGION=na python export_web.py
+pip install -r requirements.txt
+python run_all.py
+```
+
+`run_all.py` fait tout, dans l'ordre :
+
+1. `git pull` ;
+2. télécharge les matchs manquants et les tournois internationaux ;
+3. fait le relevé soloQ ;
+4. met à jour la résidence des joueurs ;
+5. exporte les 6 régions ;
+6. calcule le score mondial et entraîne le modèle de montée ;
+7. commit et push des données. Vercel redéploie le site.
+
+Le journal complet est dans `run_all.log`.
+
+| Option | Effet |
+|---|---|
+| `--regions eu na` | Seulement certaines régions |
+| `--full` | Retélécharge aussi la saison en cours (nouveaux matchs) |
+| `--mercato` | Seulement le mercato (rumeurs, transferts, contrats), environ 2 min |
+| `--no-push` | Sans envoyer sur GitHub |
+| `--skip-soloq` | Sans relevé du ladder soloQ |
+
+**Prérequis :**
+
+- **Fichier `.env`** à la racine, jamais versionné :
+  - `LEAGUEPEDIA_USER` et `LEAGUEPEDIA_PASSWORD`, un *bot password* Leaguepedia (sans lui, l'accès est anonyme, plus lent et limité) ;
+  - `RIOT_API_KEY`.
+- **CSV d'[Oracle's Elixir](https://oracleselixir.com/tools/downloads)** dans `data/oracles/`, une saison par fichier. Le plus récent d'une saison remplace les autres.
+
+## Organisation du dépôt
+
+```
+lol-scouting/
+├── run_all.py            Tout mettre à jour en une commande
+├── scout.py              Toutes les autres commandes (python scout.py pour la liste)
+├── requirements.txt
+├── corrections/          Corrections à la main, versionnées (voir plus bas)
+├── scouting/             Pipeline Python
+│   ├── config/           Réglages
+│   │   ├── regions.py        6 régions suivies, dossiers de données par région
+│   │   ├── leagues.py        Ligues suivies saison par saison et leur niveau (1re / 2e / 3e division)
+│   │   └── scoring.py        Tous les poids du score (se règlent sans rien retélécharger)
+│   ├── sources/          Clients des sources externes
+│   │   ├── leaguepedia.py    API Cargo de Leaguepedia (bot password, pauses, reprises)
+│   │   ├── riot_api.py       API Riot (soloQ)
+│   │   ├── oracles_elixir.py Stats à 15 min d'Oracle's Elixir, rattachées partie par partie
+│   │   ├── sheep_esports.py  Scoops Sheep Esports via les titres Google News
+│   │   └── images.py         Photos des joueurs et logos des équipes
+│   ├── collect/          Collecte et cache des données
+│   │   ├── pro_games.py      Parties pro d'une saison (toutes les ligues de leagues.py)
+│   │   ├── international.py  Worlds, MSI, EWC, First Stand
+│   │   ├── careers.py        Périodes en club, titres, récompenses, passages en 1re division
+│   │   ├── residency.py      Résidence officielle et double nationalité (places d'import)
+│   │   ├── team_history.py   Résultats et historique des matchs des équipes
+│   │   └── soloq.py          Ladder EUW, profils soloQ, liens pros ↔ comptes
+│   ├── analysis/         Calculs
+│   │   ├── prospects.py      Score de chaque joueur (perf. par poste, ligue, international, forme)
+│   │   ├── league_strength.py Coefficient de ligue (EMEA Masters, tournois de 2e division)
+│   │   ├── league_talent.py  Niveau des ligues saison par saison (joueurs passés, montés)
+│   │   ├── promotions.py     Qui est monté d'une saison à l'autre
+│   │   └── world_score.py    Score mondial : force des régions (Bradley-Terry)
+│   ├── model/
+│   │   └── promotion_model.py Modèle de montée (régression logistique + LightGBM)
+│   ├── mercato/
+│   │   ├── mercato.py        Mercato de la saison suivante : rumeurs, transferts, contrats, coachs
+│   │   └── rosters.py        Effectifs par saison
+│   ├── export/
+│   │   ├── site.py           Export JSON du site pour une région
+│   │   └── settings.py       Réglages du score pour la page Technique
+│   └── tools/
+│       ├── player_report.py  Fiche détaillée d'un joueur dans le terminal
+│       └── missing_ages.py   Prospects sans date de naissance
+├── web/                  Site Next.js (Root Directory « web » sur Vercel)
+│   ├── app/              Pages et routes API
+│   ├── views/            Contenu des pages
+│   ├── components/       Composants (tableaux, graphiques, cartes...)
+│   ├── lib/              Lecture des données, mercato en direct, alertes, recherche
+│   ├── data/             JSON lus par le serveur (générés par le pipeline)
+│   └── public/data/      JSON lus par le navigateur (générés par le pipeline)
+├── .github/workflows/    Vérification du build, mercato toutes les heures, récap Discord
+└── data/                 (non versionné) caches et téléchargements, un dossier par région
+```
+
+## Commandes
+
+Chaque étape se lance seule avec `python scout.py <commande>`. Sans argument, la
+commande affiche la liste. `--help` après une commande donne ses options.
+
+`--region` choisit la région (`eu` par défaut, sinon `na`, `kr`, `cn`, `lcp`,
+`br`). La syntaxe est la même sous PowerShell et sous Linux.
+
+```bash
+python scout.py matchs --year 2026 --region kr     # parties pro d'une saison
+python scout.py export --region na                 # données du site d'une région
+python scout.py modele                             # réentraîner le modèle de montée
+python scout.py residence                          # résidence officielle des joueurs
+python scout.py mercato --refresh                  # mercato : rumeurs, transferts, contrats
+python scout.py soloq snapshot                     # relevé du ladder EUW (1 fois par semaine)
+python scout.py classement --role Mid --top 15     # classement dans le terminal
+python scout.py joueur Mercy9 --season 2025        # fiche détaillée d'un joueur
+python scout.py ages-manquants                     # prospects sans date de naissance
+```
+
+| Commande | Ce qu'elle fait |
+|---|---|
+| `matchs` | Parties pro d'une saison via Leaguepedia (`--year`, `--refresh`) |
+| `international` | Worlds, MSI, EWC, First Stand (communs aux 6 régions) |
+| `soloq` | Ladder EUW et profils soloQ : `snapshot`, `profiles`, `show` |
+| `residence` | Résidence officielle et double nationalité |
+| `equipes` | Résultats et historique des matchs des équipes |
+| `mercato` | Mercato de la saison suivante |
+| `classement` | Classement des prospects (`--calibrate-top` : bonus de 1re division conseillé) |
+| `ligues` · `niveau-ligues` | Niveau des ligues (coefficient, saison par saison) |
+| `montees` | Qui est monté d'une saison à l'autre |
+| `score-mondial` | Force des régions d'après l'international (`--check`) |
+| `modele` | Modèle de montée en 1re et 2e division |
+| `export` | Données du site d'une région (`--only mercato` ou `equipes`) |
+| `reglages` | Réglages du score pour la page Technique |
+| `joueur` · `ages-manquants` · `oracles` | Outils de vérification |
+
+## Régions suivies
+
+Chaque région a ses données (`data/<région>/`) et ses fichiers du site
+(`web/data/<région>/`). L'Europe est à la racine. Le code utilise les mêmes
+niveaux partout : `LEC` = 1re division, `ERL1` = 2e, `ERL2` = 3e. Le site
+affiche les vrais noms des ligues.
+
+| Code | 1re division | Divisions inférieures |
+|---|---|---|
+| `eu` | LEC | ERL1, ERL2, EMEA Masters |
+| `na` | LCS (LTA North en 2025) | NACL, NA Academy (2020-2022) |
+| `kr` | LCK | LCK CL, LCK Academy Series |
+| `cn` | LPL | LDL (jusqu'en 2025), Asia Masters Elite et City Heroes Championship (2026) |
+| `lcp` | LCP (depuis 2025) | PCS, VCS, LJL (+ LCO) |
+| `br` | CBLOL (LTA South en 2025, + LLA en 2023-2024) | CBLOL Academy, Circuito Desafiante, Ligas Regionales |
+
+## Le site
+
+| Menu | Pages |
+|---|---|
+| **Accueil** | Indicateurs : meilleurs prospects par poste, cracks de toutes les régions. Ligues : niveau de chaque ligue saison par saison |
+| **Joueurs** | Données : classement complet filtrable. Comparer : deux joueurs côte à côte, radar |
+| **Mercato** | Rosters : effectifs et mercato en direct. Besoins : places à prendre par équipe. Montées : qui est monté, chances du modèle |
+| **SoloQ** | Ladder : top 1000 EUW. Analyses : analyse soloQ approfondie d'un joueur |
+
+À cela s'ajoutent :
+
+- **Fiche joueur** : carrière, stats par poste, détail du score, chances de montée (ce qui lui manque, ses freins), trajectoires comparées aux montés passés, fiche PDF de scouting ;
+- **Page équipe** : roster, mercato, résultats, anciens joueurs, historique des matchs (KDA, gold, objectifs, bans) ;
+- **Recherche globale** : Ctrl+K ;
+- **Liste de suivi ⭐** avec notes et alertes Discord ;
+- **Technique** : comment tout est calculé, et la stack.
+
+Développement local :
+
+```bash
+cd web
+npm install
+npm run dev
 ```
 
 ## Comment le score est calculé
 
-**Score = performance dans sa ligue + niveau de la ligue + EMEA Masters − malus ex-LEC**
+**Score = performance dans sa ligue + niveau de la ligue + international − malus ex-1re division**
 
-- **Performance dans sa ligue** : chaque stat comparée aux joueurs **du même poste dans la même ligue**. On privilégie la phase de lane (écarts de CS, gold et XP à 15 min), puis les dégâts comparés au champion joué, le KDA, la participation aux kills… Le score est réduit quand le joueur a peu de parties.
-- **Niveau de la ligue** : d'après le placement de ses équipes à l'EMEA Masters sur 2 ans (la LFL vaut plus que la Liga Portuguesa), ajusté chaque saison selon ses joueurs (`league_talent.py`) : part d'anciens joueurs de LEC et de joueurs montés en LEC l'année suivante pour une ERL1 ; joueurs passés par l'ERL1, montés l'année suivante et résultats contre l'ERL1 du pays pour une ERL2 (ex : LFL2 2025 bien plus forte que la Nexus League 2026). Un joueur monté ne profite pas de sa propre montée.
-- **EMEA Masters** : performance face aux joueurs de toutes les ligues.
-- **Ex-LEC** : petit malus pour les joueurs déjà passés par la LEC, qui remontent un peu plus rarement.
+- **Performance dans sa ligue** : chaque stat est comparée aux joueurs **du même poste dans la même ligue**. On privilégie la phase de lane (écarts de CS, gold et XP à 15 min), puis les dégâts comparés au champion joué, le KDA, la participation aux kills… Le score est réduit quand le joueur a peu de parties.
+- **Niveau de la ligue** : d'après les résultats à l'EMEA Masters (Europe) ou aux tournois internationaux de 2e division (autres régions), ajusté chaque saison selon ses joueurs : anciens joueurs de 1re division, montés l'année suivante, résultats contre la division du dessus.
+- **International** : performance à l'EMEA Masters, face aux joueurs de toutes les ligues.
+- **Forme** : le dernier split compte plus, et la progression d'un split à l'autre est affichée.
+- **Score mondial** : les 6 régions sont ramenées sur l'échelle LEC, d'après leurs matchs internationaux (modèle de Bradley-Terry).
 
-Les joueurs de LEC / LCS sont aussi classés (filtre « Inclure les joueurs de LEC » dans Données) : perf. dans la LEC jugée à moitié par rapport à leur équipe, + un bonus fixe de 1re division calibré sur les montés (`python prospects.py --calibrate-top`).
+Tous les poids sont dans `scouting/config/scoring.py`. La page **Technique** du site les affiche.
 
-Tous les poids sont dans `scoring.py` et se règlent sans rien retélécharger.
-Le score soloQ des non-pros est séparé du score pro (pas de matchs officiels à comparer).
+## Modèle de montée
 
-## Mettre les données à jour (sur le PC)
+`python scout.py modele` donne la probabilité qu'un joueur monte en 1re
+division la saison suivante. Il entraîne aussi un second modèle pour la montée
+de 3e en 2e division.
 
-Prérequis : `pip install -r requirements.txt` ; dans `.env` : `LEAGUEPEDIA_USER`,
-`LEAGUEPEDIA_PASSWORD` (bot password Leaguepedia) et `RIOT_API_KEY` ; les CSV
-d'[Oracle's Elixir](https://oracleselixir.com/tools/downloads) dans `data/oracles/`.
+- **Ce qu'il apprend** : toutes les montées des saisons 2020 à 2025, dans les 6 régions. Une montée dans la 1re division d'une autre région compte aussi.
+- **Ce qu'il regarde** : score, rang dans son poste et dans sa ligue, âge, expérience, international, et si le joueur est un import. Le statut d'import suit la résidence officielle Leaguepedia, double nationalité comprise.
+- **Comment il calcule** : régression logistique et LightGBM, moyennés.
+- **Comment il est validé** : une saison récente est mise de côté à chaque essai, puis il est testé sur 2025 comme si c'était le futur.
 
-```bash
-python fetch_pro.py --year 2026        # matchs pros (cache : rapide les fois suivantes)
-python soloq.py snapshot               # relevé du ladder EUW (1 fois / semaine)
-python soloq.py profiles               # stats soloQ de l'année des non-pros (long, reprend où il s'arrête)
-python mercato.py --refresh            # rumeurs, transferts, contrats
-python export_web.py                   # génère les données du site
-git add web/data web/public/data; git commit -m "Données"; git push   # Vercel redéploie
-# (puis la même chose avec SCOUT_REGION=na pour la NA)
-```
+## Corrections à la main
 
-Mercato en direct : les onglets Rosters et Données relancent la recherche tout
-seuls à l'ouverture si la dernière date de plus de 20 min (bouton « Actualiser »
-pour forcer). Sources : Leaguepedia (rumeurs et transferts officiels) et les
-scoops Sheep Esports lus dans les titres Google News (`sheep.py` /
-`web/lib/mercato/sheep.ts`), souvent quelques minutes après leur publication,
-avant leur saisie sur Leaguepedia. Le site de Sheep n'est jamais contacté.
-
-Réglages facultatifs du site :
-
-| Où | Quoi | Pour |
-|---|---|---|
-| Vercel > Settings > Environment Variables | `DISCORD_WEBHOOK_URL` | Alertes Discord des news des joueurs suivis (⭐) |
-| GitHub > Settings > Secrets and variables > Actions > Variables | `SITE_URL` | Mise à jour du mercato toutes les heures, même sans visite |
-| `web/data/residency.json` | `"Busio": "EMEA"` | Résidence d'un joueur quand la nationalité trompe (imports, page Besoins) |
-
-Corrections à la main (prioritaires sur les données automatiques) :
+Dans `corrections/`. Elles sont prioritaires sur les données automatiques.
 
 | Fichier | Pour |
 |---|---|
-| `birthdates.csv` | Âges manquants (`joueur,2004-06-28,source` ; une année seule = âge approximatif « ~22 ans ») — `python missing_ages.py` liste les prioritaires |
-| `web/data/residency.json` | Résidence forcée (double nationalité, résidence acquise) : `EMEA`, `AMER`, `KR`, `LPL`, `LCP` |
-| `rosters_2027.csv` | Corriger un poste du mercato (`LEC,Karmine Corp,Jungle,Yike,SkewMond,rumeur,lien-sheep` ; statut `rumeur` ou `officiel`) |
-| `team_changes.csv` | Équipe remplacée ou renommée au mercato (`2027,Dignitas,OpTic Gaming,lien`) |
-| `soloq_accounts.csv` | Lier un pro à son compte soloQ (`joueur,Pseudo#TAG`) |
+| `birthdates.csv` | Âges manquants : `joueur,2004-06-28,source`. Une année seule donne un âge approximatif (« ~22 ans »). `python scout.py ages-manquants` liste les prioritaires |
+| `rosters_2027.csv` | Corriger un poste du mercato : `LEC,Karmine Corp,Jungle,Yike,SkewMond,rumeur,lien`. Statut `rumeur` ou `officiel` |
+| `team_changes.csv` | Équipe remplacée ou renommée au mercato : `2027,Dignitas,OpTic Gaming,lien` |
+| `soloq_accounts.csv` | Lier un pro à son compte soloQ : `joueur,Pseudo#TAG` |
 | `player_overrides.csv` | Séparer deux joueurs que Leaguepedia a confondus |
-| `leagues.py` | Ligues suivies par saison et leur niveau (ERL1 / ERL2) |
 
-Outils en ligne de commande : `prospects.py` (classement), `player.py <pseudo>`
-(fiche détaillée), `promotions.py` (montées), `league_strength.py` (coefficients),
-`oracles.py <saison>` (couverture Oracle's Elixir), `league_talent.py` (niveau des ligues par saison).
+Côté site, `web/data/residency.json` force la résidence d'un joueur (`EMEA`,
+`AMER`, `KR`, `LPL`, `LCP`). Ce n'est utile que si Leaguepedia se trompe :
+`python scout.py residence` récupère déjà la résidence officielle.
 
-## Site (Vercel)
+## Réglages (Vercel, GitHub, Discord)
 
-Application Next.js dans `web/` (Root Directory `web` sur Vercel), déployée à
-chaque push sur `main`. Pour les **Analyses** lancées depuis le site :
+Les secrets restent dans `.env` (PC) ou dans les variables Vercel. Ils ne sont jamais dans le dépôt.
 
-1. Vercel → Storage / Marketplace → **Upstash Redis** → connecter au projet (gratuit).
-2. Vercel → Settings → Environment Variables : `RIOT_API_KEY` (secrète) et,
-   conseillé, `DEEP_ACCESS_CODE` (code demandé avant de lancer une analyse).
-3. Redéployer. Une analyse avance tant qu'un onglet du site est ouvert.
+| Où | Variable | Pour |
+|---|---|---|
+| Vercel > Settings > Environment Variables | `DISCORD_WEBHOOK_URL` | Alertes Discord (news des joueurs suivis, mouvements du modèle) et récap quotidien |
+| Vercel | `RIOT_API_KEY`, `DEEP_ACCESS_CODE` | Analyses soloQ lancées depuis le site (code demandé avant de lancer) |
+| Vercel > Storage | Upstash Redis | Mercato en direct, liste de suivi, analyses |
+| GitHub > Settings > Secrets and variables > Actions > Variables | `SITE_URL` | Mercato actualisé toutes les heures et récap Discord, même sans visite |
+| GitHub, même endroit | `DIGEST_REGIONS` | Régions du récap quotidien, par exemple `eu,na` (`eu` par défaut) |
 
-Développement local : `cd web && npm install && npm run dev`.
+Les GitHub Actions (`.github/workflows/`) :
+
+- **Vérification du site**, à chaque push : pipeline Python (syntaxe et imports), données des 6 régions, types, build Next.js.
+- **Mercato en ligne**, toutes les heures.
+- **Récap quotidien Discord**, chaque matin : top 5 par poste des moins de 25 ans hors 1re division, et plus fortes progressions.
 
 ## Sources
 
-Leaguepedia (CC BY-SA 3.0) : matchs, joueurs, titres, récompenses, rumeurs,
-transferts, contrats (GCD) · Oracle's Elixir : stats à 15 min · API Riot : soloQ.
+- **Leaguepedia** (CC BY-SA 3.0) : matchs, joueurs, résidence, titres, récompenses, rumeurs, transferts, contrats.
+- **Oracle's Elixir** : stats à 15 min.
+- **API Riot** : soloQ.
+- **Sheep Esports** : uniquement via les titres Google News, le site n'est jamais contacté.

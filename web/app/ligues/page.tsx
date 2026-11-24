@@ -233,7 +233,7 @@ export default function LiguesPage() {
       </div>
 
       {!hasSeasons ? (
-        <p className="text-sm text-ink-3">Relance export_web.py pour générer le niveau des ligues par saison.</p>
+        <p className="text-sm text-ink-3">Relance <code>python scout.py export</code> pour générer le niveau des ligues par saison.</p>
       ) : (
         <>
           <section className="card p-4">

@@ -15,15 +15,23 @@ concurrency:
 
 jobs:
   python:
-    name: Scripts Python (syntaxe)
+    name: Pipeline Python (syntaxe et imports)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
       - name: Compilation de tous les scripts
-        run: python -m py_compile *.py
+        run: python -m compileall -q scouting scout.py run_all.py
+      - name: Chaque module s'importe (pas d'import cassé après un déplacement)
+        run: |
+          for m in $(find scouting -name "*.py" | sed 's#/#.#g; s#\.py$##; s#\.__init__$##'); do
+            python -c "import $m" || exit 1
+          done
+          python scout.py > /dev/null
 
   web:
     name: Données et build du site

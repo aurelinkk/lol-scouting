@@ -5,7 +5,7 @@ import { type Region, REGIONS } from "@/lib/region";
 /**
  * Scoops Sheep Esports lus dans les titres de Google News (flux RSS public).
  * Le site de Sheep bloque les robots : on ne le contacte jamais. Même logique
- * que sheep.py (export Python) : un titre reconnu (joueur connu + équipe
+ * que sheep_esports.py (export Python) : un titre reconnu (joueur connu + équipe
  * identifiée) devient une rumeur au format Leaguepedia (RosterRumors).
  */
 

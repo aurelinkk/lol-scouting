@@ -2,7 +2,7 @@ import world from "@/data/world.json";
 import type { Region } from "./region";
 
 /**
- * Score mondial (python world_scale.py) : décalage de chaque région, saison par
+ * Score mondial (python scout.py score-mondial) : décalage de chaque région, saison par
  * saison, pour mettre son score à l'échelle de l'Europe (LEC), d'après les
  * résultats internationaux (Worlds, MSI, EWC, First Stand).
  */

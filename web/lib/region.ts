@@ -1,5 +1,5 @@
 // Régions analysées : Europe (racine du site) et Amérique du Nord (/na).
-// Les données NA sont générées par `SCOUT_REGION=na python export_web.py`
+// Les données NA sont générées par `python scout.py export --region na`
 // (web/data/na, web/public/data/na). Même code de niveaux qu'en Europe :
 // "LEC" = 1re division (LCS en NA), "ERL1" = 2e division (NACL).
 
