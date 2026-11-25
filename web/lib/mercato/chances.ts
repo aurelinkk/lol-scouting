@@ -6,7 +6,7 @@ import { IMPORT_LIMIT } from "@/lib/needs";
 import { isResident, originOf } from "@/lib/origin";
 import { type Region, REGIONS } from "@/lib/region";
 import type { LiveMercato } from "./live";
-import { signedFromMercato } from "./signed";
+import { mergeSigned, signedAbroad, signedFromMercato } from "./signed";
 
 /**
  * Chances « en direct » : la chance du modèle (profil seul, comme au début du
@@ -82,7 +82,10 @@ export async function computeLiveChances(region: Region): Promise<LiveChances | 
   const regions = REGIONS.filter((r) => hasRegion(r));
   const mercatos = Object.fromEntries(await Promise.all(regions.map(async (r) => [r, await liveMercato(r)] as const))) as Record<Region, Mercato | null>;
   const seats = Object.fromEntries(regions.map((r) => [r, openSeats(r, mercatos[r]?.teams ?? [])])) as Record<Region, ReturnType<typeof openSeats>>;
-  const signed = signedFromMercato(mercatos[region]?.teams ?? [], region);
+  const signed = mergeSigned(
+    signedFromMercato(mercatos[region]?.teams ?? [], region),
+    signedAbroad(Object.fromEntries(regions.map((r) => [r, mercatos[r]?.teams ?? []])), region),
+  );
   const players = getPlayers(region);
 
   const chance = (id: string, base: number, level: "low" | "top"): LiveChance | null => {

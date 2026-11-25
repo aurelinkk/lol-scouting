@@ -50,6 +50,38 @@ export function signedFromMercato(teams: MercatoTeam[], region: Region): Record<
   return out;
 }
 
+/**
+ * Signatures dans une autre région : un joueur de `region` qui apparaît comme
+ * arrivée dans le mercato d'une autre région (Noah, GIANTX -> BNK FEARX en LCK).
+ * Utile quand il n'est plus dans le mercato de sa région (mis sur le banc avant
+ * la fin de saison, sa case part de son remplaçant).
+ */
+export function signedAbroad(teamsByRegion: Partial<Record<Region, MercatoTeam[]>>, region: Region): Record<string, Signed> {
+  const out: Record<string, Signed> = {};
+  for (const [r, teams] of Object.entries(teamsByRegion) as [Region, MercatoTeam[]][]) {
+    if (r === region) continue;
+    for (const t of teams ?? [])
+      for (const s of t.slots)
+        for (const p of [s.after, ...(s.after_extra ?? [])]) {
+          if (!p?.id || p.region !== region) continue;
+          const kind = s.right === "in" ? "official" : "rumor";
+          if (out[p.id]?.official && kind !== "official") continue;
+          out[p.id] = { team: `${t.team} (${t.league})`, league: t.league, official: kind === "official", kind, stays: false, tier: asTier(t.tier) };
+        }
+  }
+  return out;
+}
+
+/** Fusion : une signature officielle à l'étranger l'emporte sur une rumeur ou un contrat chez soi */
+export function mergeSigned(own: Record<string, Signed>, abroad: Record<string, Signed>): Record<string, Signed> {
+  const out = { ...own };
+  for (const [id, a] of Object.entries(abroad)) {
+    const o = out[id];
+    if (!o || (a.official && !o.official) || (a.official && o.kind === "contract")) out[id] = a;
+  }
+  return out;
+}
+
 /** Départ d'un joueur de son club au mercato (remplacé, libéré, retraite), officiel ou rumeur.
  *  Officiel si la case le dit ou si le fil des nouveautés l'a annoncé (« Daglas quitte Team Heretics »). */
 export function departureFromMercato(

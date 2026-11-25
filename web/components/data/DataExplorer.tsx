@@ -25,7 +25,7 @@ import { ROLES, type RankingRow, type StatKey } from "@/lib/types";
 import { playerLink, publicData, REGION_INFO, teamLink, tierName } from "@/lib/region";
 import { withCurrentAge } from "@/lib/age";
 import { useRegion } from "@/lib/useRegion";
-import { type ContractEnd, type Signed, signedFromMercato } from "@/lib/mercato/signed";
+import { type ContractEnd, mergeSigned, type Signed, signedFromMercato } from "@/lib/mercato/signed";
 import { isStale } from "@/lib/mercato/stale";
 import { isResident, ORIGINS, originLabel, originOf } from "@/lib/origin";
 import { useWatchlist } from "@/lib/useWatchlist";
@@ -68,6 +68,7 @@ export default function DataExplorer({
   hasOe,
   promoted = {},
   signed: publishedSigned = {},
+  signedAbroad = {},
   contracts = {},
   mercatoGenerated,
   mercatoSeason,
@@ -78,6 +79,8 @@ export default function DataExplorer({
   hasOe: boolean;
   promoted?: Record<string, Promoted>;
   /** Joueurs qui ont déjà un club pour la saison suivante (mercato publié) */
+  /** Signatures dans les mercatos des autres régions (Noah -> BNK FEARX) */
+  signedAbroad?: Record<string, Signed>;
   signed?: Record<string, Signed>;
   /** Fin de contrat (GCD) avec le club de la saison passée */
   contracts?: Record<string, ContractEnd>;
@@ -132,7 +135,7 @@ export default function DataExplorer({
   useEffect(() => {
     const use = (d: { live?: { mercato: { generated?: string; teams: never[] } } } | null) => {
       if (d?.live && d.live.mercato.generated === mercatoGenerated)
-        setLiveSigned(signedFromMercato(d.live.mercato.teams, region));
+        setLiveSigned(mergeSigned(signedFromMercato(d.live.mercato.teams, region), signedAbroad));
     };
     fetch(`/api/mercato?region=${region}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -144,7 +147,7 @@ export default function DataExplorer({
             .then(use);
       })
       .catch(() => {});
-  }, [region, mercatoGenerated]);
+  }, [region, mercatoGenerated, signedAbroad]);
   const signed = liveSigned ?? publishedSigned;
   // Chances corrigées par le mercato en cours (places libres, signatures) : /api/chances
   const [liveChance, setLiveChance] = useState<{ up: Record<string, [number, string]>; stay: Record<string, [number, string]> } | null>(null);

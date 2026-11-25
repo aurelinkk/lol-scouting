@@ -3,7 +3,8 @@ import DataExplorer from "@/components/data/DataExplorer";
 import RegionMissing from "@/components/RegionMissing";
 import { getMercato, getMeta, getPromotions, hasRegion, getPromotionModel } from "@/lib/data";
 import type { Promoted } from "@/components/data/DataExplorer";
-import { contractsFromMercato, departureFromMercato, signedFromMercato } from "@/lib/mercato/signed";
+import { contractsFromMercato, departureFromMercato } from "@/lib/mercato/signed";
+import { publishedAbroad, publishedSigned } from "@/lib/mercato/abroad";
 import { REGION_INFO, type Region } from "@/lib/region";
 
 export const metadata = { title: "Données · LoL Scouting" };
@@ -60,7 +61,7 @@ export default function DonneesPage({ region }: { region: Region }) {
   // Heretics en avril 2026, quitte TH en novembre) : la montée reste affichée,
   // avec le départ et la nouvelle piste éventuelle
   const mercato = getMercato(region);
-  const signed = signedFromMercato(mercato?.teams ?? [], region);
+  const signed = publishedSigned(region);
   for (const [key, p] of Object.entries(promoted)) {
     const id = key.split(":")[1];
     if (!mercatoSeason || p.season !== mercatoSeason - 1 || !key.startsWith(`${mercatoSeason - 1}:`)) continue;
@@ -84,7 +85,8 @@ export default function DonneesPage({ region }: { region: Region }) {
           seasons={meta.seasons}
           hasOe={meta.has_oe}
           promoted={promoted}
-          signed={signedFromMercato(getMercato(region)?.teams ?? [], region)}
+          signed={signed}
+          signedAbroad={publishedAbroad(region)}
           contracts={contractsFromMercato(getMercato(region)?.teams ?? [])}
           mercatoGenerated={getMercato(region)?.generated}
           mercatoSeason={mercatoSeason}

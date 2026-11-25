@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Avatar, TeamLogo } from "@/components/Images";
-import { getMercato, getPromotionModel, getRankings } from "@/lib/data";
-import { signedFromMercato } from "@/lib/mercato/signed";
+import { getPromotionModel, getRankings } from "@/lib/data";
+import { publishedSigned } from "@/lib/mercato/abroad";
 import { playerLink, REGION_INFO, type Region } from "@/lib/region";
 import type { RankingRow } from "@/lib/types";
 
@@ -17,7 +17,7 @@ export default function StayModelView({ region }: { region: Region }) {
   const R = REGION_INFO[region];
   const rows = new Map<string, RankingRow>();
   for (const r of getRankings(region)) if (r.season === model.season && (!rows.has(r.id) || r.games > rows.get(r.id)!.games)) rows.set(r.id, r);
-  const signed = signedFromMercato(getMercato(region)?.teams ?? [], region);
+  const signed = publishedSigned(region);
   const list = Object.entries(chances)
     .map(([id, c]) => ({ id, ...c, row: rows.get(id) }))
     .filter((x) => x.row);

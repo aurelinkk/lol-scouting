@@ -9,7 +9,8 @@ import { hasTeam } from "@/views/Team";
 import DeepButton from "@/components/DeepButton";
 import { Evolution, StatsVsRole } from "@/components/PlayerStats";
 import { getMercato, getMeta, getPlayer, getPromotionModel, getRankings, hasRegion } from "@/lib/data";
-import { departureFromMercato, signedFromMercato } from "@/lib/mercato/signed";
+import { departureFromMercato } from "@/lib/mercato/signed";
+import { publishedSigned } from "@/lib/mercato/abroad";
 import { fmtScore, topPercent } from "@/lib/format";
 import { similarPlayers } from "@/lib/similar";
 import { similarTrajectories } from "@/lib/trajectory";
@@ -336,7 +337,7 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
         const pctv = Math.round(c.p * 100);
         // Situation au mercato : reste, nouveau club, ou départ sans piste
         const mercato = getMercato(region);
-        const sg = signedFromMercato(mercato?.teams ?? [], region)[id];
+        const sg = publishedSigned(region)[id];
         const leaving = departureFromMercato(mercato, id);
         const rate = stay.rates[region];
         return (
