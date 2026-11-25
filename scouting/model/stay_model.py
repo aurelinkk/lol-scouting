@@ -23,6 +23,7 @@ web/data/promotion_model.json.
 import json
 import math
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -33,6 +34,9 @@ MIN_GAMES = 5
 NEXT_GAMES = 3
 STATS = ["kda", "kp", "gd15", "csd15", "xpd15", "dpm", "deaths_pg"]
 LOWER_IS_BETTER = {"deaths_pg"}
+# Tournois où des équipes de 2e division sont invitées en 1re division (KC Blue et
+# Los Ratones au LEC Versus 2026) : jouer là n'est pas être un joueur de 1re division
+GUEST_EVENTS = re.compile(r"Versus|Showmatch|All-Star", re.I)
 
 
 def players_file(region):
@@ -46,6 +50,33 @@ def season_age(birthdate, season):
     except ValueError:
         return np.nan
     return season - y + (11 - m) / 12 + (1 - d) / 365
+
+
+def guest_teams(players):
+    """saison -> équipes présentes en 1re division seulement comme invitées : tous les
+    joueurs qui y ont joué n'ont, cette saison-là, que des parties de tournois à invités."""
+    seen, regular = {}, set()
+    for v in players.values():
+        guest_games = {}
+        other = {}
+        for e in v.get("evolution", []):
+            if e["tier"] != "LEC":
+                continue
+            bucket = guest_games if GUEST_EVENTS.search(e["tournament"]) else other
+            bucket[e["season"]] = bucket.get(e["season"], 0) + e["games"]
+        for l in v["lines"]:
+            if l["tier"] != "LEC":
+                continue
+            key = (l["season"], l["team"])
+            if other.get(l["season"]):
+                regular.add(key)
+            elif guest_games.get(l["season"]):
+                seen[key] = True
+    out = {}
+    for (season, team) in seen:
+        if (season, team) not in regular:
+            out.setdefault(season, set()).add(team)
+    return out
 
 
 def load():
@@ -63,9 +94,12 @@ def load():
                 for r in json.load(open(f, encoding="utf-8")):
                     rank_rows[(region, r["id"], s, r["tier"])] = r
         players = json.load(open(path, encoding="utf-8"))
+        guests = guest_teams(players)
         for pid, v in players.items():
             by = {}
             for l in v["lines"]:
+                if l["tier"] == "LEC" and l["team"] in guests.get(l["season"], ()):
+                    continue  # équipe invitée (LEC Versus) : pas des parties de 1re division
                 by.setdefault(l["season"], []).append(l)
             for s, ls in by.items():
                 top = [l for l in ls if l["tier"] == "LEC"]
