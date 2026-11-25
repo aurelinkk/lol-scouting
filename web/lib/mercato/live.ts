@@ -115,6 +115,16 @@ function lookup(name: string, region: Region): MercatoPlayer {
   return { name, id: hit.id, region: hit.region === region ? undefined : hit.region };
 }
 
+/** Club d'une autre région suivi par le site : ligue, niveau, logo (pour « → BNK FEARX Youth (LCK CL) ») */
+function destination(team: string, region: Region): { team: string; logo?: string; league: string; tier: string; region?: Region } | null {
+  for (const r of [region, ...REGIONS.filter((x) => x !== region)]) {
+    if (!hasRegion(r)) continue;
+    const t = getMercato(r)?.teams.find((x) => x.team === team || x.former_team === team);
+    if (t) return { team: t.team, logo: t.logo, league: t.league, tier: t.tier, region: r === region ? undefined : r };
+  }
+  return null;
+}
+
 export interface LiveMercato {
   region: Region;
   updatedAt: number;
@@ -168,8 +178,16 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
   const events: Event[] = [];
   for (const c of changes) {
     const role = roleOf(c.role);
-    if (!role || !teamOf(c.team) || (c.dir !== "Join" && c.dir !== "Leave")) continue;
+    if (!role || (c.dir !== "Join" && c.dir !== "Leave")) continue;
     const url = c.link || urlOf(c.ref);
+    if (!teamOf(c.team)) {
+      // Arrivée officielle dans un club non suivi ici (souvent une autre région :
+      // Paduck, Shifters -> BNK FEARX Youth en LCK CL) : il quitte son club d'ici
+      if (c.dir === "Join" && !NOT_A_TEAM.has(c.team))
+        events.push({ date: c.date.slice(0, 10), official: true, kind: "Out", player: c.player, team: c.team, role,
+          source: siteOf(url, "Leaguepedia"), url, dest: c.team, rawRole: c.role });
+      continue;
+    }
     events.push({ date: c.date.slice(0, 10), official: true, kind: c.dir as "Join" | "Leave", player: c.player,
       team: teamOf(c.team)!.team, role, source: siteOf(url, "Leaguepedia"), url, rawRole: c.role });
   }
@@ -259,6 +277,11 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
           if (s.after && same(s.after.name, e.player)) {
             vacate(t, s, e, `départ (${st})`);
             applied.push({ date: e.date, text: `${e.player} quitte ${t.team}${e.dest && !NOT_A_TEAM.has(e.dest) ? ` → ${e.dest}` : ""}`, url: e.url, official: e.official });
+          } else if (s.after && s.before && same(s.before.name, e.player) && e.dest && !NOT_A_TEAM.has(e.dest) && e.dest !== t.team) {
+            // déjà remplacé dans le mercato (Paduck -> SamD en rumeur chez Shifters) : on note où il part
+            if (!(s.left === "out" && !e.official)) s.left = e.official ? "out" : "rumor_out";
+            s.to = { team: e.dest };
+            mark(s);
           } else if (!s.after && s.before && same(s.before.name, e.player)) {
             // poste déjà libéré : on garde l'annonce la plus récente (sans repasser un officiel en rumeur)
             if (s.status.includes("confirmé") && !e.official) continue;
@@ -329,6 +352,13 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
       mark(s);
     }
   }
+  // Destinations : ligue, niveau et région d'après les mercatos publiés (BNK FEARX Youth -> LCK CL, 2e division, kr)
+  for (const t of m.teams)
+    for (const s of t.slots)
+      if (s.to?.team && !s.to.tier) {
+        const hit = destination(s.to.team, region);
+        if (hit) s.to = { ...s.to, ...hit };
+      }
   // Nouveautés = différences réelles avec le mercato publié (pas les étapes
   // intermédiaires : un départ puis une arrivée le même jour = prolongation)
   const out: LiveMercato["changes"] = [];
@@ -338,12 +368,17 @@ export async function refreshMercato(region: Region): Promise<LiveMercato | null
     for (const s of t.slots) {
       const bs = bt?.slots.find((x) => x.role === s.role);
       const extras = (x?: MercatoSlot | null) => (x?.after_extra ?? []).map((p) => nameOf(p)).join("/");
-      const changed = !bs || nameOf(bs.after) !== nameOf(s.after) || bs.status !== s.status || extras(bs) !== extras(s);
+      const sameSlot = !!bs && nameOf(bs.after) === nameOf(s.after) && bs.status === s.status && extras(bs) === extras(s);
+      // seule la destination du joueur de départ a changé (Paduck, déjà remplacé en rumeur, signe en LCK CL)
+      const newDest = sameSlot && !!s.to?.team && s.to.team !== bs?.to?.team;
+      const changed = !sameSlot || newDest;
       (s as { live?: boolean }).live = changed ? true : undefined;
       if (!changed) continue;
-      const official = s.status.includes("confirmé");
+      const official = newDest ? s.left === "out" : s.status.includes("confirmé");
       const newExtra = (s.after_extra ?? []).find((p) => !(bs?.after_extra ?? []).some((b) => same(b.name, p.name)));
-      const text = newExtra
+      const text = newDest
+        ? `${nameOf(s.before)} quitte ${t.team} → ${s.to!.team}${s.to!.league && s.to!.region ? ` (${s.to!.league})` : ""}`
+        : newExtra
         ? `${nameOf(newExtra)} → ${t.team} (${s.role}), avec ${nameOf(s.after)}`
         : s.after
         ? s.before && same(s.before.name, s.after.name)
