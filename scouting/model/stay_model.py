@@ -9,7 +9,8 @@ en avril, libéré en novembre).
 - Joueurs : au moins MIN_GAMES parties de 1re division dans la saison.
 - Cible : au moins NEXT_GAMES parties de 1re division la saison suivante, dans
   n'importe quelle région (même pseudo et même poste pour un départ à l'étranger).
-- Variables : place de titulaire (part des parties de l'équipe), win rate de
+- Variables : place de titulaire (part des parties de l'équipe, sur la saison et
+  au dernier split : un joueur mis sur le banc avant la fin part souvent), win rate de
   l'équipe et écart du joueur, score en 1re division, stats de lane comparées aux
   joueurs du même poste, saisons déjà passées en 1re division, montée en cours de
   saison, âge, import, poste, région.
@@ -37,6 +38,27 @@ LOWER_IS_BETTER = {"deaths_pg"}
 # Tournois où des équipes de 2e division sont invitées en 1re division (KC Blue et
 # Los Ratones au LEC Versus 2026) : jouer là n'est pas être un joueur de 1re division
 GUEST_EVENTS = re.compile(r"Versus|Showmatch|All-Star", re.I)
+# Tournois qui ne sont pas un split régulier (pour trouver le dernier split de la saison)
+# (« LCP 2025 Season Finals » est un vrai split ; « LEC 2023 Season Finals », un tournoi final)
+NOT_SPLIT = re.compile(r"Playoffs|(?<!LCP \d{4} Season )Finals|Placements|Play-In|Promotion|Qualif|Lock-In|Cup|Road to|Championship|Regional|Versus|Showmatch|All-Star", re.I)
+
+
+def last_splits(players):
+    """(saison, ligue) -> début de nom des tournois du dernier split régulier de 1re
+    division : « LEC 2026 Summer » (+ Playoffs), « LEC 2023 Summer » (+ Groups),
+    « LCK 2026 Rounds 3-4 », « LPL 2026 Split 3 »... Une région peut avoir deux
+    ligues de 1re division (CBLOL et LLA en 2023-2024)."""
+    start = {}
+    for v in players.values():
+        for e in v.get("evolution", []):
+            if e["tier"] == "LEC" and not NOT_SPLIT.search(e["tournament"]) and e.get("date"):
+                k = (e["season"], e["league_code"], e["tournament"])
+                start[k] = min(start.get(k, "9999"), e["date"])
+    out = {}
+    for (season, league, t), date in start.items():
+        if (season, league) not in out or date > out[(season, league)][1]:
+            out[(season, league)] = (t, date)
+    return {k: re.sub(r"\s+(Groups|Group Stage|Knockouts?)$", "", t) for k, (t, _) in out.items()}
 
 
 def players_file(region):
@@ -83,6 +105,7 @@ def load():
     """Une ligne par joueur de 1re division et par saison, toutes régions."""
     rows, top_next = [], set()
     team_games = {}
+    team_last = {}
     rank_rows = {}
     for region in pm.REGIONS:
         path = players_file(region)
@@ -95,6 +118,7 @@ def load():
                     rank_rows[(region, r["id"], s, r["tier"])] = r
         players = json.load(open(path, encoding="utf-8"))
         guests = guest_teams(players)
+        final = last_splits(players)
         for pid, v in players.items():
             by = {}
             for l in v["lines"]:
@@ -112,6 +136,12 @@ def load():
                 if g < MIN_GAMES:
                     continue
                 main = max(top, key=lambda l: l["games"])
+                # parties au dernier split de la saison (banc en fin de saison : Lot, Humanoid 2026)
+                last = final.get((s, main["league_code"]))
+                last_games = sum(e["games"] for e in v.get("evolution", [])
+                                 if e["season"] == s and e["tier"] == "LEC" and last and e["tournament"].startswith(last))
+                k = (region, s, main["team"])
+                team_last[k] = max(team_last.get(k, 0), last_games)
                 low = [l for l in ls if l["tier"] in ("ERL1", "ERL2")]
                 prev = sum(1 for ss, lls in by.items() if ss < s and sum(l["games"] for l in lls if l["tier"] == "LEC") >= MIN_GAMES)
                 rec = {"region": region, "id": pid, "name": v["name"], "country": v.get("country"),
@@ -119,7 +149,7 @@ def load():
                        "winrate": sum(l["games"] * l["winrate"] for l in top) / g,
                        "low_games": sum(l["games"] for l in low), "prev_seasons": prev,
                        "age": season_age(v.get("birthdate"), s) if not v.get("age_approx") else np.nan,
-                       "first_season": min(by)}
+                       "first_season": min(by), "last_games": last_games}
                 for st in STATS:
                     rec[st] = main.get(st)
                 rows.append(rec)
@@ -128,6 +158,7 @@ def load():
     d = d.sort_values("games", ascending=False).drop_duplicates(["season", "name", "role"]).reset_index(drop=True)
     tg = [team_games.get((r, s, t), (np.nan, np.nan)) for r, s, t in zip(d["region"], d["season"], d["team"])]
     d["team_games"] = [x[0] for x in tg]
+    d["team_last"] = [team_last.get((r, s, t), 0) for r, s, t in zip(d["region"], d["season"], d["team"])]
     d["team_wr"] = [x[1] for x in tg]
     d["score_top"] = [rank_rows.get((r, i, s, "LEC"), {}).get("final") for r, i, s in zip(d["region"], d["id"], d["season"])]
     low_rows = [rank_rows.get((r, i, s, "ERL1")) or rank_rows.get((r, i, s, "ERL2")) for r, i, s in zip(d["region"], d["id"], d["season"])]
@@ -142,6 +173,8 @@ def features(d, with_stats=True):
     X = pd.DataFrame(index=d.index)
     share = (d["games"] / d["team_games"]).clip(0, 1).fillna(0.5)
     X["Titulaire (part des parties)"] = share
+    # Joué au dernier split : part des parties de son équipe au dernier split (0 = sur le banc à la fin)
+    X["Titulaire au dernier split"] = (d["last_games"] / d["team_last"].where(d["team_last"] > 0)).clip(0, 1).fillna(share)
     X["Win rate de l'équipe"] = (d["team_wr"].fillna(0.5) - 0.5)
     X["Win rate vs son équipe"] = (d["winrate"] - d["team_wr"].fillna(d["winrate"])).clip(-0.4, 0.4)
     sc = d["score_top"].astype(float)
@@ -179,6 +212,10 @@ def explain(name, r, x, c):
     if name == "Titulaire (part des parties)":
         pct = round(100 * x)
         return f"Titulaire ({pct} % des parties de l'équipe)" if up else f"Peu utilisé ({pct} % des parties de l'équipe)"
+    if name == "Titulaire au dernier split":
+        if up:
+            return "Titulaire jusqu'au bout de la saison"
+        return "Sur le banc au dernier split" if x < 0.15 else f"Peu joué au dernier split ({round(100 * x)} % des parties)"
     if name == "Win rate de l'équipe":
         return f"Équipe qui gagne ({round(100 * (x + 0.5))} %)" if up else f"Équipe en difficulté ({round(100 * (x + 0.5))} % de victoires)"
     if name == "Win rate vs son équipe":

@@ -37,7 +37,7 @@ export default function StayModelView({ region }: { region: Region }) {
           prochaine, ici ou dans une autre région. {rate ? `En moyenne ${pct(rate.rate)} y restent` : ""}
           {rate?.mid_season != null ? `, ${pct(rate.mid_season)} des montés en cours de saison` : ""}. Fiabilité : AUC{" "}
           {v.auc.toFixed(2)} en validation, {model.forward.auc.toFixed(2)} en test sur {model.validated_on[model.validated_on.length - 1]}{" "}
-          (taux moyen seul {model.baseline.auc.toFixed(2)}). Ce qui compte le plus : la place de titulaire, les résultats de
+          (taux moyen seul {model.baseline.auc.toFixed(2)}). Ce qui compte le plus : la place de titulaire (surtout au dernier split), les résultats de
           l&apos;équipe, le score en 1re division, l&apos;expérience et l&apos;âge. Les 5 places les plus menacées de chaque poste :
         </p>
       </div>

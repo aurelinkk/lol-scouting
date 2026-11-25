@@ -379,7 +379,7 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                       rate.mid_season !== null ? ` (${Math.round(rate.mid_season * 100)} % pour les montés en cours de saison)` : ""
                     }. `
                   : ""}
-                {stay.model} appris sur les saisons {stay.trained_on.join(", ")} des six régions (place de titulaire, résultats de
+                {stay.model} appris sur les saisons {stay.trained_on.join(", ")} des six régions (place de titulaire, banc au dernier split, résultats de
                 l&apos;équipe, score en 1re division, expérience, âge, montée en cours de saison, import) ; fiabilité dans
                 l&apos;onglet{" "}
                 <Link href={link(region, "/montees")} className="text-accent hover:underline">

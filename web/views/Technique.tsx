@@ -245,7 +245,7 @@ One-hot poste (4) et région (5), interactions rang × poste (4)`}</F>
         <Block title="Modèle de maintien (model/stay_model.py)">
           <F>{`Joueurs : au moins 5 parties de 1re division dans la saison (titulaires, remplaçants, montés en cours de saison)
 Cible : au moins 3 parties de 1re division la saison suivante, n'importe quelle région (pseudo + poste)
-Variables : part des parties de l'équipe, win rate de l'équipe et écart du joueur, score en 1re division,
+Variables : part des parties de l'équipe (saison et dernier split : banc en fin de saison), win rate de l'équipe et écart du joueur, score en 1re division,
 saisons déjà passées en 1re division, montée en cours de saison, parties, international, âge, âge², import,
 poste et région (one-hot)${m.stay.with_stats ? ", stats clés (z-scores par poste)" : ""}
 ${m.stay.model}, λ = ${m.stay.lambda}, saisons 2020-2022 pondérées ${m.stay.old_weight}
