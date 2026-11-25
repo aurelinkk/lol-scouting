@@ -146,6 +146,15 @@ export default function DataExplorer({
       .catch(() => {});
   }, [region, mercatoGenerated]);
   const signed = liveSigned ?? publishedSigned;
+  // Chances corrigées par le mercato en cours (places libres, signatures) : /api/chances
+  const [liveChance, setLiveChance] = useState<{ up: Record<string, [number, string]>; stay: Record<string, [number, string]> } | null>(null);
+  useEffect(() => {
+    if (!isCurrent) return;
+    fetch(`/api/chances?region=${region}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.up && setLiveChance({ up: d.up, stay: d.stay }))
+      .catch(() => {});
+  }, [region, isCurrent]);
   const watch = useWatchlist(region);
   const [noteFor, setNoteFor] = useState<{ id: string; name: string; note?: string } | null>(null);
 
@@ -454,6 +463,33 @@ export default function DataExplorer({
           );
         },
       });
+    if (isCurrent && liveChance)
+      cols.push({
+        id: "promo_live",
+        header: "Montée direct",
+        accessorFn: (r) => liveChance.up[r.id]?.[0],
+        sortUndefined: "last",
+        sortDescFirst: true,
+        meta: {
+          align: "right",
+          group: "score",
+          title: `En direct : chance de montée corrigée par le mercato en cours (places encore libres en 1re division dans les régions où vont les joueurs comme lui, places d'import, signatures et rumeurs). La colonne Montée est la chance du profil seul, comme au début du mercato.`,
+        } satisfies Meta,
+        cell: ({ row, getValue }) => {
+          const v = getValue() as number | undefined;
+          if (v === undefined) return <span className="text-ink-3">–</span>;
+          const pct = Math.round(v * 100);
+          return (
+            <span
+              className="inline-block min-w-10 rounded border px-1 text-xs font-semibold tabular-nums"
+              style={{ borderColor: `color-mix(in srgb, var(--gold) 60%, transparent)`, color: v >= 0.3 ? "var(--text)" : "var(--text-2)" }}
+              title={liveChance.up[row.original.id]?.[1]}
+            >
+              {pct < 1 ? "<1" : pct} %
+            </span>
+          );
+        },
+      });
     if (isCurrent && Object.keys(stayChance).length)
       cols.push({
         id: "stay",
@@ -478,6 +514,33 @@ export default function DataExplorer({
                 color: v >= 0.5 ? "var(--text)" : "var(--text-2)",
               }}
               title={v < 0.5 ? "Place en 1re division menacée" : undefined}
+            >
+              {pct < 1 ? "<1" : pct} %
+            </span>
+          );
+        },
+      });
+    if (isCurrent && liveChance)
+      cols.push({
+        id: "stay_live",
+        header: "Reste direct",
+        accessorFn: (r) => liveChance.stay[r.id]?.[0],
+        sortUndefined: "last",
+        sortDescFirst: true,
+        meta: {
+          align: "right",
+          group: "score",
+          title: `En direct : chance de rester en 1re division corrigée par le mercato en cours (déjà prolongé ou signé : 100 % ; agent libre : selon les places encore libres). La colonne Reste est la chance du profil seul.`,
+        } satisfies Meta,
+        cell: ({ row, getValue }) => {
+          const v = getValue() as number | undefined;
+          if (v === undefined) return <span className="text-ink-3">–</span>;
+          const pct = Math.round(v * 100);
+          return (
+            <span
+              className="inline-block min-w-10 rounded border px-1 text-xs font-semibold tabular-nums"
+              style={{ borderColor: `color-mix(in srgb, var(--accent) 60%, transparent)`, color: v >= 0.3 ? "var(--text)" : "var(--text-2)" }}
+              title={liveChance.stay[row.original.id]?.[1]}
             >
               {pct < 1 ? "<1" : pct} %
             </span>
@@ -513,7 +576,7 @@ export default function DataExplorer({
     return cols;
     // renderPlayer / renderClub lisent watch, promoOf... : recréées avec eux
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCurrent, season, region, hasContracts, contracts, f.sansniveau, f.lec, hasTrend, R, hasOe, watch.list, promoOf, signedOf, promotionChance, stayChance]);
+  }, [isCurrent, season, region, hasContracts, contracts, f.sansniveau, f.lec, hasTrend, R, hasOe, watch.list, promoOf, signedOf, promotionChance, stayChance, liveChance]);
 
   // Colonnes affichées : choix mémorisé dans ce navigateur
   const [visibility, setVisibility] = useState<VisibilityState>({});

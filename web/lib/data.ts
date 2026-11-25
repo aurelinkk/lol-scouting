@@ -106,6 +106,11 @@ export interface PromotionModel {
   tier2?: PromotionModel;
   /** Maintien : joueurs de 1re division encore en 1re division la saison suivante */
   stay?: StayModel;
+  /** Historique du marché : destinations (région|origine|niveau -> part par région) et rotation par poste */
+  market?: {
+    destinations: Record<string, { n: number; to: Partial<Record<Region, number>> }>;
+    rotation: Partial<Record<Region, Record<string, number>>>;
+  };
 }
 export interface StayMetrics { n: number; stayed: number; auc: number; logloss: number; brier: number }
 export interface StayModel {

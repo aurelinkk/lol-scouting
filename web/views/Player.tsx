@@ -14,6 +14,7 @@ import { fmtScore, topPercent } from "@/lib/format";
 import { similarPlayers } from "@/lib/similar";
 import { similarTrajectories } from "@/lib/trajectory";
 import TrajectoryChart from "@/components/TrajectoryChart";
+import LiveChance from "@/components/LiveChance";
 import { WORLD, worldOffset, worldScore } from "@/lib/world";
 
 // Pages pré-générées pour les joueurs classés ; les autres sont générées à la demande
@@ -216,6 +217,8 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                     {c.official.league ? ` (${c.official.league})` : ""}
                   </div>
                 )}
+                <div className="text-[11px] text-ink-3">profil seul, comme au début du mercato</div>
+                <LiveChance region={region} id={id} kind="up" />
               </div>
               <div className="min-w-60 flex-1">
                 <div className="mb-1 text-[11px] uppercase tracking-wide text-ink-3">Ce qui pèse le plus</div>
@@ -359,6 +362,8 @@ export default function PlayerView({ id, region }: { id: string; region: Region 
                     {leaving.official ? "" : " (rumeur)"} · pas encore de nouveau club connu
                   </div>
                 ) : null}
+                <div className="text-[11px] text-ink-3">profil seul, comme au début du mercato</div>
+                <LiveChance region={region} id={id} kind="stay" />
               </div>
               <div className="min-w-60 flex-1">
                 <div className="mb-1 text-[11px] uppercase tracking-wide text-ink-3">Ce qui pèse le plus</div>

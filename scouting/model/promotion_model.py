@@ -780,6 +780,12 @@ def main(verbose=False):
         data["stay"] = stay_model.build(verbose)
     except Exception as e:
         print(f"  (modèle de maintien non calculé : {e})")
+    # Historique du marché (destinations, rotation) : chances « en direct » du site
+    try:
+        from scouting.model import market
+        data["market"] = market.build()
+    except Exception as e:
+        print(f"  (historique du marché non calculé : {e})")
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"  -> {OUT}")

@@ -241,6 +241,19 @@ One-hot poste (4) et région (5), interactions rang × poste (4)`}</F>
         </div>
       </Block>
 
+      {m.market && (
+        <Block title="Chances en direct (model/market.py + lib/mercato/chances.ts)">
+          <F>{`direct = chance du modèle × Σ régions [ part des destinations × min(1, places libres / rotation) ]
+Part des destinations : historique 2020-2025 des joueurs qui décrochent une place en 1re division,
+  selon leur région et leur origine (résident, ou import KR / LPL / EMEA / AMER / LCP)
+Places libres : postes de 1re division sans joueur prévu au même poste (une place prise par une rumeur
+  compte pour 0,25) ; pour un non-résident, seulement les équipes qui ont encore une place d'import
+Rotation : places qui changent de titulaire une année normale (moyenne 2023-2026, par région et par poste)
+Signature officielle en 1re division ou prolongation : 100 % · en division inférieure : 2 %
+Rumeur en 1re division : au moins 70 % · mercato en ligne relu toutes les heures, chances toutes les 10 min`}</F>
+        </Block>
+      )}
+
       {m.stay && (
         <Block title="Modèle de maintien (model/stay_model.py)">
           <F>{`Joueurs : au moins 5 parties de 1re division dans la saison (titulaires, remplaçants, montés en cours de saison)
