@@ -48,6 +48,8 @@ RECENT_FROM = 2023
 OLD_WEIGHTS = [0.0, 0.25, 0.5, 1.0]
 STATS = ["kda", "kp", "dpm", "cs_min", "gd15", "csd15", "xpd15", "vision_min", "deaths_pg"]
 LOWER_IS_BETTER = {"deaths_pg"}
+# Ligues entièrement composées d'équipes réserves de la 1re division
+ACADEMY_LEAGUES = {"NAAC", "CBLA"}
 
 AMER = {"United States", "Canada", "Mexico", "Brazil", "Argentina", "Chile", "Peru", "Colombia", "Uruguay",
         "Venezuela", "Ecuador", "Bolivia", "Paraguay", "Costa Rica", "Panama", "Guatemala", "Honduras",
@@ -251,6 +253,12 @@ def features(d, with_stats=True):
     X["Âge inconnu"] = age.isna().astype(float)
     X["Expérience (parties)"] = np.log1p(d["games"]) - math.log(40)
     X["Niveau de la ligue (à score égal)"] = zscore(d.assign(c=d["league_coef"].fillna(d["league_coef"].median())), "c", ["region", "season"])
+    # Ligue sans historique dans sa région (LRN, rattachée à la NA en 2026 ; avant, au
+    # Brésil) : rien ne dit comment ses joueurs montent ici, niveau relatif neutralisé
+    # (sinon le modèle l'assimile aux ligues réserves, où les meilleurs montent tous)
+    first = d.groupby(["region", "league_code"])["season"].transform("min")
+    X.loc[(first == d["season"].max()).to_numpy() & (d["season"] == d["season"].max()).to_numpy(),
+          "Niveau de la ligue (à score égal)"] = 0.0
     X["3e division"] = (d["tier"] == "ERL2").astype(float)
     X["Ancien de 1re division"] = d["ex_lec"].notna().astype(float)
     X["EMEA Masters / international"] = ((d["em_games"].fillna(0) > 0) | (d["intl_games"].fillna(0) > 0)).astype(float)
@@ -258,7 +266,11 @@ def features(d, with_stats=True):
     X["Import"] = [float(not resident(n, c, r)) for n, c, r in zip(d["name"], d["country"], d["region"])]
     # Académie : seulement en Corée et en Chine, où elle mène vraiment à l'équipe
     # mère (en Europe, les joueurs de KC Blue montent souvent, mais ailleurs qu'à KC)
-    X["Académie d'un club de 1re division"] = (d["academy"] & d["region"].isin(["kr", "cn"])).astype(float)
+    # NA Academy (NAAC, 2020-2022) et CBLOL Academy : ligues des équipes réserves, montées par
+    # appel du club mère. Sans ce marqueur, le modèle croyait qu'en NA une ligue plus
+    # faible que la NACL fait monter davantage, et surcotait la LRN rattachée à la NA en 2026
+    X["Académie d'un club de 1re division"] = ((d["academy"] & d["region"].isin(["kr", "cn"]))
+                                               | d["league_code"].isin(ACADEMY_LEAGUES)).astype(float)
     if with_stats:
         for s in STATS:
             if s not in d:
