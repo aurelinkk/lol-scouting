@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { isStale } from "@/lib/mercato/stale";
 import { useWatchlist } from "@/lib/useWatchlist";
 import { RefreshCwIcon } from "lucide-react";
+import { useLiveMercato, useSeenNews } from "@/lib/mercato/useLive";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -304,13 +304,6 @@ interface LiveChange {
   league?: string;
   team?: string;
 }
-interface Live {
-  updatedAt: number;
-  since: string;
-  mercato: { teams: MercatoTeam[]; undecided?: { player: string; id?: string; options: string[] }[]; generated?: string };
-  changes: LiveChange[];
-}
-
 function ago(ms: number) {
   const min = Math.round((Date.now() - ms) / 60000);
   if (min < 1) return "à l'instant";
@@ -335,44 +328,12 @@ export default function MercatoBoard({
   generated?: string;
 }) {
   const region = useRegion();
-  const [live, setLive] = useState<Live | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Version rafraîchie en ligne, seulement si elle part du mercato publié actuel
-  const usable = live && live.mercato.generated === generated ? live : null;
+  // Mercato en direct : dernière version vue, puis version partagée, mise à jour en arrière-plan
+  const { live: usable, loading, auto, error, refresh } = useLiveMercato(region, generated);
   const teams = usable?.mercato.teams ?? baseTeams;
   const undecided = usable?.mercato.undecided ?? baseUndecided;
-
-  const [auto, setAuto] = useState(false);
-  useEffect(() => {
-    fetch(`/api/mercato?region=${region}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.live) setLive(d.live);
-        // Mise à jour automatique si la dernière recherche date de plus de 20 min
-        if (isStale(d?.live, generated)) {
-          setAuto(true);
-          refresh().finally(() => setAuto(false));
-        }
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [region, generated]);
-
-  async function refresh() {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch(`/api/mercato?region=${region}`, { method: "POST" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
-      if (d.live) setLive(d.live);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Nouveautés déjà vues dans ce navigateur : seules les autres restent en gras
+  const { seen: seenNews, markSeen } = useSeenNews(region);
   const top = REGION_INFO[region].top;
   const leagues = useMemo(() => {
     // 1re division, puis 2e, puis 3e (LCK AS) ; ordre alphabétique dans une division
@@ -390,7 +351,7 @@ export default function MercatoBoard({
   const leagueNews = useMemo(() => {
     const leagueOf = (c: LiveChange) =>
       c.league ?? teams.find((t) => c.text.includes(t.team))?.league;
-    const fresh = (usable?.changes ?? []).map((c) => ({ ...c, fresh: true }));
+    const fresh = (usable?.changes ?? []).map((c) => ({ ...c, fresh: !!seenNews && !seenNews.has(`${c.date}|${c.text}`) }));
     const seen = new Set<string>();
     return [...fresh, ...baseNews.map((c) => ({ ...c, fresh: false }))]
       .filter((c) => leagueOf(c) === league)
@@ -401,7 +362,11 @@ export default function MercatoBoard({
         return true;
       })
       .sort((a, b) => b.date.localeCompare(a.date) || +b.fresh - +a.fresh);
-  }, [usable, baseNews, league, teams]);
+  }, [usable, baseNews, league, teams, seenNews]);
+  // Les nouveautés affichées comptent comme vues (en gras jusqu'à la prochaine visite)
+  useEffect(() => {
+    if (usable?.changes.length) markSeen(usable.changes.map((c) => `${c.date}|${c.text}`));
+  }, [usable, markSeen]);
 
   // News des joueurs suivis (⭐), toutes ligues, en tête du panneau
   const watch = useWatchlist(region);
@@ -409,7 +374,7 @@ export default function MercatoBoard({
     const names = Object.values(watch.list).map((w) => w.name);
     if (!names.length) return [];
     const seen = new Set<string>();
-    return [...(usable?.changes ?? []).map((c) => ({ ...c, fresh: true })), ...baseNews.map((c) => ({ ...c, fresh: false }))]
+    return [...(usable?.changes ?? []).map((c) => ({ ...c, fresh: !!seenNews && !seenNews.has(`${c.date}|${c.text}`) })), ...baseNews.map((c) => ({ ...c, fresh: false }))]
       .filter((c) => names.some((n) => mentions(c.text, n)))
       .filter((c) => {
         const key = `${c.date}|${c.text}`;
@@ -418,7 +383,7 @@ export default function MercatoBoard({
         return true;
       })
       .sort((a, b) => b.date.localeCompare(a.date) || +b.fresh - +a.fresh);
-  }, [watch.list, usable, baseNews]);
+  }, [watch.list, usable, baseNews, seenNews]);
 
   return (
     <div className="space-y-3">
@@ -439,7 +404,7 @@ export default function MercatoBoard({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 card px-3 py-2 text-xs">
-        <Button variant="soft" size="lg" onClick={refresh} disabled={loading}>
+        <Button variant="soft" size="lg" onClick={() => refresh()} disabled={loading}>
           <RefreshCwIcon className={loading ? "animate-spin" : ""} />
           {loading ? (auto ? "Mise à jour automatique…" : "Recherche des nouveautés…") : "Actualiser le mercato"}
         </Button>
@@ -455,8 +420,8 @@ export default function MercatoBoard({
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
         <div
-          className={`relative grid flex-1 gap-3 transition-opacity sm:grid-cols-2 xl:grid-cols-3 ${loading ? "pointer-events-none opacity-50" : ""}`}
-          aria-busy={loading}
+          className={`relative grid flex-1 gap-3 transition-opacity sm:grid-cols-2 xl:grid-cols-3 ${loading && !auto ? "pointer-events-none opacity-50" : ""}`}
+          aria-busy={loading && !auto}
         >
           {shown.map((t) => (
             <TeamCard key={t.team} t={t} season={season} />
@@ -521,7 +486,7 @@ export default function MercatoBoard({
               </ul>
               <p className="mt-1.5 text-[11px] text-ink-3">
                 ● officiel · ○ rumeur
-                {leagueNews.some((c) => c.fresh) && " · en gras et cases entourées : depuis l'export"}
+                {leagueNews.some((c) => c.fresh) && " · en gras : nouveau depuis ta dernière visite"}
               </p>
             </div>
           )}

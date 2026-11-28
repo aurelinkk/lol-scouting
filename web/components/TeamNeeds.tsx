@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Avatar, TeamLogo } from "./Images";
 import { IMPORT_LIMIT, MAX_AGE } from "@/lib/needs";
 import { ChevronDownIcon } from "lucide-react";
@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { MercatoSlot, MercatoTeam } from "./MercatoBoard";
 import { fmtScore } from "@/lib/format";
 import { contractsFromMercato, signedFromMercato } from "@/lib/mercato/signed";
-import { isStale } from "@/lib/mercato/stale";
+import { useLiveMercato } from "@/lib/mercato/useLive";
 import { isResident, originLabel, originOf } from "@/lib/origin";
 import { playerLink, type Region, REGION_INFO, teamLink } from "@/lib/region";
 
@@ -77,23 +77,8 @@ export default function TeamNeeds({
   const limit = IMPORT_LIMIT[region];
 
   // Mercato rafraîchi en ligne (même logique que Rosters / Données)
-  const [liveTeams, setLiveTeams] = useState<MercatoTeam[] | null>(null);
-  useEffect(() => {
-    type Live = { mercato: { generated?: string; teams: MercatoTeam[] }; updatedAt: number };
-    const use = (d: { live?: Live } | null) => {
-      if (d?.live && d.live.mercato.generated === generated) setLiveTeams(d.live.mercato.teams);
-    };
-    fetch(`/api/mercato?region=${region}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        use(d);
-        if (generated && isStale(d?.live, generated))
-          return fetch(`/api/mercato?region=${region}`, { method: "POST" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then(use);
-      })
-      .catch(() => {});
-  }, [region, generated]);
+  const { live } = useLiveMercato(region, generated);
+  const liveTeams = live?.mercato.teams ?? null;
 
   const all = liveTeams ?? baseTeams;
   const signed = useMemo(() => signedFromMercato(all, region), [all, region]);

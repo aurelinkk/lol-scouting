@@ -26,7 +26,7 @@ import { playerLink, publicData, REGION_INFO, teamLink, tierName } from "@/lib/r
 import { withCurrentAge } from "@/lib/age";
 import { useRegion } from "@/lib/useRegion";
 import { type ContractEnd, mergeSigned, type Signed, signedFromMercato } from "@/lib/mercato/signed";
-import { isStale } from "@/lib/mercato/stale";
+import { useLiveMercato } from "@/lib/mercato/useLive";
 import { isResident, ORIGINS, originLabel, originOf } from "@/lib/origin";
 import { useWatchlist } from "@/lib/useWatchlist";
 
@@ -131,23 +131,11 @@ export default function DataExplorer({
   }, [search, f.q, setF]);
 
   // ---- Mercato en direct (même source que Rosters) -----------------------
-  const [liveSigned, setLiveSigned] = useState<Record<string, Signed> | null>(null);
-  useEffect(() => {
-    const use = (d: { live?: { mercato: { generated?: string; teams: never[] } } } | null) => {
-      if (d?.live && d.live.mercato.generated === mercatoGenerated)
-        setLiveSigned(mergeSigned(signedFromMercato(d.live.mercato.teams, region), signedAbroad));
-    };
-    fetch(`/api/mercato?region=${region}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        use(d);
-        if (mercatoGenerated && isStale(d?.live, mercatoGenerated))
-          return fetch(`/api/mercato?region=${region}`, { method: "POST" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then(use);
-      })
-      .catch(() => {});
-  }, [region, mercatoGenerated, signedAbroad]);
+  const { live: liveMercato } = useLiveMercato(region, mercatoGenerated);
+  const liveSigned = useMemo(
+    () => (liveMercato ? mergeSigned(signedFromMercato(liveMercato.mercato.teams, region), signedAbroad) : null),
+    [liveMercato, region, signedAbroad],
+  );
   const signed = liveSigned ?? publishedSigned;
   // Chances corrigées par le mercato en cours (places libres, signatures) : /api/chances
   const [liveChance, setLiveChance] = useState<{ up: Record<string, [number, string]>; stay: Record<string, [number, string]> } | null>(null);
